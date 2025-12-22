@@ -19,7 +19,6 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-// 任务类型
 export type QuestType = 'search' | 'hunt' | 'challenge' | 'train' | 'life';
 
 export type Quest = {
@@ -30,7 +29,6 @@ export type Quest = {
   total: number;
 };
 
-// 宠物结构
 export type Pet = {
   name: string;
   type: string;
@@ -45,17 +43,9 @@ export type HeroState = {
   age: number;
   personality: string;
   title: string;
-  
-  // Lv.3 解锁
   motto: string;
-  
-  // 神力值
   godPower: number;
-  
-  // 解锁功能列表
   unlockedFeatures: string[];
-
-  // Lv.5 解锁
   pet: Pet | null;
 
   attributes: {
@@ -69,14 +59,14 @@ export type HeroState = {
   hp: number; maxHp: number;
   exp: number; maxExp: number;
   gold: number;
-  alignment: number; // 善恶值
+  alignment: number;
   currentQuest: Quest;
   
   location: string;
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   
   logs: LogEntry[];
-  majorEvents: string[];
+  majorEvents: string[]; // 大事记
   inventory: Item[];
   equipment: Equipment;
   skills: Skill[];
@@ -102,12 +92,10 @@ export type LogEntry = {
   time: string;
 };
 
-// 性格库
 export const PERSONALITIES = [
   "侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "社恐"
 ];
 
-// 宠物库 (纯正武侠风)
 export const PET_TEMPLATES = [
   { type: "神雕", desc: "羽毛如铁，力大无穷，似乎曾陪伴过某位独臂大侠隐居深谷。" },
   { type: "闪电貂", desc: "体型娇小，动作如电，极具灵性，专咬敌人手指，剧毒无比。" },
@@ -120,21 +108,28 @@ export const PET_TEMPLATES = [
   { type: "大黄", desc: "虽然只是一条普通的中华田园犬，但忠诚护主，从未退缩。" }
 ];
 
-// 竞技场对手 (补充)
 export const ARENA_OPPONENTS = [
   "少林铜人", "峨眉师太", "全真道士", "丐帮八袋长老", "魔教左护法", "只会一招的菜鸟", "隐世扫地僧", "金兵百夫长"
 ];
 
-// 任务模板
+// 地点库 (关联任务类型)
+export const MAP_LOCATIONS = {
+  common: ["荒野古道", "龙门客栈", "十里坡", "风陵渡口"],
+  search: ["楼兰废墟", "剑冢", "绝情谷底", "桃花岛"],
+  hunt:   ["黑风寨", "万兽山庄", "五毒教总坛", "快活林"],
+  challenge: ["光明顶", "紫禁之巅", "华山栈道", "聚贤庄"],
+  train:  ["少林藏经阁", "活死人墓寒玉床", "思过崖", "达摩洞"],
+  life:   ["扬州丽春院", "汴京御街", "牛家村", "七侠镇"]
+};
+
 export const QUEST_SOURCES = {
   search: ["寻找失传的《易筋经》残卷", "探寻楼兰古国的宝藏线索", "搜集打造屠龙刀的玄铁", "寻找传说中的天山雪莲"],
   hunt:   ["讨伐黑风寨的土匪首领", "清理后山的吊睛白额虎", "追捕采花大盗‘万里独行’", "消灭为祸一方的五毒教徒"],
   challenge: ["挑战华山派大弟子", "去少林寺闯十八铜人阵", "与丐帮长老比拼酒量", "参加武林大会争夺盟主"],
   train:  ["在寒玉床上修炼内功", "在瀑布下练习拔剑一万次", "在梅花桩上练习轻功", "背诵艰涩难懂的武功心法"],
-  life:   ["帮隔壁王大妈寻找走失的鸭子", "去集市摆摊卖艺赚盘缠", "帮村长修补漏雨的屋顶", "为心上人描眉画画"]
+  life:   ["帮隔壁王大妈寻找走失的鸭子", "去集市摆摊卖艺赚盘缠", "帮村长修补屋顶", "为心上人描眉画画"]
 };
 
-// 掉落表
 export const LOOT_TABLE: Partial<Item>[] = [
   { name: "半个冷馒头", type: 'misc', desc: "硬得像石头，但能填饱肚子。", price: 1 },
   { name: "女儿红", type: 'misc', desc: "陈年好酒，喝一口精神百倍。", price: 20 },
@@ -151,35 +146,8 @@ export const LOOT_TABLE: Partial<Item>[] = [
 ];
 
 export const STATIC_LOGS = {
-  idle: [
-    "微风拂过，路边的狗尾巴草挠得少侠鼻子发痒。",
-    "少侠停下脚步，抖了抖鞋里的沙子，顺便看了一眼远处的青山。",
-    "路过一片竹林，少侠试图用剑劈开落叶，结果差点扭了腰。",
-    "肚子咕咕叫了一声，少侠摸出半个冷馒头啃了起来。",
-    "远处传来几声鸦啼，江湖路远，少侠紧了紧背后的包袱。",
-    "遇到一个算命瞎子，非说少侠印堂发黑，少侠没理他。",
-    "天色渐暗，路边的野花倒是开得正好。",
-    "少侠对着空气挥了一拳，假装打败了东方不败。",
-    "踩到了一坨看起来很像黄金的牛粪，少侠叹了口气。",
-    "忽然想起出门忘了关窗户，少侠懊恼不已。",
-    "路边的茶棚里，几个脚夫正在吹嘘自己见过郭靖。",
-  ],
-  fight: [
-    "那毛贼不知死活，挥舞着生锈的片刀冲了上来。",
-    "少侠侧身一闪，脚下使了个绊子，那恶霸便摔了个狗吃屎。",
-    "剑光一闪！少侠并未拔剑，仅用剑鞘便点中了对方的麻穴。",
-    "对方使出一招'黑虎掏心'，少侠冷笑一声，反手一掌将其击退。",
-    "一番缠斗，少侠衣衫虽有些凌乱，但眼神却愈发锐利。",
-  ],
-  town: [
-    "路过一个小镇，少侠决定去集市把背包里的垃圾卖掉。",
-    "酒馆里人声鼎沸，少侠进去叫了一斤熟牛肉，二两烧刀子。",
-    "在当铺里，掌柜的拿着放大镜仔细端详少侠捡来的破烂。",
-  ],
-  arena: [
-    "观众席传来阵阵欢呼，似乎有人押了少侠赢。",
-    "对手露出了破绽，少侠犹豫了一下要不要攻其要害。",
-    "这一招'亢龙有悔'险些没躲过，少侠惊出了一身冷汗。",
-    "双方内力比拼，头顶冒出了丝丝白气。",
-  ]
+  idle: ["微风拂过。", "发了一会儿呆。", "路边的狗尾巴草挠得心里痒痒的。", "抬头看了看天上的流云。"],
+  fight: ["你来我往，好不热闹。", "刀光剑影，招招致命。", "险象环生，还好躲得快。", "使出一招'白鹤亮翅'。"],
+  town: ["集市热闹非凡。", "闻到了酒香，走不动道了。", "路人行色匆匆。", "听说最近猪肉又涨价了。"],
+  arena: ["观众席传来阵阵欢呼。", "对手露出了破绽。", "这一招险些没躲过。", "双方内力比拼，头顶冒出白气。"]
 };

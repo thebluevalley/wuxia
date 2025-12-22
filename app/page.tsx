@@ -20,7 +20,6 @@ export default function Home() {
         <div className="z-10 flex flex-col items-center">
           <div className="w-20 h-20 border-4 border-stone-800 rounded-full flex items-center justify-center mb-6 shadow-lg bg-white"><span className="font-serif text-4xl font-bold">侠</span></div>
           <h1 className="text-4xl font-serif font-bold mb-2 tracking-[0.5em] text-stone-900">云游江湖</h1>
-          <p className="text-stone-500 text-sm mb-12 font-serif tracking-widest">一剑 · 一酒 · 一江湖</p>
           <input type="text" placeholder="请赐道号" className="w-64 bg-transparent border-b-2 border-stone-300 p-2 text-center text-xl outline-none focus:border-stone-800 transition-colors mb-8 font-serif placeholder:text-stone-300" value={inputName} onChange={e => setInputName(e.target.value)} />
           <button onClick={() => inputName && login(inputName)} disabled={loading} className="px-8 py-3 bg-stone-800 text-[#fcf9f2] font-serif text-lg rounded shadow-lg hover:bg-stone-700 active:scale-95 transition-all">{loading ? '墨研中...' : '入世修行'}</button>
         </div>
@@ -28,7 +27,7 @@ export default function Home() {
     );
   }
 
-  // --- Header ---
+  // Header 区域
   const Header = () => (
     <header className="p-4 pb-2 flex-none z-10 bg-[#fcf9f2]/90 backdrop-blur-sm border-b border-stone-200">
       <div className="flex justify-between items-start mb-3">
@@ -42,34 +41,25 @@ export default function Home() {
             <span className="flex items-center gap-1"><MapPin size={10}/> {hero.location}</span>
           </div>
         </div>
-        
-        {/* 神力条 */}
         <div className="flex flex-col items-end gap-1">
-           <div className="flex items-center gap-1 text-amber-600 font-bold text-xs">
-              <Zap size={12} fill="currentColor"/> {Math.floor(hero.godPower)}%
-           </div>
-           <div className="w-16 h-1.5 bg-stone-200 rounded-full overflow-hidden">
-              <div className="h-full bg-amber-500 transition-all duration-500" style={{width: `${hero.godPower}%`}}></div>
-           </div>
+           <div className="flex items-center gap-1 text-amber-600 font-bold text-xs"><Zap size={12} fill="currentColor"/> {Math.floor(hero.godPower)}%</div>
+           <div className="w-16 h-1.5 bg-stone-200 rounded-full overflow-hidden"><div className="h-full bg-amber-500 transition-all duration-500" style={{width: `${hero.godPower}%`}}></div></div>
         </div>
       </div>
-      
-      {/* 任务条 */}
       <div className="bg-white border border-stone-200 rounded p-2 shadow-sm flex flex-col gap-1 mb-2">
          <div className="flex justify-between text-[10px] text-stone-500">
-            <span className="flex items-center gap-1 font-bold text-stone-700 truncate max-w-[200px]">
-              <Target size={10} className="text-amber-600 shrink-0"/> {hero.currentQuest.name}
-            </span>
+            <span className="flex items-center gap-1 font-bold text-stone-700 truncate max-w-[200px]"><Target size={10} className="text-amber-600 shrink-0"/> {hero.currentQuest.name}</span>
             <span className="font-mono">{hero.currentQuest.progress}%</span>
          </div>
-         <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden">
-            <div className="h-full bg-amber-500 transition-all duration-700 rounded-full" style={{ width: `${hero.currentQuest.progress}%` }} />
-         </div>
+         <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-amber-500 transition-all duration-700 rounded-full" style={{ width: `${hero.currentQuest.progress}%` }} /></div>
+      </div>
+      <div className="space-y-1">
+        <div className="h-[2px] w-full bg-stone-200 rounded-full"><div className="h-full bg-stone-800 transition-all duration-500 rounded-full" style={{ width: `${(hero.hp / hero.maxHp) * 100}%` }} /></div>
       </div>
     </header>
   );
 
-  // --- 1. 江湖日志 ---
+  // 日志视图
   const LogsView = () => (
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-4 scroll-smooth">
@@ -86,19 +76,11 @@ export default function Home() {
       </div>
       <div className="p-4 bg-gradient-to-t from-[#fcf9f2] via-[#fcf9f2] to-transparent">
          <div className="flex justify-between gap-4">
-          <button 
-            onClick={() => godAction('punish')} 
-            disabled={hero.godPower < 25}
-            className="flex-1 h-12 border border-stone-200 rounded flex flex-col items-center justify-center gap-0 text-stone-600 hover:bg-stone-100 active:scale-95 bg-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed group"
-          >
+          <button onClick={() => godAction('punish')} disabled={hero.godPower < 25} className="flex-1 h-12 border border-stone-200 rounded flex flex-col items-center justify-center gap-0 text-stone-600 hover:bg-stone-100 active:scale-95 bg-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed group">
             <span className="flex items-center gap-1 text-sm font-bold group-hover:text-red-800"><Zap size={14} /> 天罚</span>
             <span className="text-[10px] text-stone-400">消耗 25% 神力</span>
           </button>
-          <button 
-            onClick={() => godAction('bless')} 
-            disabled={hero.godPower < 25}
-            className="flex-1 h-12 border border-stone-200 rounded flex flex-col items-center justify-center gap-0 text-stone-600 hover:bg-stone-100 active:scale-95 bg-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed group"
-          >
+          <button onClick={() => godAction('bless')} disabled={hero.godPower < 25} className="flex-1 h-12 border border-stone-200 rounded flex flex-col items-center justify-center gap-0 text-stone-600 hover:bg-stone-100 active:scale-95 bg-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed group">
             <span className="flex items-center gap-1 text-sm font-bold group-hover:text-emerald-800"><Cloud size={14} /> 赐福</span>
             <span className="text-[10px] text-stone-400">消耗 25% 神力</span>
           </button>
@@ -107,29 +89,49 @@ export default function Home() {
     </div>
   );
 
-  // --- 2. 侠客详情 (解锁功能) ---
+  // 侠客视图
   const HeroView = () => (
     <div className="p-6 overflow-y-auto h-full space-y-6">
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><User size={16}/> 侠客档案</h3>
+        
+        {/* XP 进度条 (新功能) */}
+        <div className="mb-4">
+           <div className="flex justify-between text-xs text-stone-500 mb-1">
+             <span>等级 Lv.{hero.level}</span>
+             <span>{hero.exp} / {hero.maxExp} XP</span>
+           </div>
+           <div className="h-2 w-full bg-stone-100 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 transition-all duration-500" style={{width: `${(hero.exp / hero.maxExp) * 100}%`}}></div>
+           </div>
+        </div>
+
         <div className="flex items-center justify-between mb-4">
            <div className="text-center flex-1 border-r border-stone-100"><div className="text-xs text-stone-400">性格</div><div className="font-bold text-stone-700">{hero.personality}</div></div>
            <div className="text-center flex-1 border-r border-stone-100"><div className="text-xs text-stone-400">善恶</div><div className="font-bold text-stone-700">{hero.alignment}</div></div>
            <div className="text-center flex-1"><div className="text-xs text-stone-400">岁数</div><div className="font-bold text-stone-700">{hero.age}</div></div>
         </div>
         
-        {/* Lv.3 解锁: 座右铭 */}
-        {hero.unlockedFeatures.includes('motto') ? (
+        {hero.unlockedFeatures.includes('motto') && (
            <div className="mt-4 p-3 bg-stone-50 rounded border border-stone-100 relative">
               <Quote size={12} className="absolute top-2 left-2 text-stone-300"/>
               <div className="text-center text-sm font-serif italic text-stone-600">“{hero.motto}”</div>
            </div>
-        ) : (
-           <div className="mt-4 p-2 text-center text-xs text-stone-300 border border-dashed border-stone-200 rounded"><Lock size={12} className="inline mr-1"/> Lv.3 解锁座右铭</div>
         )}
       </div>
 
-      {/* Lv.5 解锁: 宠物 */}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
+         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><Star size={16}/> 天赋资质</h3>
+         <div className="space-y-3">
+             <AttributeRow icon={<Heart size={14}/>} label="体魄" val={hero.attributes.constitution} color="bg-red-400" />
+             <AttributeRow icon={<BicepsFlexed size={14}/>} label="臂力" val={hero.attributes.strength} color="bg-amber-400" />
+             <AttributeRow icon={<Wind size={14}/>} label="身法" val={hero.attributes.dexterity} color="bg-blue-400" />
+             <AttributeRow icon={<Brain size={14}/>} label="悟性" val={hero.attributes.intelligence} color="bg-purple-400" />
+             <AttributeRow icon={<Clover size={14}/>} label="福源" val={hero.attributes.luck} color="bg-emerald-400" />
+         </div>
+      </div>
+      
+      {/* 宠物面板 */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><PawPrint size={16}/> 灵宠</h3>
         {hero.unlockedFeatures.includes('pet') ? (
@@ -145,29 +147,17 @@ export default function Home() {
         ) : <div className="p-2 text-center text-xs text-stone-300 border border-dashed border-stone-200 rounded"><Lock size={12} className="inline mr-1"/> Lv.5 解锁灵宠</div>}
       </div>
 
-      {/* Lv.10 解锁: 竞技场 */}
+      {/* 近期大事记 (新功能) */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
-         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><Trophy size={16}/> 战绩</h3>
-         <div className="grid grid-cols-2 gap-4 text-center">
-             <div><div className="text-2xl font-bold text-stone-800">{hero.stats.kills}</div><div className="text-xs text-stone-400">击败怪物</div></div>
-             <div>
-               {hero.unlockedFeatures.includes('arena') ? (
-                 <><div className="text-2xl font-bold text-amber-600">{hero.stats.arenaWins || 0}</div><div className="text-xs text-stone-400">竞技场胜场</div></>
-               ) : <div className="text-xs text-stone-300 mt-2"><Lock size={12} className="inline"/> Lv.10 解锁</div>}
+        <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><History size={16}/> 传闻轶事</h3>
+        <div className="space-y-3 pl-2 border-l-2 border-stone-100">
+           {hero.majorEvents.slice(0, 8).map((event, i) => (
+             <div key={i} className="text-xs text-stone-500 relative pl-2">
+               <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-stone-300 ring-2 ring-white"></div>
+               {event}
              </div>
-         </div>
-      </div>
-      
-      {/* 属性 */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
-         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><Star size={16}/> 属性</h3>
-         <div className="space-y-3">
-             <AttributeRow icon={<Heart size={14}/>} label="体魄" val={hero.attributes.constitution} color="bg-red-400" />
-             <AttributeRow icon={<BicepsFlexed size={14}/>} label="臂力" val={hero.attributes.strength} color="bg-amber-400" />
-             <AttributeRow icon={<Wind size={14}/>} label="身法" val={hero.attributes.dexterity} color="bg-blue-400" />
-             <AttributeRow icon={<Brain size={14}/>} label="悟性" val={hero.attributes.intelligence} color="bg-purple-400" />
-             <AttributeRow icon={<Clover size={14}/>} label="福源" val={hero.attributes.luck} color="bg-emerald-400" />
-         </div>
+           ))}
+        </div>
       </div>
     </div>
   );
@@ -182,30 +172,8 @@ export default function Home() {
     </div>
   );
 
-  // --- 3. 行囊 (完整列表) ---
-  const BagView = () => (
-    <div className="p-4 h-full overflow-y-auto">
-      <h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3>
-      {hero.inventory.length === 0 ? <div className="text-center text-stone-400 mt-20">空空如也</div> : (
-        <div className="space-y-2">
-          {hero.inventory.map((item, idx) => (
-            <div key={idx} className="bg-white border border-stone-100 p-3 rounded flex items-center justify-between shadow-sm">
-               <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-stone-50 rounded flex items-center justify-center text-stone-300 relative">
-                    <Package size={16}/>
-                    {item.count > 1 && <span className="absolute -top-1 -right-1 bg-amber-100 text-amber-800 text-[9px] px-1 rounded-full border border-amber-200">x{item.count}</span>}
-                  </div>
-                  <div><div className="text-sm font-bold text-stone-700">{item.name}</div><div className="text-xs text-stone-400">{item.desc}</div></div>
-               </div>
-               <div className="text-right"><div className="text-[10px] px-2 py-1 bg-stone-50 text-stone-500 rounded inline-block mb-1">价 {item.price}</div></div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  // --- 4. 装备 (完整列表) ---
+  const BagView = () => (<div className="p-4 h-full overflow-y-auto"><h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3><div className="space-y-2">{hero.inventory.map((item,i)=><div key={i} className="bg-white border border-stone-100 p-3 rounded flex justify-between"><span className="font-bold text-sm text-stone-700">{item.name}</span><span className="text-xs text-stone-400">x{item.count}</span></div>)}</div></div>);
+  
   const EquipView = () => {
     const slots: {key: ItemType, label: string, icon: any}[] = [
       { key: 'head', label: '头饰', icon: <HardHat size={18}/> },
@@ -216,23 +184,7 @@ export default function Home() {
       { key: 'accessory', label: '饰品', icon: <Gem size={18}/> },
     ];
     return (
-      <div className="p-4 h-full overflow-y-auto">
-         <h3 className="font-bold text-stone-800 mb-4 px-2">当前装备</h3>
-         <div className="space-y-3">
-            {slots.map((slot) => {
-              const item = hero.equipment[slot.key as keyof typeof hero.equipment];
-              return (
-                <div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm">
-                   <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div>
-                   <div className="flex-1">
-                      <div className="text-xs text-stone-400 mb-1">{slot.label}</div>
-                      {item ? <><div className="font-bold text-stone-800 text-sm">{item.name}</div><div className="text-xs text-stone-500 mt-0.5 line-clamp-1">{item.desc}</div></> : <div className="text-stone-300 italic text-sm">空</div>}
-                   </div>
-                </div>
-              );
-            })}
-         </div>
-      </div>
+      <div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className="font-bold text-stone-800 text-sm">{item.name}</div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>
     );
   };
 
@@ -245,11 +197,23 @@ export default function Home() {
         {activeTab === 'bag' && <BagView />}
         {activeTab === 'equip' && <EquipView />}
       </main>
-      <nav className="h-16 bg-white border-t border-stone-200 flex justify-around items-center px-2 flex-none z-20">
-         <button onClick={() => setActiveTab('logs')} className={`p-2 ${activeTab==='logs'?'text-stone-800':'text-stone-400'}`}><ScrollText/></button>
-         <button onClick={() => setActiveTab('hero')} className={`p-2 ${activeTab==='hero'?'text-stone-800':'text-stone-400'}`}><User/></button>
-         <button onClick={() => setActiveTab('bag')} className={`p-2 ${activeTab==='bag'?'text-stone-800':'text-stone-400'}`}><Package/></button>
-         <button onClick={() => setActiveTab('equip')} className={`p-2 ${activeTab==='equip'?'text-stone-800':'text-stone-400'}`}><Shield/></button>
+      <nav className="h-16 bg-white border-t border-stone-200 flex justify-around items-center px-2 flex-none z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
+         <button onClick={() => setActiveTab('logs')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeTab === 'logs' ? 'text-stone-800' : 'text-stone-400'}`}>
+            <ScrollText size={20} strokeWidth={activeTab === 'logs' ? 2.5 : 2} />
+            <span className="text-[10px] font-bold">江湖</span>
+         </button>
+         <button onClick={() => setActiveTab('hero')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeTab === 'hero' ? 'text-stone-800' : 'text-stone-400'}`}>
+            <User size={20} strokeWidth={activeTab === 'hero' ? 2.5 : 2} />
+            <span className="text-[10px] font-bold">侠客</span>
+         </button>
+         <button onClick={() => setActiveTab('bag')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeTab === 'bag' ? 'text-stone-800' : 'text-stone-400'}`}>
+            <Package size={20} strokeWidth={activeTab === 'bag' ? 2.5 : 2} />
+            <span className="text-[10px] font-bold">行囊</span>
+         </button>
+         <button onClick={() => setActiveTab('equip')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeTab === 'equip' ? 'text-stone-800' : 'text-stone-400'}`}>
+            <Shield size={20} strokeWidth={activeTab === 'equip' ? 2.5 : 2} />
+            <span className="text-[10px] font-bold">装备</span>
+         </button>
       </nav>
     </div>
   );
