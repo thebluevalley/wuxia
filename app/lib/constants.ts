@@ -41,9 +41,9 @@ export type SkillType = 'attack' | 'inner' | 'speed' | 'medical' | 'trade';
 export type Skill = {
   name: string;
   type: SkillType;
-  level: number; // 当前层数
-  exp: number;   // 当前熟练度
-  maxExp: number; // 升级所需
+  level: number;
+  exp: number;
+  maxExp: number;
   desc: string;
 };
 
@@ -61,11 +61,11 @@ export type HeroState = {
   storyStage: string; 
 
   attributes: { 
-    constitution: number; // 根骨 -> 影响血量成长
-    strength: number;     // 臂力 -> 影响战斗胜率
-    dexterity: number;    // 身法 -> 影响闪避/跑图
-    intelligence: number; // 悟性 -> 影响技能升级速度
-    luck: number;         // 福源 -> 影响掉落
+    constitution: number;
+    strength: number;
+    dexterity: number;
+    intelligence: number;
+    luck: number;
   };
 
   hp: number; maxHp: number;
@@ -75,6 +75,7 @@ export type HeroState = {
   currentQuest: Quest;
   
   location: string;
+  // ⚠️ 关键修正：确保包含 town 和 arena
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   
   logs: LogEntry[];
@@ -82,9 +83,8 @@ export type HeroState = {
   inventory: Item[];
   equipment: Equipment;
   
-  // 技能列表
-  martialArts: Skill[]; // 武功
-  lifeSkills: Skill[];  // 生活技能
+  martialArts: Skill[];
+  lifeSkills: Skill[];
   
   stats: { kills: number; days: number; arenaWins: number; };
 };
@@ -98,7 +98,6 @@ export type LogEntry = {
 
 export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "社恐"];
 
-// 技能库
 export const SKILL_LIBRARY = {
   attack: ["太祖长拳", "落英神剑掌", "降龙十八掌", "独孤九剑", "打狗棒法", "六脉神剑"],
   inner:  ["吐纳法", "易筋经", "九阳神功", "北冥神功", "小无相功", "洗髓经"],
@@ -137,7 +136,6 @@ export const QUEST_SOURCES = {
   life:   ["帮王大妈找鸭子", "摆摊卖艺", "修补屋顶", "为心上人画眉", "打听江湖传闻"]
 };
 
-// 掉落表 (增加武功秘籍、消耗品)
 export const LOOT_TABLE: Partial<Item>[] = [
   { name: "半个冷馒头", type: 'consumable', desc: "回血 +10", price: 1 },
   { name: "女儿红", type: 'consumable', desc: "回血 +50，增加豪气", price: 20 },
@@ -153,7 +151,6 @@ export const LOOT_TABLE: Partial<Item>[] = [
   { name: "神秘的藏宝图", type: 'misc', desc: "可能通向宝藏", price: 100 },
 ];
 
-// 旁白文案 (更简洁，作为转场)
 export const STATIC_LOGS = {
   idle: ["风起云涌。", "路漫漫其修远兮。", "江湖夜雨十年灯。", "天边划过流星。"],
   fight: ["杀气弥漫。", "胜负只在一念之间。", "此时无声胜有声。"],
@@ -170,7 +167,6 @@ export const STORY_STAGES = [
   { level: 100, name: "破碎虚空", desc: "羽化登仙，留下传说" }
 ];
 
-// 世界观
 export const WORLD_LORE = `
 背景：王朝末年，乱世江湖。
 势力：听雨楼(情报)、铸剑山庄(神兵)、隐元会(杀手)、丐帮(天下第一帮)。

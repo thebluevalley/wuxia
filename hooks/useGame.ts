@@ -30,7 +30,6 @@ export function useGame() {
     return locations[Math.floor(Math.random() * locations.length)];
   };
 
-  // 初始技能
   const getInitialSkills = (): Skill[] => [{ name: "太祖长拳", type: 'attack', level: 1, exp: 0, maxExp: 100, desc: "江湖流传最广的入门拳法" }];
   const getInitialLifeSkills = (): Skill[] => [{ name: "包扎", type: 'medical', level: 1, exp: 0, maxExp: 100, desc: "简单的伤口处理" }];
 
@@ -93,16 +92,14 @@ export function useGame() {
   const triggerAI = async (eventType: string, action?: string) => {
     if (!hero) return false;
     try {
-      // 提取最高级的武功名称传给 AI
       const bestSkill = hero.martialArts.sort((a,b) => b.level - a.level)[0];
-      
       const context = {
         ...hero,
         storyStage: getStoryStage(hero.level),
         worldLore: WORLD_LORE,
         questInfo: `[${hero.currentQuest.type}] ${hero.currentQuest.name} (${hero.currentQuest.progress}%)`,
         petInfo: hero.pet ? `携带${hero.pet.type}` : "无",
-        skillInfo: `擅长${bestSkill.name}(Lv.${bestSkill.level})`, // 告诉AI主角会什么武功
+        skillInfo: `擅长${bestSkill.name}(Lv.${bestSkill.level})`, 
       };
       
       const res = await fetch('/api/ai', {
@@ -112,7 +109,6 @@ export function useGame() {
       if (!res.ok) return false;
       const data = await res.json();
       if (data.text) {
-        // 普通 AI 日志不再高亮，融入环境
         addLog(data.text, eventType === 'god_action' ? 'highlight' : 'normal');
         return true;
       }
@@ -139,43 +135,35 @@ export function useGame() {
     if (!hero) return;
 
     const gameLoop = async () => {
-      // 1. 基础恢复
       setHero(h => h ? { ...h, godPower: Math.min(100, h.godPower + 5) } : null);
 
-      // 2. 状态机逻辑
       let newState = hero.state;
       let newLocation = hero.location;
       let newQuest = hero.currentQuest;
-      let newQuestProgress = newQuest.progress + 5 + Math.floor(Math.random() * 5); // 进度稍微加快
+      let newQuestProgress = newQuest.progress + 5 + Math.floor(Math.random() * 5);
       let goldChange = 0;
       let expChange = 0;
 
-      // 任务完成
       if (newQuestProgress >= 100) {
         newQuestProgress = 0;
         const reward = Math.floor(Math.random() * 50) + 30;
         goldChange += reward;
         expChange += 50;
-        
-        // 提升悟性
         setHero(h => h ? { ...h, attributes: {...h.attributes, intelligence: h.attributes.intelligence + 1} } : null);
         addLog(`【委托达成】完成 ${newQuest.name}，获赏金 ${reward}，悟性提升。`, 'highlight');
-        
         newQuest = generateQuest();
         newLocation = getLocationByQuest(newQuest.type);
         setTimeout(() => addLog(`【新程】前往 ${newLocation} 执行：${newQuest.name}`, 'system'), 1000);
       }
 
-      // 状态切换 (战斗/竞技/城镇)
       if (hero.level >= 10 && hero.state === 'idle' && Math.random() < 0.15) {
          newState = 'arena';
       } else if (hero.inventory.length >= 15 && hero.state !== 'town') {
-         newState = 'town'; // 包快满了就回城
+         newState = 'town';
       } else if (hero.state !== 'town' && Math.random() < 0.2) {
          newState = hero.state === 'idle' ? 'fight' : 'idle';
       }
 
-      // 3. 核心交互 (Skill & Money)
       setHero(h => {
         if(!h) return null;
         let finalH = { 
@@ -187,13 +175,12 @@ export function useGame() {
             exp: h.exp + expChange
         };
 
-        // --- 战斗/竞技场逻辑 ---
+        // --- 战斗逻辑 ---
         if (finalH.state === 'fight' || finalH.state === 'arena') {
-           // 提升武功熟练度
            if (finalH.martialArts.length > 0) {
              const skillIdx = Math.floor(Math.random() * finalH.martialArts.length);
              const skill = finalH.martialArts[skillIdx];
-             skill.exp += (finalH.attributes.intelligence * 0.5) + 2; // 悟性影响修炼速度
+             skill.exp += (finalH.attributes.intelligence * 0.5) + 2;
              if (skill.exp >= skill.maxExp) {
                skill.level++;
                skill.exp = 0;
@@ -201,8 +188,6 @@ export function useGame() {
                setTimeout(() => addLog(`【武学突破】${skill.name} 晋升至 ${skill.level} 层！`, 'highlight'), 500);
              }
            }
-           
-           // 竞技场结算
            if (finalH.state === 'arena') {
               if (Math.random() > 0.4) {
                  finalH.stats.arenaWins++;
@@ -212,43 +197,37 @@ export function useGame() {
                  finalH.hp = Math.floor(finalH.hp * 0.6);
                  addLog("【败】技不如人，即使使用了绝招也被破解。", "bad");
               }
-              finalH.state = 'idle'; // 竞技场结束回待机
+              finalH.state = 'idle';
            }
         }
 
-        // --- 城镇逻辑 (Economy System) ---
+        // --- 城镇逻辑 ---
         if (finalH.state === 'town') {
-           // 1. 卖东西
            const sellValue = finalH.inventory.reduce((acc, i) => acc + (i.price * i.count), 0);
            if (sellValue > 0) {
              finalH.gold += sellValue;
              finalH.inventory = [];
              addLog(`在集市变卖行囊，获利 ${sellValue} 文。`, 'system');
            }
-           
-           // 2. 花钱 (Money Sink)
            if (finalH.gold > 50 && finalH.hp < finalH.maxHp) {
               finalH.gold -= 20;
               finalH.hp = finalH.maxHp;
               addLog("花费 20 文在医馆疗伤，精神焕发。", 'system');
            }
-           // 买秘籍 (低概率)
            if (finalH.gold > 300 && Math.random() < 0.2) {
               finalH.gold -= 300;
               const newSkillName = SKILL_LIBRARY.inner[Math.floor(Math.random() * SKILL_LIBRARY.inner.length)];
-              // 检查是否已会
               if (!finalH.martialArts.find(s => s.name === newSkillName)) {
                  finalH.martialArts.push({ name: newSkillName, type: 'inner', level: 1, exp: 0, maxExp: 100, desc: "重金购得的秘籍" });
                  addLog(`斥资 300 文购得【${newSkillName}】秘籍，开始修习！`, 'highlight');
                  finalH.majorEvents.unshift(`${new Date().toLocaleTimeString()} 习得 ${newSkillName}`);
               }
            }
-           
-           finalH.state = 'idle'; // 离开城镇
+           finalH.state = 'idle';
         }
-
-        // --- 掉落逻辑 (Increased Rate) ---
-        if (finalH.state !== 'town' && Math.random() < 0.15) { // 15% 概率掉落 (大幅提升)
+        
+        // --- 掉落逻辑 (使用 else if 修复逻辑冲突) ---
+        else if (Math.random() < 0.15) { 
            const template = LOOT_TABLE[Math.floor(Math.random() * LOOT_TABLE.length)];
            const newItem: Item = { 
              id: Date.now().toString(), 
@@ -256,33 +235,28 @@ export function useGame() {
              type: template.type as ItemType, count: 1, price: template.price || 1
            };
            
-           // 自动使用消耗品
            if (newItem.type === 'consumable') {
               if (finalH.hp < finalH.maxHp) {
                  finalH.hp = Math.min(finalH.maxHp, finalH.hp + 50);
                  setTimeout(() => addLog(`路边捡到${newItem.name}，当场服下，伤势好转。`, 'system'), 200);
               } else {
-                 // 满血就卖
                  const idx = finalH.inventory.findIndex(i => i.name === newItem.name);
                  if (idx >= 0) finalH.inventory[idx].count++; else finalH.inventory.push(newItem);
               }
            } 
-           // 自动装备逻辑
            else if (newItem.type !== 'misc' && newItem.type !== 'book' && !finalH.equipment[newItem.type as keyof Equipment]) {
               finalH.equipment = { ...finalH.equipment, [newItem.type]: newItem };
               setTimeout(() => addLog(`获得装备【${newItem.name}】，立即穿戴。`, 'highlight'), 500);
            } else {
               const idx = finalH.inventory.findIndex(i => i.name === newItem.name);
               if (idx >= 0) finalH.inventory[idx].count++; else finalH.inventory.push(newItem);
-              if (Math.random() < 0.5) setTimeout(() => addLog(`获得：${newItem.name}`, 'normal'), 500); // 只有50%概率提示普通获得，防止刷屏
+              if (Math.random() < 0.5) setTimeout(() => addLog(`获得：${newItem.name}`, 'normal'), 500);
            }
         }
 
-        // 升级
         if (finalH.exp >= finalH.maxExp) {
            finalH.level++; finalH.exp = 0; finalH.maxExp = Math.floor(finalH.maxExp * 1.5);
            finalH.maxHp += 30; finalH.hp = finalH.maxHp;
-           // 全属性+1
            Object.keys(finalH.attributes).forEach(k => finalH.attributes[k as keyof typeof finalH.attributes]++);
            finalH.majorEvents.unshift(`${new Date().toLocaleTimeString()} 突破至 Lv.${finalH.level}`);
            addLog(`【境界突破】气冲斗牛，晋升 Lv.${finalH.level}！`, 'highlight');
@@ -291,12 +265,10 @@ export function useGame() {
         return finalH;
       });
 
-      // 4. AI 触发 (80% 概率，主角待遇)
       const dice = Math.random();
       let aiTriggered = false;
       if (dice < 0.8) aiTriggered = await triggerAI('auto');
 
-      // 5. 旁白 (Fallback)
       if (!aiTriggered) {
          let list = STATIC_LOGS.idle;
          if (newState === 'fight') list = STATIC_LOGS.fight;
@@ -304,12 +276,10 @@ export function useGame() {
          else if (newState === 'arena') list = STATIC_LOGS.arena;
          
          let text = list[Math.floor(Math.random() * list.length)];
-         if (!recentLogsRef.current.includes(text)) addLog(text, 'system'); // 旁白用灰色
+         if (!recentLogsRef.current.includes(text)) addLog(text, 'system');
       }
 
-      // 节奏：30s ~ 2m
       const nextTick = Math.floor(Math.random() * (120000 - 30000) + 30000); 
-      // const nextTick = 5000; // Debug
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
 
