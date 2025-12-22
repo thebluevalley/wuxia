@@ -1,10 +1,10 @@
 'use client';
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState } from 'react';
-import { Scroll, Zap, Cloud, MapPin, User, Package, Shield, ScrollText, Sword } from 'lucide-react';
+import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem } from 'lucide-react';
 
 export default function Home() {
-  const { hero, login, godAction, testAI, loading } = useGame();
+  const { hero, login, godAction, loading } = useGame();
   const [inputName, setInputName] = useState('');
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'equip'>('logs');
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -41,7 +41,7 @@ export default function Home() {
     );
   }
 
-  // --- 辅助组件：顶部状态栏 ---
+  // --- 顶部状态栏 ---
   const Header = () => (
     <header className="p-4 pb-2 flex-none z-10 bg-[#fcf9f2]/90 backdrop-blur-sm border-b border-stone-200">
       <div className="flex justify-between items-start mb-3">
@@ -67,7 +67,7 @@ export default function Home() {
     </header>
   );
 
-  // --- 1. 江湖日志视图 (含天罚赐福) ---
+  // --- 1. 江湖日志 ---
   const LogsView = () => (
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-3 scroll-smooth">
@@ -86,27 +86,26 @@ export default function Home() {
         <div ref={bottomRef} className="h-4" />
       </div>
       
-      {/* 悬浮操作栏 (仅在日志页显示) */}
+      {/* 操作栏：Godville 风格 */}
       <div className="p-4 bg-gradient-to-t from-[#fcf9f2] via-[#fcf9f2] to-transparent">
          <div className="flex justify-between gap-4">
-          <button onClick={() => godAction('punish')} className="flex-1 h-10 border border-stone-200 rounded flex items-center justify-center gap-2 text-stone-600 hover:bg-stone-100 active:scale-95 bg-white shadow-sm">
-            <Zap size={14} /> <span className="text-xs">天罚</span>
+          <button onClick={() => godAction('punish')} className="flex-1 h-12 border border-stone-200 rounded flex flex-col items-center justify-center gap-0 text-stone-600 hover:bg-stone-100 active:scale-95 bg-white shadow-sm group">
+            <span className="flex items-center gap-1 text-sm font-bold group-hover:text-red-800"><Zap size={14} /> 天罚</span>
+            <span className="text-[10px] text-stone-400">扣血 / 涨经验</span>
           </button>
-          <button onClick={testAI} className="h-10 px-4 border border-stone-200 rounded text-stone-400 hover:text-stone-600 text-[10px] bg-white">
-            测试天道
-          </button>
-          <button onClick={() => godAction('bless')} className="flex-1 h-10 border border-stone-200 rounded flex items-center justify-center gap-2 text-stone-600 hover:bg-stone-100 active:scale-95 bg-white shadow-sm">
-            <Cloud size={14} /> <span className="text-xs">赐福</span>
+          
+          <button onClick={() => godAction('bless')} className="flex-1 h-12 border border-stone-200 rounded flex flex-col items-center justify-center gap-0 text-stone-600 hover:bg-stone-100 active:scale-95 bg-white shadow-sm group">
+            <span className="flex items-center gap-1 text-sm font-bold group-hover:text-emerald-800"><Cloud size={14} /> 赐福</span>
+            <span className="text-[10px] text-stone-400">回满状态</span>
           </button>
         </div>
       </div>
     </div>
   );
 
-  // --- 2. 英雄属性视图 ---
+  // --- 2. 侠客属性 (保持列表风格) ---
   const HeroView = () => (
     <div className="p-6 overflow-y-auto h-full space-y-6">
-      {/* 基础信息卡片 */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><User size={16}/> 侠客档案</h3>
         <div className="grid grid-cols-2 gap-y-3 text-sm text-stone-600">
@@ -118,8 +117,6 @@ export default function Home() {
           <div><span className="text-stone-400">击杀：</span>{hero.stats.kills}</div>
         </div>
       </div>
-
-      {/* 武学卡片 */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><Sword size={16}/> 武学修为</h3>
         <div className="space-y-3">
@@ -134,34 +131,31 @@ export default function Home() {
           ))}
         </div>
       </div>
-
-      {/* 生活技能 */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
-        <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><Package size={16}/> 生活杂艺</h3>
-        <div className="space-y-2">
-           {hero.lifeSkills.map((skill, i) => (
-             <div key={i} className="flex justify-between text-sm">
-                <span className="text-stone-600">{skill.name}</span>
-                <span className="text-stone-400 text-xs">{skill.desc}</span>
-             </div>
-           ))}
-        </div>
-      </div>
     </div>
   );
 
-  // --- 3. 背包视图 ---
+  // --- 3. 行囊 (改为列表风格) ---
   const BagView = () => (
     <div className="p-4 h-full overflow-y-auto">
       <h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/50)</h3>
       {hero.inventory.length === 0 ? (
-        <div className="text-center text-stone-400 mt-20">空空如也，脸比兜干净。</div>
+        <div className="text-center text-stone-400 mt-20">空空如也</div>
       ) : (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="space-y-2">
           {hero.inventory.map((item, idx) => (
-            <div key={idx} className="aspect-square bg-white border border-stone-200 rounded flex flex-col items-center justify-center p-2 text-center shadow-sm hover:border-amber-400 transition-colors">
-              <Package size={20} className="text-stone-300 mb-1" />
-              <span className="text-[10px] text-stone-600 leading-tight line-clamp-2">{item.name}</span>
+            <div key={idx} className="bg-white border border-stone-100 p-3 rounded flex items-center justify-between shadow-sm">
+               <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-stone-50 rounded flex items-center justify-center text-stone-300">
+                    <Package size={16}/>
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-stone-700">{item.name}</div>
+                    <div className="text-xs text-stone-400">{item.desc}</div>
+                  </div>
+               </div>
+               <div className="text-[10px] px-2 py-1 bg-stone-50 text-stone-500 rounded">
+                 {item.type === 'weapon' ? '兵器' : item.type === 'armor' ? '衣甲' : item.type === 'accessory' ? '饰品' : '杂物'}
+               </div>
             </div>
           ))}
         </div>
@@ -169,45 +163,57 @@ export default function Home() {
     </div>
   );
 
-  // --- 4. 装备视图 ---
-  const EquipView = () => (
-    <div className="p-6 h-full flex flex-col items-center">
-       <div className="relative w-64 h-80 bg-stone-100 rounded-xl border border-stone-200 mt-4 flex items-center justify-center">
-          {/* 人物剪影 (简单用文字代替) */}
-          <div className="text-stone-300 text-6xl opacity-20 font-serif">侠</div>
+  // --- 4. 装备 (改为列表风格) ---
+  const EquipView = () => {
+    const slots = [
+      { key: 'weapon', label: '兵器', icon: <Sword size={18}/> },
+      { key: 'armor',  label: '衣甲', icon: <Shield size={18}/> },
+      { key: 'accessory', label: '饰品', icon: <Gem size={18}/> },
+    ];
 
-          {/* 装备槽位 */}
-          <div className="absolute top-4 left-4 w-12 h-12 bg-white border border-stone-300 rounded flex items-center justify-center shadow-sm">
-             {hero.equipment.weapon ? <Sword size={20} className="text-stone-800"/> : <Sword size={20} className="text-stone-200"/>}
-          </div>
-          <div className="absolute top-4 right-4 w-12 h-12 bg-white border border-stone-300 rounded flex items-center justify-center shadow-sm">
-             {hero.equipment.armor ? <Shield size={20} className="text-stone-800"/> : <Shield size={20} className="text-stone-200"/>}
-          </div>
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-12 h-12 bg-white border border-stone-300 rounded flex items-center justify-center shadow-sm">
-             {hero.equipment.accessory ? <Zap size={20} className="text-stone-800"/> : <Zap size={20} className="text-stone-200"/>}
-          </div>
-       </div>
-       <div className="mt-8 text-center text-stone-500 text-sm">
-          <p>当前装备加成</p>
-          <p className="text-xs mt-2 text-stone-400">暂无装备，赤手空拳闯江湖。</p>
-       </div>
-    </div>
-  );
+    return (
+      <div className="p-4 h-full overflow-y-auto">
+         <h3 className="font-bold text-stone-800 mb-4 px-2">当前装备</h3>
+         <div className="space-y-3">
+            {slots.map((slot) => {
+              const item = hero.equipment[slot.key as keyof typeof hero.equipment];
+              return (
+                <div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm">
+                   <div className={`w-12 h-12 rounded-full flex items-center justify-center border ${item ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>
+                      {slot.icon}
+                   </div>
+                   <div className="flex-1">
+                      <div className="text-xs text-stone-400 mb-1">{slot.label}</div>
+                      {item ? (
+                        <>
+                          <div className="font-bold text-stone-800">{item.name}</div>
+                          <div className="text-xs text-stone-500 mt-0.5">{item.desc}</div>
+                        </>
+                      ) : (
+                        <div className="text-stone-300 italic text-sm">暂无装备</div>
+                      )}
+                   </div>
+                </div>
+              );
+            })}
+         </div>
+         <div className="mt-8 text-center text-xs text-stone-400">
+           装备由游历自动获取，无法手动更换。
+         </div>
+      </div>
+    );
+  };
 
-  // --- 主界面 ---
+  // --- 主框架 ---
   return (
     <div className="flex flex-col h-[100dvh] bg-[#fcf9f2] text-stone-800 font-serif max-w-md mx-auto shadow-2xl relative">
       <Header />
-      
-      {/* 中间内容区 (根据 Tab 切换) */}
       <main className="flex-1 overflow-hidden bg-[#fcf9f2]">
         {activeTab === 'logs' && <LogsView />}
         {activeTab === 'hero' && <HeroView />}
         {activeTab === 'bag' && <BagView />}
         {activeTab === 'equip' && <EquipView />}
       </main>
-
-      {/* 底部导航栏 */}
       <nav className="h-16 bg-white border-t border-stone-200 flex justify-around items-center px-2 flex-none z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
         <button onClick={() => setActiveTab('logs')} className={`flex flex-col items-center gap-1 p-2 w-16 ${activeTab === 'logs' ? 'text-stone-800' : 'text-stone-400'}`}>
           <ScrollText size={20} strokeWidth={activeTab === 'logs' ? 2.5 : 2} />

@@ -11,26 +11,17 @@ export function useGame() {
   const [loading, setLoading] = useState(false);
   const lastLogText = useRef<string>("");
 
-  // 登录/初始化英雄
+  // 登录/初始化
   const login = async (name: string) => {
     setLoading(true);
-    
     // 随机性别
     const gender = Math.random() > 0.5 ? '男' : '女';
     
     const newHero: HeroState = {
-      name, 
-      level: 1, 
-      gender,
-      age: 16, // 初出茅庐
-      cultivation: '初窥门径',
-      hp: 100, maxHp: 100, 
-      exp: 0, maxExp: 100, 
-      gold: 0,
-      location: '荒野古道', 
-      state: 'idle', 
-      logs: [], 
-      inventory: [],
+      name, level: 1, gender, age: 16, cultivation: '初窥门径',
+      hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 0,
+      location: '荒野古道', state: 'idle', 
+      logs: [], inventory: [],
       equipment: { weapon: null, armor: null, accessory: null },
       skills: [{ name: '太祖长拳', level: 1, desc: '江湖流传最广的入门拳法。' }],
       lifeSkills: [{ name: '烹饪', level: 1, desc: '只会烤红薯。' }],
@@ -43,7 +34,6 @@ export function useGame() {
         const { data: created } = await supabase.from('profiles').insert({ username: name, data: newHero }).select().single();
         data = created;
       }
-      // 兼容旧数据（防止老号报错）
       const mergedData = { ...newHero, ...data.data }; 
       if (data) setHero(mergedData);
     } else {
@@ -81,21 +71,40 @@ export function useGame() {
     return false;
   };
 
-  // 手动测试
-  const testAI = async () => {
-    addLog("【系统】正在尝试沟通天道...", "system");
-    const success = await triggerAI('auto');
-    if (!success) addLog("【系统】天道渺茫。(请检查API Key)", "bad");
-  };
-
+  // --- 核心：Godville 风格的神力干预 ---
   const godAction = async (type: 'bless' | 'punish') => {
     if (!hero) return;
+    
     if (type === 'bless') {
+      // 赐福 (Encourage): 回满血，虽然无收益，但是保命
       setHero(h => h ? {...h, hp: h.maxHp} : null);
-      triggerAI('god_action', '赐福');
+      triggerAI('god_action', '赐福(恢复状态)');
     } else {
-      setHero(h => h ? {...h, hp: Math.max(1, h.hp - 10), exp: h.exp + 20} : null);
-      triggerAI('god_action', '天罚');
+      // 天罚 (Punish): 扣血换经验 (鞭策)
+      // 逻辑：天雷劈下来，虽然受伤，但主角被吓得跑得更快了(加经验)，或者以此淬炼了肉身
+      const damage = Math.floor(hero.maxHp * 0.15); // 扣 15% 血
+      const expGain = Math.floor(hero.maxExp * 0.10); // 涨 10% 经验
+      
+      setHero(h => {
+        if (!h) return null;
+        let newHp = h.hp - damage;
+        if (newHp < 1) newHp = 1; // 别劈死
+        
+        // 检查升级
+        let newExp = h.exp + expGain;
+        let newLevel = h.level;
+        let newMaxExp = h.maxExp;
+        let newMaxHp = h.maxHp;
+        
+        if (newExp >= h.maxExp) {
+           newLevel++; newExp = 0; newMaxExp = Math.floor(h.maxExp * 1.5); newMaxHp += 20;
+           setTimeout(() => addLog(`【天道酬勤】在雷劈的压力下，竟然突破了！(Lv.${newLevel})`, 'highlight'), 800);
+        }
+        
+        return { ...h, hp: newHp, exp: newExp, level: newLevel, maxExp: newMaxExp, maxHp: newMaxHp };
+      });
+      
+      triggerAI('god_action', '天罚(雷劈鞭策)');
     }
   };
 
@@ -106,7 +115,7 @@ export function useGame() {
       const dice = Math.random();
       let aiTriggered = false;
 
-      // AI 触发
+      // 40% 概率触发 AI
       if (dice < 0.4) aiTriggered = await triggerAI('auto');
 
       // 本地兜底
@@ -159,5 +168,5 @@ export function useGame() {
     return () => clearInterval(tick);
   }, [hero?.name]);
 
-  return { hero, login, godAction, testAI, loading };
+  return { hero, login, godAction, loading };
 }

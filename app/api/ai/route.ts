@@ -2,10 +2,8 @@ import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-  // 1. 检查 Key
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    console.error("❌ [API Error] GROQ_API_KEY 未配置");
     return NextResponse.json({ text: null, error: "后端未找到 GROQ_API_KEY" }, { status: 500 });
   }
 
@@ -13,7 +11,7 @@ export async function POST(req: Request) {
     const { context, eventType, userAction } = await req.json();
     const groq = new Groq({ apiKey });
 
-    // --- Prompt (保持不变) ---
+    // 基础人设
     const baseInstruction = `
       你是一位精通古龙风格的武侠小说旁白。
       请生成一段**极简短**的游戏日志。
@@ -26,10 +24,15 @@ export async function POST(req: Request) {
 
     let prompt = "";
     if (eventType === 'god_action') {
+      // 区分赐福与天罚
+      const isPunish = userAction.includes('天罚');
       prompt = `${baseInstruction}
-      情境：主角${context.name}遭遇突发事件。
-      事件：天降异象，【${userAction}】。
-      任务：描写该现象对他的影响。`;
+      情境：主角${context.name}正在江湖游历。
+      事件：${isPunish ? '天降惊雷（玩家使用了天罚）' : '天降甘霖（玩家使用了赐福）'}。
+      ${isPunish 
+        ? '任务：描写他被雷劈后的狼狈，或者被迫加快赶路/练功的搞笑样子。（Godville风格：神用雷电鞭策英雄）' 
+        : '任务：描写他伤势痊愈，或者感到一股暖流的温馨瞬间。'}
+      `;
     } else if (eventType === 'auto') {
       const isFight = context.state === 'fight';
       prompt = `${baseInstruction}
@@ -45,8 +48,6 @@ export async function POST(req: Request) {
 
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      // ⚠️ 修复点：更新为最新的 Llama 3.3 版本
-      // 这是目前 Groq 上最智能且免费的模型
       model: "llama-3.3-70b-versatile", 
       temperature: 0.8,
       max_tokens: 60,
@@ -59,7 +60,6 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error("❌ [Groq Error]:", error.message);
-    // 返回具体错误给前端显示
     return NextResponse.json({ text: null, error: error.message }, { status: 500 });
   }
 }
