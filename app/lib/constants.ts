@@ -102,11 +102,11 @@ export type LogEntry = {
 export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "社恐"];
 
 export const SKILL_LIBRARY = {
-  attack: ["太祖长拳", "落英神剑掌", "降龙十八掌", "独孤九剑", "打狗棒法", "六脉神剑"],
-  inner:  ["吐纳法", "易筋经", "九阳神功", "北冥神功", "小无相功", "洗髓经"],
-  speed:  ["草上飞", "凌波微步", "梯云纵", "神行百变", "水上漂"],
-  medical:["包扎", "推拿", "针灸", "炼丹术", "神农尝百草"],
-  trade:  ["讨价还价", "鉴宝", "巧舌如簧", "市井智慧"]
+  attack: ["太祖长拳", "落英神剑掌", "降龙十八掌", "独孤九剑", "打狗棒法", "六脉神剑", "弹指神通", "黯然销魂掌"],
+  inner:  ["吐纳法", "易筋经", "九阳神功", "北冥神功", "小无相功", "洗髓经", "九阴真经", "神照经"],
+  speed:  ["草上飞", "凌波微步", "梯云纵", "神行百变", "水上漂", "踏雪无痕", "筋斗云(伪)"],
+  medical:["包扎", "推拿", "针灸", "炼丹术", "神农尝百草", "平一指医经"],
+  trade:  ["讨价还价", "鉴宝", "巧舌如簧", "市井智慧", "聚宝盆之术"]
 };
 
 export const PET_TEMPLATES = [
@@ -117,26 +117,57 @@ export const PET_TEMPLATES = [
   { type: "莽牯朱蛤", desc: "万毒之王，百毒不侵。" },
   { type: "九尾灵狐", desc: "通体雪白，极具灵性。" },
   { type: "玉蜂", desc: "古墓派驯养，酿造玉蜂浆。" },
-  { type: "大黄", desc: "忠诚的中华田园犬。" }
+  { type: "大黄", desc: "忠诚的中华田园犬，眼神坚毅。" }
 ];
 
-export const ARENA_OPPONENTS = ["少林铜人", "峨眉师太", "全真道士", "丐帮长老", "魔教护法", "隐世扫地僧", "金兵百夫长", "东瀛浪人"];
+export const ARENA_OPPONENTS = ["少林铜人", "峨眉师太", "全真道士", "丐帮长老", "魔教护法", "隐世扫地僧", "金兵百夫长", "东瀛浪人", "波斯圣女", "西域番僧"];
 
-export const MAP_LOCATIONS = {
-  common: ["荒野古道", "龙门客栈", "风陵渡口", "乱葬岗", "悦来客栈"],
-  search: ["楼兰废墟", "剑冢", "绝情谷底", "桃花岛", "大漠深处"],
-  hunt:   ["黑风寨", "万兽山庄", "五毒教总坛", "快活林", "阴风谷"],
-  challenge: ["光明顶", "紫禁之巅", "华山栈道", "聚贤庄", "侠客岛"],
-  train:  ["少林藏经阁", "寒玉床", "思过崖", "达摩洞", "冰火岛"],
-  life:   ["扬州丽春院", "汴京御街", "牛家村", "七侠镇", "同福客栈"]
-};
+// ⚠️ 升级：分级地图系统
+// minLv: 最低进入等级
+export const WORLD_MAP = [
+  // Tier 1: 新手村 (1-10级)
+  { name: "牛家村", type: "life", minLv: 1 },
+  { name: "破庙", type: "common", minLv: 1 },
+  { name: "乱葬岗", type: "hunt", minLv: 1 },
+  { name: "荒野古道", type: "common", minLv: 1 },
+  { name: "十里坡", type: "train", minLv: 1 },
+  { name: "小河边", type: "life", minLv: 1 },
+  // Tier 2: 初入江湖 (10-30级)
+  { name: "扬州城", type: "life", minLv: 10 },
+  { name: "快活林", type: "hunt", minLv: 10 },
+  { name: "悦来客栈", type: "common", minLv: 10 },
+  { name: "丐帮分舵", type: "challenge", minLv: 15 },
+  { name: "黑风寨", type: "hunt", minLv: 15 },
+  { name: "风陵渡口", type: "common", minLv: 15 },
+  { name: "无量山", type: "search", minLv: 20 },
+  { name: "梅庄", type: "life", minLv: 20 },
+  // Tier 3: 名动一方 (30-50级)
+  { name: "汴京御街", type: "life", minLv: 30 },
+  { name: "五毒教总坛", type: "hunt", minLv: 30 },
+  { name: "绝情谷", type: "search", minLv: 35 },
+  { name: "桃花岛", type: "train", minLv: 35 },
+  { name: "终南山", type: "challenge", minLv: 40 },
+  { name: "聚贤庄", type: "challenge", minLv: 40 },
+  { name: "冰火岛", type: "train", minLv: 45 },
+  // Tier 4: 绝世高手 (50-80级)
+  { name: "光明顶", type: "challenge", minLv: 50 },
+  { name: "少林藏经阁", type: "train", minLv: 55 },
+  { name: "黑木崖", type: "hunt", minLv: 60 },
+  { name: "紫禁之巅", type: "challenge", minLv: 65 },
+  { name: "剑冢", type: "search", minLv: 70 },
+  // Tier 5: 传说之地 (80+级)
+  { name: "侠客岛", type: "train", minLv: 80 },
+  { name: "昆仑仙境", type: "search", minLv: 85 },
+  { name: "剑魔荒冢", type: "train", minLv: 90 },
+  { name: "破碎虚空", type: "common", minLv: 99 }
+];
 
 export const QUEST_SOURCES = {
-  search: ["寻找失传的《易筋经》", "探寻前朝宝藏", "搜集玄铁", "寻找天山雪莲", "寻找盟主信物"],
-  hunt:   ["讨伐黑风寨主", "清理吊睛白额虎", "追捕采花大盗", "消灭五毒教徒", "刺杀叛国将军"],
-  challenge: ["挑战华山大弟子", "闯十八铜人阵", "比拼酒量", "争夺武林盟主", "破解珍珑棋局"],
-  train:  ["修炼内功", "练习拔剑", "练习轻功", "参悟太玄经", "海浪中练掌"],
-  life:   ["帮王大妈找鸭子", "摆摊卖艺", "修补屋顶", "为心上人画眉", "打听江湖传闻"]
+  search: ["寻找失传的《易筋经》残卷", "探寻前朝宝藏线索", "搜集打造屠龙刀的玄铁", "寻找传说中的天山雪莲", "寻找失踪的盟主信物"],
+  hunt:   ["讨伐黑风寨的土匪首领", "清理后山的吊睛白额虎", "追捕采花大盗‘万里独行’", "消灭为祸一方的五毒教徒", "刺杀通敌叛国的将军"],
+  challenge: ["挑战华山派大弟子", "去少林寺闯十八铜人阵", "与丐帮长老比拼酒量", "参加武林大会争夺盟主", "破解珍珑棋局"],
+  train:  ["在寒玉床上修炼内功", "在瀑布下练习拔剑一万次", "在梅花桩上练习轻功", "参悟石壁上的太玄经", "在海浪中修炼掌法"],
+  life:   ["帮隔壁王大妈寻找走失的鸭子", "去集市摆摊卖艺赚盘缠", "帮村长修补漏雨的屋顶", "为心上人描眉画画", "在酒馆打听江湖传闻"]
 };
 
 export const LOOT_TABLE: Partial<Item>[] = [
@@ -144,8 +175,10 @@ export const LOOT_TABLE: Partial<Item>[] = [
   { name: "女儿红", type: 'consumable', desc: "回血 +50，增加豪气", price: 20 },
   { name: "金疮药", type: 'consumable', desc: "回血 +100", price: 50 },
   { name: "大还丹", type: 'consumable', desc: "回满血，增加内力", price: 500 },
+  { name: "叫花鸡", type: 'consumable', desc: "回血 +200，香气扑鼻", price: 100 },
   { name: "生锈的铁剑", type: 'weapon', desc: "攻击 +1", price: 30 },
   { name: "百炼钢刀", type: 'weapon', desc: "攻击 +10", price: 150 },
+  { name: "倚天剑鞘", type: 'weapon', desc: "攻击 +50", price: 1000 },
   { name: "粗布头巾", type: 'head', desc: "防御 +1", price: 10 },
   { name: "金丝软甲(残)", type: 'body', desc: "防御 +20", price: 250 },
   { name: "神行太保靴", type: 'feet', desc: "身法 +5", price: 80 },
@@ -155,10 +188,10 @@ export const LOOT_TABLE: Partial<Item>[] = [
 ];
 
 export const STATIC_LOGS = {
-  idle: ["风起云涌。", "路漫漫其修远兮。", "江湖夜雨十年灯。", "天边划过流星。"],
-  fight: ["杀气弥漫。", "胜负只在一念之间。", "此时无声胜有声。"],
-  town: ["市井喧嚣。", "红尘滚滚。", "有人欢喜有人愁。"],
-  arena: ["万众瞩目。", "巅峰对决。", "生死状已签。"]
+  idle: ["微风拂过。", "发了一会儿呆。", "路边的狗尾巴草挠得心里痒痒的。", "抬头看了看天上的流云。"],
+  fight: ["杀气弥漫。", "胜负只在一念之间。", "此时无声胜有声。", "刀光剑影。"],
+  town: ["市井喧嚣。", "红尘滚滚。", "有人欢喜有人愁。", "酒香不怕巷子深。"],
+  arena: ["万众瞩目。", "巅峰对决。", "生死状已签。", "台下欢声雷动。"]
 };
 
 export const STORY_STAGES = [
