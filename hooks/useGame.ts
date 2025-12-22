@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QUEST_SOURCES, QuestType, PERSONALITIES, PET_TEMPLATES, ARENA_OPPONENTS, MAP_LOCATIONS, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, SkillType } from '@/app/lib/constants';
+import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QUEST_SOURCES, QuestType, PERSONALITIES, PET_TEMPLATES, ARENA_OPPONENTS, MAP_LOCATIONS, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message } from '@/app/lib/constants';
 
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL 
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
@@ -51,12 +51,12 @@ export function useGame() {
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 0, alignment: 0,
       location: getLocationByQuest(initialQuest.type),
       state: 'idle', 
-      logs: [], inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
+      logs: [], messages: [], majorEvents: [`${new Date().toLocaleDateString()}：${name} 踏入江湖。`],
+      inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       martialArts: getInitialSkills(),
       lifeSkills: getInitialLifeSkills(),
       stats: { kills: 0, days: 1, arenaWins: 0 },
       currentQuest: initialQuest,
-      majorEvents: [`${new Date().toLocaleDateString()}：${name} 踏入江湖。`]
     };
     
     if (supabase) {
@@ -68,6 +68,7 @@ export function useGame() {
       const mergedData = { ...newHero, ...data.data };
       if (!mergedData.martialArts) mergedData.martialArts = getInitialSkills();
       if (!mergedData.lifeSkills) mergedData.lifeSkills = getInitialLifeSkills();
+      if (!mergedData.messages) mergedData.messages = []; // 兼容旧号
       mergedData.storyStage = getStoryStage(mergedData.level);
       
       if (data) setHero(mergedData);
@@ -86,6 +87,21 @@ export function useGame() {
         time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}) 
       };
       return { ...prev, logs: [...prev.logs, newLog].slice(-50) };
+    });
+  };
+
+  // ⚠️ 新增：添加消息（传闻/系统）
+  const addMessage = (type: 'rumor' | 'system', title: string, content: string) => {
+    setHero(prev => {
+      if (!prev) return null;
+      const newMsg: Message = {
+        id: Date.now().toString(),
+        type, title, content,
+        time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}),
+        isRead: false
+      };
+      // 保留最近 50 条消息
+      return { ...prev, messages: [newMsg, ...prev.messages].slice(0, 50) };
     });
   };
 
@@ -108,8 +124,23 @@ export function useGame() {
       });
       if (!res.ok) return false;
       const data = await res.json();
+      
       if (data.text) {
-        addLog(data.text, eventType === 'god_action' ? 'highlight' : 'normal');
+        // 如果是传闻，添加到消息列表
+        if (eventType === 'generate_rumor') {
+           // 简单的正则尝试提取标题，如果 AI 没按格式返回，就用默认标题
+           let title = "江湖风声";
+           let content = data.text;
+           if (data.text.includes("：")) {
+             const parts = data.text.split("：");
+             title = parts[0].length < 10 ? parts[0] : "江湖风声";
+             content = parts.slice(1).join("：");
+           }
+           addMessage('rumor', title, content);
+        } else {
+           // 普通日志
+           addLog(data.text, eventType === 'god_action' ? 'highlight' : 'normal');
+        }
         return true;
       }
     } catch (e) { console.error(e); }
@@ -144,13 +175,17 @@ export function useGame() {
       let goldChange = 0;
       let expChange = 0;
 
+      // 任务完成 -> 系统消息
       if (newQuestProgress >= 100) {
         newQuestProgress = 0;
         const reward = Math.floor(Math.random() * 50) + 30;
         goldChange += reward;
         expChange += 50;
         setHero(h => h ? { ...h, attributes: {...h.attributes, intelligence: h.attributes.intelligence + 1} } : null);
-        addLog(`【委托达成】完成 ${newQuest.name}，获赏金 ${reward}，悟性提升。`, 'highlight');
+        
+        addLog(`【委托达成】完成 ${newQuest.name}`, 'highlight');
+        addMessage('system', '任务完成', `成功完成【${newQuest.name}】，获得赏金 ${reward} 文，经验 +50，悟性 +1。`);
+        
         newQuest = generateQuest();
         newLocation = getLocationByQuest(newQuest.type);
         setTimeout(() => addLog(`【新程】前往 ${newLocation} 执行：${newQuest.name}`, 'system'), 1000);
@@ -175,43 +210,40 @@ export function useGame() {
             exp: h.exp + expChange
         };
 
-        // --- 战斗逻辑 ---
+        // 战斗逻辑
         if (finalH.state === 'fight' || finalH.state === 'arena') {
            if (finalH.martialArts.length > 0) {
              const skillIdx = Math.floor(Math.random() * finalH.martialArts.length);
              const skill = finalH.martialArts[skillIdx];
              skill.exp += (finalH.attributes.intelligence * 0.5) + 2;
              if (skill.exp >= skill.maxExp) {
-               skill.level++;
-               skill.exp = 0;
-               skill.maxExp = Math.floor(skill.maxExp * 1.2);
+               skill.level++; skill.exp = 0; skill.maxExp = Math.floor(skill.maxExp * 1.2);
+               // 技能升级 -> 系统消息
+               addMessage('system', '武学精进', `你的【${skill.name}】突破到了第 ${skill.level} 层！`);
                setTimeout(() => addLog(`【武学突破】${skill.name} 晋升至 ${skill.level} 层！`, 'highlight'), 500);
              }
            }
            if (finalH.state === 'arena') {
               if (Math.random() > 0.4) {
-                 finalH.stats.arenaWins++;
-                 finalH.gold += 50;
+                 finalH.stats.arenaWins++; finalH.gold += 50;
                  addLog("【胜】险胜强敌，名声大噪！", "highlight");
               } else {
                  finalH.hp = Math.floor(finalH.hp * 0.6);
-                 addLog("【败】技不如人，即使使用了绝招也被破解。", "bad");
+                 addLog("【败】技不如人，被打得鼻青脸肿。", "bad");
               }
               finalH.state = 'idle';
            }
         }
 
-        // --- 城镇逻辑 ---
+        // 城镇逻辑
         if (finalH.state === 'town') {
            const sellValue = finalH.inventory.reduce((acc, i) => acc + (i.price * i.count), 0);
            if (sellValue > 0) {
-             finalH.gold += sellValue;
-             finalH.inventory = [];
+             finalH.gold += sellValue; finalH.inventory = [];
              addLog(`在集市变卖行囊，获利 ${sellValue} 文。`, 'system');
            }
            if (finalH.gold > 50 && finalH.hp < finalH.maxHp) {
-              finalH.gold -= 20;
-              finalH.hp = finalH.maxHp;
+              finalH.gold -= 20; finalH.hp = finalH.maxHp;
               addLog("花费 20 文在医馆疗伤，精神焕发。", 'system');
            }
            if (finalH.gold > 300 && Math.random() < 0.2) {
@@ -220,25 +252,22 @@ export function useGame() {
               if (!finalH.martialArts.find(s => s.name === newSkillName)) {
                  finalH.martialArts.push({ name: newSkillName, type: 'inner', level: 1, exp: 0, maxExp: 100, desc: "重金购得的秘籍" });
                  addLog(`斥资 300 文购得【${newSkillName}】秘籍，开始修习！`, 'highlight');
+                 addMessage('system', '习得神功', `花费重金购得【${newSkillName}】，江湖路远，技多不压身。`);
                  finalH.majorEvents.unshift(`${new Date().toLocaleTimeString()} 习得 ${newSkillName}`);
               }
            }
            finalH.state = 'idle';
         }
         
-        // --- 掉落逻辑 (使用 else if 修复逻辑冲突) ---
+        // 掉落逻辑
         else if (Math.random() < 0.15) { 
            const template = LOOT_TABLE[Math.floor(Math.random() * LOOT_TABLE.length)];
-           const newItem: Item = { 
-             id: Date.now().toString(), 
-             name: template.name!, desc: template.desc!, quality: 'common', 
-             type: template.type as ItemType, count: 1, price: template.price || 1
-           };
+           const newItem: Item = { id: Date.now().toString(), name: template.name!, desc: template.desc!, quality: 'common', type: template.type as ItemType, count: 1, price: template.price || 1 };
            
            if (newItem.type === 'consumable') {
               if (finalH.hp < finalH.maxHp) {
                  finalH.hp = Math.min(finalH.maxHp, finalH.hp + 50);
-                 setTimeout(() => addLog(`路边捡到${newItem.name}，当场服下，伤势好转。`, 'system'), 200);
+                 setTimeout(() => addLog(`捡到${newItem.name}服下，伤势好转。`, 'system'), 200);
               } else {
                  const idx = finalH.inventory.findIndex(i => i.name === newItem.name);
                  if (idx >= 0) finalH.inventory[idx].count++; else finalH.inventory.push(newItem);
@@ -246,7 +275,8 @@ export function useGame() {
            } 
            else if (newItem.type !== 'misc' && newItem.type !== 'book' && !finalH.equipment[newItem.type as keyof Equipment]) {
               finalH.equipment = { ...finalH.equipment, [newItem.type]: newItem };
-              setTimeout(() => addLog(`获得装备【${newItem.name}】，立即穿戴。`, 'highlight'), 500);
+              addMessage('system', '获得装备', `捡到了【${newItem.name}】，立即装备上了。`);
+              setTimeout(() => addLog(`获得装备【${newItem.name}】。`, 'highlight'), 500);
            } else {
               const idx = finalH.inventory.findIndex(i => i.name === newItem.name);
               if (idx >= 0) finalH.inventory[idx].count++; else finalH.inventory.push(newItem);
@@ -254,27 +284,35 @@ export function useGame() {
            }
         }
 
+        // 升级 -> 系统消息
         if (finalH.exp >= finalH.maxExp) {
            finalH.level++; finalH.exp = 0; finalH.maxExp = Math.floor(finalH.maxExp * 1.5);
            finalH.maxHp += 30; finalH.hp = finalH.maxHp;
            Object.keys(finalH.attributes).forEach(k => finalH.attributes[k as keyof typeof finalH.attributes]++);
            finalH.majorEvents.unshift(`${new Date().toLocaleTimeString()} 突破至 Lv.${finalH.level}`);
+           
+           addMessage('system', '境界提升', `恭喜！你的境界突破至 Lv.${finalH.level}，全属性提升！`);
            addLog(`【境界突破】气冲斗牛，晋升 Lv.${finalH.level}！`, 'highlight');
         }
 
         return finalH;
       });
 
+      // AI 触发逻辑
       const dice = Math.random();
-      let aiTriggered = false;
-      if (dice < 0.8) aiTriggered = await triggerAI('auto');
-
-      if (!aiTriggered) {
+      // 5% 概率触发江湖传闻 (低频)
+      if (dice < 0.05) {
+         await triggerAI('generate_rumor');
+      } 
+      // 60% 概率触发普通日志
+      else if (dice < 0.65) {
+         await triggerAI('auto');
+      }
+      else {
          let list = STATIC_LOGS.idle;
          if (newState === 'fight') list = STATIC_LOGS.fight;
          else if (newState === 'town') list = STATIC_LOGS.town;
          else if (newState === 'arena') list = STATIC_LOGS.arena;
-         
          let text = list[Math.floor(Math.random() * list.length)];
          if (!recentLogsRef.current.includes(text)) addLog(text, 'system');
       }

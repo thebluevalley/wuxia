@@ -36,7 +36,6 @@ export type Pet = {
   desc: string;
 };
 
-// 技能系统
 export type SkillType = 'attack' | 'inner' | 'speed' | 'medical' | 'trade';
 export type Skill = {
   name: string;
@@ -45,6 +44,17 @@ export type Skill = {
   exp: number;
   maxExp: number;
   desc: string;
+};
+
+// ⚠️ 新增：消息系统类型
+export type MessageType = 'rumor' | 'system';
+export type Message = {
+  id: string;
+  type: MessageType;
+  title: string;
+  content: string;
+  time: string;
+  isRead: boolean;
 };
 
 export type HeroState = {
@@ -61,11 +71,7 @@ export type HeroState = {
   storyStage: string; 
 
   attributes: { 
-    constitution: number;
-    strength: number;
-    dexterity: number;
-    intelligence: number;
-    luck: number;
+    constitution: number; strength: number; dexterity: number; intelligence: number; luck: number;
   };
 
   hp: number; maxHp: number;
@@ -73,19 +79,19 @@ export type HeroState = {
   gold: number;
   alignment: number;
   currentQuest: Quest;
-  
   location: string;
-  // ⚠️ 关键修正：确保包含 town 和 arena
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   
   logs: LogEntry[];
-  majorEvents: string[];
+  // ⚠️ 新增：消息列表 (用于告示页面)
+  messages: Message[];
+  // majorEvents 保留作为简略历史，messages 作为详细记录
+  majorEvents: string[]; 
+  
   inventory: Item[];
   equipment: Equipment;
-  
   martialArts: Skill[];
   lifeSkills: Skill[];
-  
   stats: { kills: number; days: number; arenaWins: number; };
 };
 
