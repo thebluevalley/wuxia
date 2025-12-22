@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-  // 1. 检查 Key
+  // 1. 检查 Key 是否存在
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     console.error("❌ [API Error] GOOGLE_API_KEY 未在环境变量中配置");
@@ -13,8 +13,7 @@ export async function POST(req: Request) {
     const { context, eventType, userAction } = await req.json();
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // ⚠️ 切换为 Gemini 2.0 Flash (实验版)
-    // 注意：如果未来 google 改名，这里可能需要更新为 'gemini-2.0-flash'
+    // ⚠️ 强制切换为 Gemini 2.0 Flash (实验版)
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
     // --- Prompt (提示词) ---
@@ -56,8 +55,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ text });
 
   } catch (error: any) {
+    // 打印详细错误信息到终端，方便排查
     console.error("❌ [Gemini 2.0 Error]:", error.message);
-    // 如果是模型不存在，可能是 Google 改名了，会在终端显示
     return NextResponse.json({ text: null });
   }
 }
