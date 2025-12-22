@@ -43,7 +43,7 @@ export function useGame() {
     });
   };
 
-  // 触发 AI
+  // 触发 AI (带错误诊断)
   const triggerAI = async (eventType: string, action?: string) => {
     if (!hero) return false;
     try {
@@ -52,27 +52,32 @@ export function useGame() {
         body: JSON.stringify({ context: hero, eventType, userAction: action })
       });
       
-      // 增加错误处理，防止静默失败
-      if (!res.ok) {
-        console.error("API请求失败:", res.status, res.statusText);
+      const data = await res.json();
+
+      // 如果后端返回了具体的 error 字段，直接显示出来！
+      if (data.error) {
+        console.error("后端报错:", data.error);
+        addLog(`【系统故障】${data.error}`, 'bad');
         return false;
       }
 
-      const data = await res.json();
       if (data.text) {
         addLog(data.text, eventType === 'god_action' ? 'highlight' : 'ai');
         lastLogText.current = data.text;
         return true;
       }
-    } catch (e) { console.error("前端调用错误:", e); }
+    } catch (e: any) { 
+      console.error("前端调用错误:", e);
+      addLog(`【网络故障】${e.message}`, 'bad');
+    }
     return false;
   };
 
-  // 手动测试 AI (文案已更新为 Groq)
+  // 手动测试 AI
   const testAI = async () => {
-    addLog("【系统】正在尝试沟通天道 (Groq Llama3)...", "system");
-    const success = await triggerAI('auto');
-    if (!success) addLog("【系统】天道渺茫。(请检查 .env.local 是否配置了 GROQ_API_KEY 并重启了终端)", "bad");
+    addLog("【系统】正在连接 Groq Llama3 ...", "system");
+    await triggerAI('auto');
+    // 不再显示通用的“天道渺茫”，而是依赖 triggerAI 里的具体报错
   };
 
   // 拾取物品
