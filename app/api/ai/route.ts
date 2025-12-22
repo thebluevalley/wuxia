@@ -3,39 +3,37 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ text: null, error: "后端未找到 GROQ_API_KEY" }, { status: 500 });
-  }
+  if (!apiKey) return NextResponse.json({ text: null, error: "No Key" }, { status: 500 });
 
   try {
     const { context, eventType, userAction } = await req.json();
     const groq = new Groq({ apiKey });
 
-    // 基础信息
-    const questInfo = context.questInfo || "游历江湖";
-    const petInfo = context.petInfo || "孤身一人";
+    // 提取信息
+    const questInfo = context.questInfo || "游历";
+    const petInfo = context.petInfo || "无";
+    const skillInfo = context.skillInfo || "乱拳";
     const stage = context.storyStage || "初出茅庐";
-    const lore = context.worldLore || "江湖动荡";
+    const lore = context.worldLore || "江湖";
     
-    // 🔥 核心 Prompt：赋予 AI 文学灵魂
+    // Prompt 设计：强调文学性，融入技能和物品
     const baseInstruction = `
-      你是一位精通金庸、古龙风格的武侠小说家。正在为放置游戏《云游江湖》实时撰写剧情日志。
+      你是一位武侠小说家（古龙/金庸风格）。为游戏《云游江湖》的主角"${context.name}"撰写实时日志。
       
-      【当前主角设定】
-      - 称号：${context.name} (Lv.${context.level})
-      - 人生阶段：【${stage}】 (请根据阶段调整语气，初出茅庐要青涩，一代宗师要孤傲)
-      - 性格：${context.personality} (行为要符合性格)
+      【设定】
+      - 阶段：${stage} (请符合此阶段的心境)
+      - 性格：${context.personality}
+      - 武功：${skillInfo} (战斗时务必描写具体招式)
       - 随从：${petInfo}
       - 所在：${context.location}
       - 任务：${questInfo}
       - 世界观：${lore}
 
-      【写作要求】
-      1. 字数：30-50字，短小精悍。
-      2. 风格：**极具文学性**。多用四字成语，多写环境氛围（风、雪、酒、剑），多写心理活动。
-      3. 拒绝流水账（如“他打了一下怪”），要写出画面感（如“剑光一闪，那厮的衣角已然碎裂”）。
-      4. 必须用“他”指代主角。
-      5. 结合当前[状态]和[任务]进行描写。
+      【要求】
+      1. 字数：30-55字。
+      2. 风格：**拒绝流水账**。使用环境渲染（风、雨、残阳）、心理独白、动作留白。
+      3. **不要**出现"玩家"、"系统"、"灵感"等词，这是小说正文。
+      4. 用“他”指代主角。
     `;
 
     let prompt = "";
@@ -43,35 +41,32 @@ export async function POST(req: Request) {
     if (eventType === 'god_action') {
       const isPunish = userAction.includes('天罚');
       prompt = `${baseInstruction}
-      【事件】天降异象，主角遭遇了【${userAction}】。
-      【任务】
+      【事件】天降异象【${userAction}】。
       ${isPunish 
-        ? '写一段他遭受挫折、被雷劈或运功岔气的狼狈描写。体现出“天将降大任于斯人也”的磨砺感。' 
-        : '写一段他福至心灵、伤势痊愈或顿悟的描写。体现出天道眷顾的喜悦。'}
+        ? '写一段他遭遇挫折、被雷劈或走火入魔的狼狈描写。' 
+        : '写一段他福至心灵、伤势痊愈或顿悟的喜悦描写。'}
       `;
     } else if (eventType === 'auto') {
       const isFight = context.state === 'fight' || context.state === 'arena';
       prompt = `${baseInstruction}
-      【状态】${isFight ? '激战中' : '游历/任务中'}。
-      【任务】
+      【状态】${isFight ? '激战' : '游历/生活'}。
       ${isFight 
-        ? '描写战斗的惊险瞬间。使用武侠招式名称（如：黑虎掏心、白鹤亮翅）。如果有宠物，描写宠物如何协助攻击。' 
-        : '描写他在执行任务途中的见闻、风景、内心独白，或者与路人/NPC的简短互动。要体现出江湖的烟火气或肃杀气。'}
+        ? '描写战斗瞬间。使用他的武功招式。如果带着宠物，宠物如何助攻？' 
+        : '描写旅途见闻、风景、内心感悟，或者在城镇中的烟火气（喝酒、买卖）。'}
       `;
     }
 
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 1.0, // 提高创造性，避免重复
-      max_tokens: 100,  // 稍微放宽字数限制，允许更优美的句子
+      temperature: 1.0, 
+      max_tokens: 100,
     });
 
     const text = completion.choices[0]?.message?.content || "";
     return NextResponse.json({ text });
 
   } catch (error: any) {
-    console.error("Groq Error:", error);
     return NextResponse.json({ text: null, error: error.message }, { status: 500 });
   }
 }
