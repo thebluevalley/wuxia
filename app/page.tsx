@@ -1,8 +1,8 @@
 'use client';
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Save } from 'lucide-react';
-import { ItemType } from '@/app/lib/constants';
+import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info } from 'lucide-react';
+import { ItemType, Quality } from '@/app/lib/constants';
 
 export default function Home() {
   const { hero, login, godAction, loading, error, clearError } = useGame();
@@ -15,44 +15,28 @@ export default function Home() {
     if (activeTab === 'logs') bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [hero?.logs, activeTab]);
 
-  // --- 登录界面 (带密码) ---
+  // ⚠️ 稀有度颜色映射
+  const getQualityColor = (q: Quality) => {
+    switch (q) {
+      case 'legendary': return 'text-orange-600 font-bold';
+      case 'epic': return 'text-purple-600 font-semibold';
+      case 'rare': return 'text-blue-600';
+      default: return 'text-stone-700';
+    }
+  };
+
   if (!hero) {
     return (
        <div className="flex h-[100dvh] flex-col items-center justify-center bg-[#fcf9f2] text-stone-800 p-6 relative overflow-hidden">
         <div className="z-10 flex flex-col items-center w-full max-w-xs">
           <div className="w-20 h-20 border-4 border-stone-800 rounded-full flex items-center justify-center mb-6 shadow-lg bg-white"><span className="font-serif text-4xl font-bold">侠</span></div>
           <h1 className="text-4xl font-serif font-bold mb-8 tracking-[0.5em] text-stone-900">云游江湖</h1>
-          
           <div className="flex flex-col gap-4 w-full">
-            <input 
-              type="text" 
-              placeholder="大侠尊姓大名" 
-              className="w-full bg-white/50 border-b-2 border-stone-300 p-3 text-center text-lg outline-none focus:border-stone-800 transition-colors font-serif placeholder:text-stone-400 rounded-t" 
-              value={inputName} 
-              onChange={e => {setInputName(e.target.value); clearError();}} 
-            />
-            <input 
-              type="password" 
-              placeholder="输入密令 (防止他人冒充)" 
-              className="w-full bg-white/50 border-b-2 border-stone-300 p-3 text-center text-lg outline-none focus:border-stone-800 transition-colors font-serif placeholder:text-stone-400 rounded-b" 
-              value={inputPassword} 
-              onChange={e => {setInputPassword(e.target.value); clearError();}} 
-            />
+            <input type="text" placeholder="大侠尊姓大名" className="w-full bg-white/50 border-b-2 border-stone-300 p-3 text-center text-lg outline-none focus:border-stone-800 transition-colors font-serif placeholder:text-stone-400 rounded-t" value={inputName} onChange={e => {setInputName(e.target.value); clearError();}} />
+            <input type="password" placeholder="输入密令" className="w-full bg-white/50 border-b-2 border-stone-300 p-3 text-center text-lg outline-none focus:border-stone-800 transition-colors font-serif placeholder:text-stone-400 rounded-b" value={inputPassword} onChange={e => {setInputPassword(e.target.value); clearError();}} />
           </div>
-
           {error && <div className="text-red-600 text-xs mt-3 bg-red-50 px-2 py-1 rounded border border-red-200">{error}</div>}
-
-          <button 
-            onClick={() => inputName && inputPassword && login(inputName, inputPassword)} 
-            disabled={loading || !inputName || !inputPassword}
-            className="mt-8 px-10 py-3 bg-stone-800 text-[#fcf9f2] font-serif text-lg rounded shadow-lg hover:bg-stone-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full"
-          >
-            {loading ? '正在读取江湖存档...' : '入世 / 继续'}
-          </button>
-          
-          <p className="text-stone-400 text-xs mt-4">
-            * 若名字不存在则自动创建，若存在则验证密令
-          </p>
+          <button onClick={() => inputName && inputPassword && login(inputName, inputPassword)} disabled={loading || !inputName || !inputPassword} className="mt-8 px-10 py-3 bg-stone-800 text-[#fcf9f2] font-serif text-lg rounded shadow-lg hover:bg-stone-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full">{loading ? '正在读取江湖存档...' : '入世 / 继续'}</button>
         </div>
       </div>
     );
@@ -94,7 +78,7 @@ export default function Home() {
     </header>
   );
 
-  // 1. 日志
+  // 1. Logs
   const LogsView = () => (
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-4 scroll-smooth">
@@ -121,7 +105,7 @@ export default function Home() {
     </div>
   );
 
-  // 2. 侠客
+  // 2. Hero
   const HeroView = () => (
     <div className="p-6 overflow-y-auto h-full space-y-6">
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
@@ -157,14 +141,6 @@ export default function Home() {
          </div>
       </div>
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
-         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><Stethoscope size={16}/> 生活百艺</h3>
-         <div className="flex flex-wrap gap-2">
-            {hero.lifeSkills.map((skill, i) => (
-              <span key={i} className="text-xs border border-stone-200 px-2 py-1 rounded text-stone-600 bg-stone-50">{skill.name} Lv.{skill.level}</span>
-            ))}
-         </div>
-      </div>
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
          <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><Star size={16}/> 天赋资质</h3>
          <div className="space-y-3">
              <AttributeRow icon={<Heart size={14}/>} label="体魄" val={hero.attributes.constitution} color="bg-red-400" />
@@ -187,9 +163,48 @@ export default function Home() {
 
   const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full" style={{width: `${Math.min(100, val * 2)}%`, backgroundColor: color.replace('bg-', '') === 'bg-red-400' ? '#f87171' : color === 'bg-amber-400' ? '#fbbf24' : color === 'bg-blue-400' ? '#60a5fa' : color === 'bg-purple-400' ? '#c084fc' : '#34d399'}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
 
-  const BagView = () => (<div className="p-4 h-full overflow-y-auto"><h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3><div className="space-y-2">{hero.inventory.map((item,i)=><div key={i} className="bg-white border border-stone-100 p-3 rounded flex justify-between"><span className="font-bold text-sm text-stone-700">{item.name}</span><div className="text-right"><span className="text-xs text-stone-400 block">x{item.count}</span><span className="text-[10px] bg-stone-100 px-1 rounded text-stone-500">价{item.price}</span></div></div>)}</div></div>);
-  const EquipView = () => { const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; return (<div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className="font-bold text-stone-800 text-sm">{item.name}</div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>);};
+  // 3. Bag
+  const BagView = () => (
+    <div className="p-4 h-full overflow-y-auto">
+      <h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3>
+      <div className="space-y-2">
+        {hero.inventory.map((item,i) => (
+          <div key={i} className="bg-white border border-stone-100 p-3 rounded flex justify-between">
+            <span className={`font-bold text-sm ${getQualityColor(item.quality)}`}>{item.name}</span>
+            <div className="text-right">
+              <span className="text-xs text-stone-400 block">x{item.count}</span>
+              <span className="text-[10px] bg-stone-100 px-1 rounded text-stone-500">价{item.price}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  
+  // 4. Equip
+  const EquipView = () => { 
+    const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; 
+    return (
+      <div className="p-4 h-full overflow-y-auto">
+        <div className="space-y-3">
+          {slots.map((slot) => { 
+            const item = hero.equipment[slot.key as keyof typeof hero.equipment]; 
+            return (
+              <div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div>
+                <div className="flex-1">
+                  <div className="text-xs text-stone-400 mb-1">{slot.label}</div>
+                  {item ? <div className={`font-bold text-sm ${getQualityColor(item.quality)}`}>{item.name}</div> : <div className="text-stone-300 italic text-sm">空</div>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    );
+  };
 
+  // 5. Messages
   const MessagesView = () => {
     const rumors = hero.messages.filter(m => m.type === 'rumor');
     const systems = hero.messages.filter(m => m.type === 'system');

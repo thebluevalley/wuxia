@@ -1,11 +1,13 @@
 export type ItemType = 'weapon' | 'head' | 'body' | 'legs' | 'feet' | 'accessory' | 'misc' | 'consumable' | 'book';
+export type Quality = 'common' | 'rare' | 'epic' | 'legendary';
 
 export type Item = {
   id: string;
   name: string;
   desc: string;
-  quality: 'common' | 'rare' | 'legendary';
+  quality: Quality; // 稀有度
   type: ItemType;
+  minLevel: number; // 最低穿戴/掉落等级
   count: number;
   price: number;
 };
@@ -122,44 +124,26 @@ export const PET_TEMPLATES = [
 
 export const ARENA_OPPONENTS = ["少林铜人", "峨眉师太", "全真道士", "丐帮长老", "魔教护法", "隐世扫地僧", "金兵百夫长", "东瀛浪人", "波斯圣女", "西域番僧"];
 
-// ⚠️ 升级：分级地图系统
-// minLv: 最低进入等级
+export const MAP_LOCATIONS = {
+  common: ["荒野古道", "龙门客栈", "风陵渡口", "乱葬岗", "悦来客栈"],
+  search: ["楼兰废墟", "剑冢", "绝情谷底", "桃花岛", "大漠深处"],
+  hunt:   ["黑风寨", "万兽山庄", "五毒教总坛", "快活林", "阴风谷"],
+  challenge: ["光明顶", "紫禁之巅", "华山栈道", "聚贤庄", "侠客岛"],
+  train:  ["少林藏经阁", "寒玉床", "思过崖", "达摩洞", "冰火岛"],
+  life:   ["扬州丽春院", "汴京御街", "牛家村", "七侠镇", "同福客栈"]
+};
+
 export const WORLD_MAP = [
-  // Tier 1: 新手村 (1-10级)
-  { name: "牛家村", type: "life", minLv: 1 },
-  { name: "破庙", type: "common", minLv: 1 },
-  { name: "乱葬岗", type: "hunt", minLv: 1 },
-  { name: "荒野古道", type: "common", minLv: 1 },
-  { name: "十里坡", type: "train", minLv: 1 },
-  { name: "小河边", type: "life", minLv: 1 },
-  // Tier 2: 初入江湖 (10-30级)
-  { name: "扬州城", type: "life", minLv: 10 },
-  { name: "快活林", type: "hunt", minLv: 10 },
-  { name: "悦来客栈", type: "common", minLv: 10 },
-  { name: "丐帮分舵", type: "challenge", minLv: 15 },
-  { name: "黑风寨", type: "hunt", minLv: 15 },
-  { name: "风陵渡口", type: "common", minLv: 15 },
-  { name: "无量山", type: "search", minLv: 20 },
-  { name: "梅庄", type: "life", minLv: 20 },
-  // Tier 3: 名动一方 (30-50级)
-  { name: "汴京御街", type: "life", minLv: 30 },
-  { name: "五毒教总坛", type: "hunt", minLv: 30 },
-  { name: "绝情谷", type: "search", minLv: 35 },
-  { name: "桃花岛", type: "train", minLv: 35 },
-  { name: "终南山", type: "challenge", minLv: 40 },
-  { name: "聚贤庄", type: "challenge", minLv: 40 },
-  { name: "冰火岛", type: "train", minLv: 45 },
-  // Tier 4: 绝世高手 (50-80级)
-  { name: "光明顶", type: "challenge", minLv: 50 },
-  { name: "少林藏经阁", type: "train", minLv: 55 },
-  { name: "黑木崖", type: "hunt", minLv: 60 },
-  { name: "紫禁之巅", type: "challenge", minLv: 65 },
-  { name: "剑冢", type: "search", minLv: 70 },
-  // Tier 5: 传说之地 (80+级)
-  { name: "侠客岛", type: "train", minLv: 80 },
-  { name: "昆仑仙境", type: "search", minLv: 85 },
-  { name: "剑魔荒冢", type: "train", minLv: 90 },
-  { name: "破碎虚空", type: "common", minLv: 99 }
+  // Tier 1: 1-10
+  { name: "牛家村", type: "life", minLv: 1 }, { name: "破庙", type: "common", minLv: 1 }, { name: "乱葬岗", type: "hunt", minLv: 1 }, { name: "荒野古道", type: "common", minLv: 1 }, { name: "十里坡", type: "train", minLv: 1 },
+  // Tier 2: 10-30
+  { name: "扬州城", type: "life", minLv: 10 }, { name: "快活林", type: "hunt", minLv: 10 }, { name: "悦来客栈", type: "common", minLv: 10 }, { name: "丐帮分舵", type: "challenge", minLv: 15 }, { name: "黑风寨", type: "hunt", minLv: 15 }, { name: "无量山", type: "search", minLv: 20 },
+  // Tier 3: 30-50
+  { name: "汴京御街", type: "life", minLv: 30 }, { name: "五毒教总坛", type: "hunt", minLv: 30 }, { name: "绝情谷", type: "search", minLv: 35 }, { name: "桃花岛", type: "train", minLv: 35 }, { name: "终南山", type: "challenge", minLv: 40 },
+  // Tier 4: 50-80
+  { name: "光明顶", type: "challenge", minLv: 50 }, { name: "少林藏经阁", type: "train", minLv: 55 }, { name: "黑木崖", type: "hunt", minLv: 60 }, { name: "紫禁之巅", type: "challenge", minLv: 65 }, { name: "剑冢", type: "search", minLv: 70 },
+  // Tier 5: 80+
+  { name: "侠客岛", type: "train", minLv: 80 }, { name: "昆仑仙境", type: "search", minLv: 85 }, { name: "剑魔荒冢", type: "train", minLv: 90 }, { name: "破碎虚空", type: "common", minLv: 99 }
 ];
 
 export const QUEST_SOURCES = {
@@ -170,28 +154,69 @@ export const QUEST_SOURCES = {
   life:   ["帮隔壁王大妈寻找走失的鸭子", "去集市摆摊卖艺赚盘缠", "帮村长修补漏雨的屋顶", "为心上人描眉画画", "在酒馆打听江湖传闻"]
 };
 
+// ⚠️ 升级：分级掉落表 (minLevel, quality)
 export const LOOT_TABLE: Partial<Item>[] = [
-  { name: "半个冷馒头", type: 'consumable', desc: "回血 +10", price: 1 },
-  { name: "女儿红", type: 'consumable', desc: "回血 +50，增加豪气", price: 20 },
-  { name: "金疮药", type: 'consumable', desc: "回血 +100", price: 50 },
-  { name: "大还丹", type: 'consumable', desc: "回满血，增加内力", price: 500 },
-  { name: "叫花鸡", type: 'consumable', desc: "回血 +200，香气扑鼻", price: 100 },
-  { name: "生锈的铁剑", type: 'weapon', desc: "攻击 +1", price: 30 },
-  { name: "百炼钢刀", type: 'weapon', desc: "攻击 +10", price: 150 },
-  { name: "倚天剑鞘", type: 'weapon', desc: "攻击 +50", price: 1000 },
-  { name: "粗布头巾", type: 'head', desc: "防御 +1", price: 10 },
-  { name: "金丝软甲(残)", type: 'body', desc: "防御 +20", price: 250 },
-  { name: "神行太保靴", type: 'feet', desc: "身法 +5", price: 80 },
-  { name: "平安符", type: 'accessory', desc: "福源 +1", price: 88 },
-  { name: "武功秘籍残卷", type: 'book', desc: "记载着一招半式", price: 300 },
-  { name: "神秘的藏宝图", type: 'misc', desc: "可能通向宝藏", price: 100 },
+  // Lv 1+ (Common)
+  { name: "半个冷馒头", type: 'consumable', desc: "回血 +10", price: 1, minLevel: 1, quality: 'common' },
+  { name: "生锈的铁剑", type: 'weapon', desc: "攻击 +1", price: 10, minLevel: 1, quality: 'common' },
+  { name: "粗布头巾", type: 'head', desc: "防御 +1", price: 5, minLevel: 1, quality: 'common' },
+  { name: "麻布裤", type: 'legs', desc: "防御 +1", price: 5, minLevel: 1, quality: 'common' },
+  { name: "草鞋", type: 'feet', desc: "身法 +1", price: 2, minLevel: 1, quality: 'common' },
+  
+  // Lv 10+ (Common/Rare)
+  { name: "女儿红", type: 'consumable', desc: "回血 +50，增加豪气", price: 20, minLevel: 10, quality: 'common' },
+  { name: "百炼钢刀", type: 'weapon', desc: "攻击 +10", price: 150, minLevel: 10, quality: 'rare' },
+  { name: "精铁护腕", type: 'accessory', desc: "臂力 +2", price: 100, minLevel: 10, quality: 'rare' },
+  { name: "皮甲", type: 'body', desc: "防御 +10", price: 80, minLevel: 10, quality: 'common' },
+  
+  // Lv 20+ (Rare)
+  { name: "金疮药", type: 'consumable', desc: "回血 +100", price: 50, minLevel: 20, quality: 'common' },
+  { name: "神行太保靴", type: 'feet', desc: "身法 +15", price: 300, minLevel: 20, quality: 'rare' },
+  { name: "金丝软甲(残)", type: 'body', desc: "防御 +30", price: 500, minLevel: 25, quality: 'rare' },
+  { name: "平安符", type: 'accessory', desc: "福源 +5", price: 200, minLevel: 15, quality: 'common' },
+
+  // Lv 40+ (Epic)
+  { name: "黑玉断续膏", type: 'consumable', desc: "回血 +500", price: 200, minLevel: 40, quality: 'rare' },
+  { name: "九花玉露丸", type: 'consumable', desc: "回血 +300, 内力大增", price: 300, minLevel: 35, quality: 'rare' },
+  { name: "玄铁重剑(仿)", type: 'weapon', desc: "攻击 +80", price: 1000, minLevel: 40, quality: 'epic' },
+  { name: "武功秘籍残卷", type: 'book', desc: "记载着一招半式", price: 500, minLevel: 30, quality: 'rare' },
+
+  // Lv 60+ (Legendary)
+  { name: "大还丹", type: 'consumable', desc: "起死回生", price: 1000, minLevel: 60, quality: 'epic' },
+  { name: "倚天剑", type: 'weapon', desc: "武林至尊，攻击 +200", price: 5000, minLevel: 60, quality: 'legendary' },
+  { name: "屠龙刀", type: 'weapon', desc: "号令天下，攻击 +220", price: 5500, minLevel: 65, quality: 'legendary' },
+  { name: "软猬甲", type: 'body', desc: "刀枪不入，反弹伤害", price: 4000, minLevel: 55, quality: 'legendary' },
 ];
 
+// ⚠️ 升级：更有代入感的静态日志 (拒绝鸡肋)
 export const STATIC_LOGS = {
-  idle: ["微风拂过。", "发了一会儿呆。", "路边的狗尾巴草挠得心里痒痒的。", "抬头看了看天上的流云。"],
-  fight: ["杀气弥漫。", "胜负只在一念之间。", "此时无声胜有声。", "刀光剑影。"],
-  town: ["市井喧嚣。", "红尘滚滚。", "有人欢喜有人愁。", "酒香不怕巷子深。"],
-  arena: ["万众瞩目。", "巅峰对决。", "生死状已签。", "台下欢声雷动。"]
+  idle: [
+    "风中隐约传来兵刃相交之声，令我不由得握紧了剑柄。",
+    "路过一间破败的茶寮，那瞎眼的说书人正讲到高潮处。",
+    "天边残阳如血，将孤独的影子拉得很长很长。",
+    "一阵马蹄声疾驰而过，尘土飞扬，不知又是哪里的急报。",
+    "忽觉丹田发热，似乎是近日苦练略有小成。",
+    "抚摸着手中的兵器，感受着它冰冷的温度。",
+    "远处山峦起伏，恰似这人心险恶的江湖。",
+  ],
+  fight: [
+    "杀气瞬间弥漫，连空气都仿佛凝固。",
+    "这一剑快若闪电，直取要害，避无可避。",
+    "双方内力激荡，周围的落叶被震得粉碎。",
+    "生死只在一线之间，不敢有丝毫分神。",
+  ],
+  town: [
+    "街道两旁叫卖声不绝于耳，充满了红尘烟火气。",
+    "酒楼上推杯换盏，几位豪客正在高谈阔论。",
+    "市井之中卧虎藏龙，那卖菜的老翁眼神竟如鹰隼般锐利。",
+    "由于囊中羞涩，只能看着路边的酱牛肉咽口水。",
+  ],
+  arena: [
+    "四周看台座无虚席，欢呼声震耳欲聋。",
+    "对手气息绵长，显然是内家高手，不可轻敌。",
+    "这一场比武关乎名声，绝不能输。",
+    "胜负已分，台下爆发出雷鸣般的掌声。",
+  ]
 };
 
 export const STORY_STAGES = [
