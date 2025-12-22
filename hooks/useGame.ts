@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE } from '@/app/lib/constants';
+import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment } from '@/app/lib/constants';
 
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL 
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
@@ -11,19 +11,17 @@ export function useGame() {
   const [loading, setLoading] = useState(false);
   const lastLogText = useRef<string>("");
 
-  // 登录/初始化
+  // 登录
   const login = async (name: string) => {
     setLoading(true);
-    // 随机性别
     const gender = Math.random() > 0.5 ? '男' : '女';
-    
     const newHero: HeroState = {
       name, level: 1, gender, age: 16, cultivation: '初窥门径',
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 0,
       location: '荒野古道', state: 'idle', 
       logs: [], inventory: [],
-      equipment: { weapon: null, armor: null, accessory: null },
-      skills: [{ name: '太祖长拳', level: 1, desc: '江湖流传最广的入门拳法。' }],
+      equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
+      skills: [{ name: '太祖长拳', level: 1, desc: '江湖入门拳法。' }],
       lifeSkills: [{ name: '烹饪', level: 1, desc: '只会烤红薯。' }],
       stats: { kills: 0, deaths: 0, days: 1 }
     };
@@ -71,40 +69,14 @@ export function useGame() {
     return false;
   };
 
-  // --- 核心：Godville 风格的神力干预 ---
   const godAction = async (type: 'bless' | 'punish') => {
     if (!hero) return;
-    
     if (type === 'bless') {
-      // 赐福 (Encourage): 回满血，虽然无收益，但是保命
       setHero(h => h ? {...h, hp: h.maxHp} : null);
-      triggerAI('god_action', '赐福(恢复状态)');
+      triggerAI('god_action', '赐福');
     } else {
-      // 天罚 (Punish): 扣血换经验 (鞭策)
-      // 逻辑：天雷劈下来，虽然受伤，但主角被吓得跑得更快了(加经验)，或者以此淬炼了肉身
-      const damage = Math.floor(hero.maxHp * 0.15); // 扣 15% 血
-      const expGain = Math.floor(hero.maxExp * 0.10); // 涨 10% 经验
-      
-      setHero(h => {
-        if (!h) return null;
-        let newHp = h.hp - damage;
-        if (newHp < 1) newHp = 1; // 别劈死
-        
-        // 检查升级
-        let newExp = h.exp + expGain;
-        let newLevel = h.level;
-        let newMaxExp = h.maxExp;
-        let newMaxHp = h.maxHp;
-        
-        if (newExp >= h.maxExp) {
-           newLevel++; newExp = 0; newMaxExp = Math.floor(h.maxExp * 1.5); newMaxHp += 20;
-           setTimeout(() => addLog(`【天道酬勤】在雷劈的压力下，竟然突破了！(Lv.${newLevel})`, 'highlight'), 800);
-        }
-        
-        return { ...h, hp: newHp, exp: newExp, level: newLevel, maxExp: newMaxExp, maxHp: newMaxHp };
-      });
-      
-      triggerAI('god_action', '天罚(雷劈鞭策)');
+      setHero(h => h ? {...h, hp: Math.max(1, h.hp - Math.floor(h.maxHp * 0.15)), exp: h.exp + Math.floor(h.maxExp * 0.1)} : null);
+      triggerAI('god_action', '天罚');
     }
   };
 
@@ -115,50 +87,74 @@ export function useGame() {
       const dice = Math.random();
       let aiTriggered = false;
 
-      // 40% 概率触发 AI
+      // AI 触发概率
       if (dice < 0.4) aiTriggered = await triggerAI('auto');
 
-      // 本地兜底
       if (!aiTriggered) {
-        const list = hero.state === 'fight' ? STATIC_LOGS.fight : STATIC_LOGS.idle;
-        let text = list[Math.floor(Math.random() * list.length)];
-        let attempts = 0;
-        while (text === lastLogText.current && attempts < 5) {
-           text = list[Math.floor(Math.random() * list.length)];
-           attempts++;
+        // 如果背包满了，强制进入“城镇”状态去卖东西
+        if (hero.inventory.length >= 20 && hero.state !== 'town') {
+             setHero(h => h ? { ...h, state: 'town' } : null);
+             addLog("行囊已满，少侠决定找个集市把破烂卖了。", "system");
+        } else if (hero.state === 'town') {
+             // 卖东西逻辑
+             setHero(h => {
+               if(!h) return null;
+               const totalGold = h.inventory.reduce((acc, item) => acc + (item.price * item.count), 0);
+               addLog(`少侠在当铺里一阵讨价还价，把包里的东西都卖了，换得 ${totalGold} 文钱。`, "highlight");
+               return { ...h, inventory: [], gold: h.gold + totalGold, state: 'idle' };
+             });
+        } else {
+             // 普通日志
+             const list = hero.state === 'fight' ? STATIC_LOGS.fight : STATIC_LOGS.idle;
+             let text = list[Math.floor(Math.random() * list.length)];
+             let attempts = 0;
+             while (text === lastLogText.current && attempts < 5) {
+                text = list[Math.floor(Math.random() * list.length)];
+                attempts++;
+             }
+             lastLogText.current = text;
+             addLog(text);
         }
-        lastLogText.current = text;
-        addLog(text);
       }
 
-      // 状态变更 & 掉落
+      // 状态变更
       setHero(h => {
         if(!h) return null;
         let newH = {...h};
         
-        // 掉落
-        if (Math.random() < 0.1) {
-           const lootTemplate = LOOT_TABLE[Math.floor(Math.random() * LOOT_TABLE.length)];
+        // 掉落逻辑 (降低概率到 2%)
+        if (h.state !== 'town' && Math.random() < 0.02) {
+           const template = LOOT_TABLE[Math.floor(Math.random() * LOOT_TABLE.length)];
            const newItem: Item = { 
              id: Date.now().toString(), 
-             name: lootTemplate.name || "未知物品", 
-             desc: lootTemplate.desc || "...", 
-             quality: 'common',
-             type: lootTemplate.type || 'misc' 
+             name: template.name!, desc: template.desc!, quality: 'common', 
+             type: template.type as ItemType, count: 1, price: template.price || 1
            };
-           newH.inventory = [...newH.inventory, newItem];
-           setTimeout(() => addLog(`捡到了【${newItem.name}】。`, 'highlight'), 500);
+
+           // 1. 自动装备逻辑：如果该部位是空的，直接穿上
+           if (newItem.type !== 'misc' && !newH.equipment[newItem.type as keyof Equipment]) {
+              newH.equipment = { ...newH.equipment, [newItem.type]: newItem };
+              setTimeout(() => addLog(`捡到一件【${newItem.name}】，正好缺这个，顺手穿上了。`, 'highlight'), 200);
+           } 
+           // 2. 堆叠逻辑
+           else {
+              const existingIndex = newH.inventory.findIndex(i => i.name === newItem.name);
+              if (existingIndex >= 0) {
+                newH.inventory[existingIndex].count += 1;
+                // 只有第一次捡到或者通过AI才提示，防止刷屏
+              } else {
+                newH.inventory = [...newH.inventory, newItem];
+                setTimeout(() => addLog(`捡到了【${newItem.name}】。`, 'highlight'), 500);
+              }
+           }
         }
 
-        if (Math.random() < 0.1) newH.state = newH.state === 'idle' ? 'fight' : 'idle';
+        if (h.state !== 'town' && Math.random() < 0.1) newH.state = newH.state === 'idle' ? 'fight' : 'idle';
         if (h.hp < h.maxHp && h.state === 'idle') newH.hp += 2;
         if (Math.random() < 0.2) newH.gold += 1;
         
-        // 升级
         if (newH.exp >= newH.maxExp) {
-           newH.level++; newH.exp = 0; newH.maxExp = Math.floor(newH.maxExp * 1.5); 
-           newH.maxHp += 20; newH.hp = newH.maxHp;
-           newH.cultivation = newH.level > 10 ? '略有小成' : '初窥门径';
+           newH.level++; newH.exp = 0; newH.maxExp = Math.floor(newH.maxExp * 1.5); newH.maxHp += 20; newH.hp = newH.maxHp;
            setTimeout(() => addLog(`【境界突破】金光透体！等级提升至 Lv.${newH.level}`, 'highlight'), 100);
         }
         return newH;
@@ -166,7 +162,7 @@ export function useGame() {
     }, 4000);
 
     return () => clearInterval(tick);
-  }, [hero?.name]);
+  }, [hero?.name, hero?.state, hero?.inventory.length]); // 监听 inventory.length 以触发回城
 
   return { hero, login, godAction, loading };
 }
