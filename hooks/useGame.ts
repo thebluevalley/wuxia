@@ -9,8 +9,10 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 export function useGame() {
   const [hero, setHero] = useState<HeroState | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null); // 新增错误状态
   const recentLogsRef = useRef<string[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null); // 保存定时器
 
   const getStoryStage = (level: number) => {
     const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
@@ -33,12 +35,15 @@ export function useGame() {
   const getInitialSkills = (): Skill[] => [{ name: "太祖长拳", type: 'attack', level: 1, exp: 0, maxExp: 100, desc: "江湖流传最广的入门拳法" }];
   const getInitialLifeSkills = (): Skill[] => [{ name: "包扎", type: 'medical', level: 1, exp: 0, maxExp: 100, desc: "简单的伤口处理" }];
 
-  const login = async (name: string) => {
+  // ⚠️ 登录逻辑：验证密码，加载/创建用户
+  const login = async (name: string, password: string) => {
     setLoading(true);
+    setError(null);
+
+    // 默认新英雄模板
     const gender = Math.random() > 0.5 ? '男' : '女';
     const personality = PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)];
     const initialQuest = generateQuest();
-    
     const newHero: HeroState = {
       name, level: 1, gender, age: 16, 
       personality, title: "初出茅庐",
@@ -58,35 +63,80 @@ export function useGame() {
       stats: { kills: 0, days: 1, arenaWins: 0 },
       currentQuest: initialQuest,
     };
-    
-    // 初始化时直接设置
-    setHero(newHero); 
-    
-    if (supabase) {
-      let { data } = await supabase.from('profiles').select('*').eq('username', name).single();
-      if (!data) {
-        const { data: created } = await supabase.from('profiles').insert({ username: name, data: newHero }).select().single();
-        data = created;
+
+    if (!supabase) {
+      setHero(newHero); // 离线模式（无后端）
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // 1. 尝试获取用户
+      let { data: user, error: fetchError } = await supabase.from('profiles').select('*').eq('username', name).single();
+
+      if (user) {
+        // 2. 用户存在，验证密码
+        if (user.password !== password) {
+          setError("密令错误！非本人请勿尝试。");
+          setLoading(false);
+          return;
+        }
+        // 3. 密码正确，加载数据 (合并新字段以防老存档崩溃)
+        const mergedData = { ...newHero, ...user.data };
+        // 修复潜在的旧数据结构问题
+        if (!mergedData.martialArts) mergedData.martialArts = getInitialSkills();
+        if (!mergedData.messages) mergedData.messages = [];
+        mergedData.storyStage = getStoryStage(mergedData.level);
+        
+        setHero(mergedData);
+        // 触发 "回归游戏" AI 事件
+        setTimeout(() => triggerAI('resume_game', undefined, mergedData), 500);
+
+      } else {
+        // 4. 用户不存在，创建新用户
+        const { error: insertError } = await supabase.from('profiles').insert({ 
+          username: name, 
+          password: password, 
+          data: newHero 
+        });
+        
+        if (insertError) {
+          throw insertError;
+        }
+        
+        setHero(newHero);
+        // 触发 "新游戏" AI 事件
+        setTimeout(() => triggerAI('start_game', undefined, newHero), 500);
       }
-      const mergedData = { ...newHero, ...data.data };
-      // 兼容代码...
-      if (!mergedData.martialArts) mergedData.martialArts = getInitialSkills();
-      if (!mergedData.messages) mergedData.messages = [];
-      mergedData.storyStage = getStoryStage(mergedData.level);
-      
-      setHero(mergedData);
+    } catch (e: any) {
+      console.error(e);
+      setError("连接天道失败，请重试。");
     }
     
-    // ⚠️ 核心：登录成功后，立即触发“开场”剧情
     setLoading(false);
-    setTimeout(() => {
-       // 需要传当前的 hero 状态
-       triggerAI('start_game', undefined, newHero);
-    }, 500);
   };
 
+  // ⚠️ 自动保存逻辑 (Auto-Save with Debounce)
+  useEffect(() => {
+    if (!hero || !supabase) return;
+
+    // 清除上一次的定时器，避免频繁保存
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+    // 设置新的定时器：5秒后保存
+    saveTimeoutRef.current = setTimeout(async () => {
+      // 只保存数据，不保存 UI 状态
+      await supabase.from('profiles').update({ data: hero }).eq('username', hero.name);
+      console.log("💾 游戏进度已自动保存");
+    }, 5000);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [hero]); // 当 hero 变化时触发
+
   const addLog = (text: string, type: LogEntry['type'] = 'normal') => {
-    recentLogsRef.current = [text, ...recentLogsRef.current].slice(0, 3); // 记录最近3条
+    recentLogsRef.current = [text, ...recentLogsRef.current].slice(0, 3);
     setHero(prev => {
       if (!prev) return null;
       const newLog = { 
@@ -110,7 +160,6 @@ export function useGame() {
     });
   };
 
-  // ⚠️ 升级：传入 explicitHero 以支持在 setHero 生效前调用
   const triggerAI = async (eventType: string, action?: string, explicitHero?: HeroState) => {
     const currentHero = explicitHero || hero;
     if (!currentHero) return false;
@@ -124,7 +173,6 @@ export function useGame() {
         questInfo: `[${currentHero.currentQuest.type}] ${currentHero.currentQuest.name} (${currentHero.currentQuest.progress}%)`,
         petInfo: currentHero.pet ? `携带${currentHero.pet.type}` : "无",
         skillInfo: `擅长${bestSkill?.name || '乱拳'}(Lv.${bestSkill?.level || 1})`,
-        // ⚠️ 核心：把最近发生的 3 条日志发给 AI，让它别重复
         recentLogs: recentLogsRef.current 
       };
       
@@ -146,7 +194,7 @@ export function useGame() {
            }
            addMessage('rumor', title, content);
         } else {
-           addLog(data.text, eventType === 'god_action' || eventType === 'start_game' ? 'highlight' : 'normal');
+           addLog(data.text, eventType === 'god_action' || eventType === 'start_game' || eventType === 'resume_game' ? 'highlight' : 'normal');
         }
         return true;
       }
@@ -182,10 +230,8 @@ export function useGame() {
       let goldChange = 0;
       let expChange = 0;
       
-      // ⚠️ 任务推进标记
       let isQuestUpdate = false; 
 
-      // 任务完成
       if (newQuestProgress >= 100) {
         newQuestProgress = 0;
         const reward = Math.floor(Math.random() * 50) + 30;
@@ -200,7 +246,6 @@ export function useGame() {
         newLocation = getLocationByQuest(newQuest.type);
         setTimeout(() => addLog(`【新程】前往 ${newLocation} 执行：${newQuest.name}`, 'system'), 1000);
       } else {
-        // 普通进度增加，标记为任务更新，大概率触发 AI
         isQuestUpdate = true;
       }
 
@@ -304,22 +349,16 @@ export function useGame() {
         return finalH;
       });
 
-      // ⚠️ AI 触发逻辑优化
       const dice = Math.random();
-      
-      // 1. 传闻 (5%)
       if (dice < 0.05) {
          await triggerAI('generate_rumor');
       } 
-      // 2. 任务推进 (如果任务有进度更新，50% 概率触发 AI 描写具体过程)
       else if (isQuestUpdate && dice < 0.5) {
          await triggerAI('quest_update');
       }
-      // 3. 普通日志 (30%)
       else if (dice < 0.8) {
          await triggerAI('auto');
       }
-      // 4. 本地兜底
       else {
          let list = STATIC_LOGS.idle;
          if (newState === 'fight') list = STATIC_LOGS.fight;
@@ -337,5 +376,5 @@ export function useGame() {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [hero?.name]);
 
-  return { hero, login, godAction, loading };
+  return { hero, login, godAction, loading, error, clearError: () => setError(null) };
 }

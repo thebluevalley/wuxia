@@ -1,27 +1,58 @@
 'use client';
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info } from 'lucide-react';
+import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Save } from 'lucide-react';
 import { ItemType } from '@/app/lib/constants';
 
 export default function Home() {
-  const { hero, login, godAction, loading } = useGame();
+  const { hero, login, godAction, loading, error, clearError } = useGame();
   const [inputName, setInputName] = useState('');
-  const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'equip' | 'messages'>('logs'); // 新增 messages tab
+  const [inputPassword, setInputPassword] = useState('');
+  const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'equip' | 'messages'>('logs');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (activeTab === 'logs') bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [hero?.logs, activeTab]);
 
+  // --- 登录界面 (带密码) ---
   if (!hero) {
     return (
        <div className="flex h-[100dvh] flex-col items-center justify-center bg-[#fcf9f2] text-stone-800 p-6 relative overflow-hidden">
-        <div className="z-10 flex flex-col items-center">
+        <div className="z-10 flex flex-col items-center w-full max-w-xs">
           <div className="w-20 h-20 border-4 border-stone-800 rounded-full flex items-center justify-center mb-6 shadow-lg bg-white"><span className="font-serif text-4xl font-bold">侠</span></div>
-          <h1 className="text-4xl font-serif font-bold mb-2 tracking-[0.5em] text-stone-900">云游江湖</h1>
-          <input type="text" placeholder="请赐道号" className="w-64 bg-transparent border-b-2 border-stone-300 p-2 text-center text-xl outline-none focus:border-stone-800 transition-colors mb-8 font-serif placeholder:text-stone-300" value={inputName} onChange={e => setInputName(e.target.value)} />
-          <button onClick={() => inputName && login(inputName)} disabled={loading} className="px-8 py-3 bg-stone-800 text-[#fcf9f2] font-serif text-lg rounded shadow-lg hover:bg-stone-700 active:scale-95 transition-all">{loading ? '墨研中...' : '入世修行'}</button>
+          <h1 className="text-4xl font-serif font-bold mb-8 tracking-[0.5em] text-stone-900">云游江湖</h1>
+          
+          <div className="flex flex-col gap-4 w-full">
+            <input 
+              type="text" 
+              placeholder="大侠尊姓大名" 
+              className="w-full bg-white/50 border-b-2 border-stone-300 p-3 text-center text-lg outline-none focus:border-stone-800 transition-colors font-serif placeholder:text-stone-400 rounded-t" 
+              value={inputName} 
+              onChange={e => {setInputName(e.target.value); clearError();}} 
+            />
+            <input 
+              type="password" 
+              placeholder="输入密令 (防止他人冒充)" 
+              className="w-full bg-white/50 border-b-2 border-stone-300 p-3 text-center text-lg outline-none focus:border-stone-800 transition-colors font-serif placeholder:text-stone-400 rounded-b" 
+              value={inputPassword} 
+              onChange={e => {setInputPassword(e.target.value); clearError();}} 
+            />
+          </div>
+
+          {error && <div className="text-red-600 text-xs mt-3 bg-red-50 px-2 py-1 rounded border border-red-200">{error}</div>}
+
+          <button 
+            onClick={() => inputName && inputPassword && login(inputName, inputPassword)} 
+            disabled={loading || !inputName || !inputPassword}
+            className="mt-8 px-10 py-3 bg-stone-800 text-[#fcf9f2] font-serif text-lg rounded shadow-lg hover:bg-stone-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full"
+          >
+            {loading ? '正在读取江湖存档...' : '入世 / 继续'}
+          </button>
+          
+          <p className="text-stone-400 text-xs mt-4">
+            * 若名字不存在则自动创建，若存在则验证密令
+          </p>
         </div>
       </div>
     );
@@ -159,14 +190,11 @@ export default function Home() {
   const BagView = () => (<div className="p-4 h-full overflow-y-auto"><h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3><div className="space-y-2">{hero.inventory.map((item,i)=><div key={i} className="bg-white border border-stone-100 p-3 rounded flex justify-between"><span className="font-bold text-sm text-stone-700">{item.name}</span><div className="text-right"><span className="text-xs text-stone-400 block">x{item.count}</span><span className="text-[10px] bg-stone-100 px-1 rounded text-stone-500">价{item.price}</span></div></div>)}</div></div>);
   const EquipView = () => { const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; return (<div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className="font-bold text-stone-800 text-sm">{item.name}</div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>);};
 
-  // ⚠️ 新增：5. 告示视图 (Messages)
   const MessagesView = () => {
     const rumors = hero.messages.filter(m => m.type === 'rumor');
     const systems = hero.messages.filter(m => m.type === 'system');
-
     return (
       <div className="p-4 h-full overflow-y-auto space-y-6">
-         {/* 江湖传闻 */}
          <div>
             <h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><MessageSquare size={16}/> 江湖风声</h3>
             {rumors.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无风声</div> : (
@@ -183,8 +211,6 @@ export default function Home() {
               </div>
             )}
          </div>
-
-         {/* 系统消息 */}
          <div>
             <h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><Info size={16}/> 系统记录</h3>
             {systems.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无记录</div> : (

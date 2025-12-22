@@ -14,55 +14,48 @@ export async function POST(req: Request) {
     const skillInfo = context.skillInfo || "乱拳";
     const stage = context.storyStage || "初出茅庐";
     const lore = context.worldLore || "江湖";
-    // ⚠️ 历史记录
     const recentLogs = context.recentLogs ? context.recentLogs.join(" | ") : "无";
     
-    // Prompt 设计
     const baseInstruction = `
       你是一位精通金庸古龙风格的武侠小说家。为《云游江湖》的主角"${context.name}"撰写实时剧情。
-      
-      【设定】
-      - 阶段：${stage} (请符合此阶段心境)
-      - 性格：${context.personality}
-      - 所在：${context.location}
-      - 任务：${questInfo}
-      - 历史：${recentLogs} (⚠️绝对不要重复这些内容！)
-
-      【写作要求】
-      1. 拒绝流水账。写出画面感、环境氛围、心理活动。
-      2. 这是一个连续的故事，请根据[历史]推动剧情发展。
-      3. 除非是"开场"，否则字数控制在35-60字。
-      4. 用“他”指代主角。
+      【设定】阶段:${stage}, 性格:${context.personality}, 所在:${context.location}, 任务:${questInfo}, 历史:${recentLogs}
+      【要求】拒绝流水账，写出画面感。字数35-60字。用“他”指代主角。
     `;
 
     let prompt = "";
     let maxTokens = 100;
     
-    // ⚠️ 1. 开场白 (长文本)
+    // 1. 开场白 (新游戏)
     if (eventType === 'start_game') {
       prompt = `${baseInstruction}
       【任务】游戏刚开始。写一段精彩的开场白。
-      【内容】描写他为何踏入江湖（是身负血仇、为了梦想、还是被迫下山？），描写当时的天气和他的心境。
+      【内容】描写他为何踏入江湖（身负血仇、为了梦想、或被迫下山？），描写当时的天气和他的心境。
       【要求】字数 80-120 字。文笔要极好，引人入胜。`;
       maxTokens = 200;
     }
-    // ⚠️ 2. 任务推进 (具体行动)
-    else if (eventType === 'quest_update') {
+    // 2. 回归游戏 (读取存档)
+    else if (eventType === 'resume_game') {
       prompt = `${baseInstruction}
-      【任务】任务进度更新了。请写一段具体的**行动描写**。
-      【内容】不要只说“正在做任务”。要写具体的细节。
-      例如：如果是"寻找宝藏"，写"他拨开杂草，发现了一个隐蔽的树洞..."
-      例如：如果是"讨伐土匪"，写"他屏住呼吸，潜伏在寨门后的阴影里..."
+      【任务】玩家休息了一段时间，重新回到了游戏。
+      【内容】描写他从休息中醒来，或者整理行装准备继续上路。可以带点“江湖路远，久别重逢”的感慨。
       `;
     }
-    // 3. 江湖传闻
+    // 3. 任务推进
+    else if (eventType === 'quest_update') {
+      prompt = `${baseInstruction}
+      【任务】任务进度更新。写一段具体的**行动描写**。
+      【内容】不要只说“正在做任务”。要写具体的细节。
+      例如：如果是"寻找宝藏"，写"他拨开杂草，发现了一个隐蔽的树洞..."
+      `;
+    }
+    // 4. 江湖传闻
     else if (eventType === 'generate_rumor') {
       prompt = `${baseInstruction}
-      【任务】写一段“江湖传闻”。不要写主角。写江湖大事（门派被灭、神兵出世）。
+      【任务】写一段“江湖传闻”。不要写主角。写江湖大事。
       格式：【标题】：内容。`;
       maxTokens = 150;
     } 
-    // 4. 普通/战斗
+    // 5. 普通/战斗
     else if (eventType === 'auto') {
       const isFight = context.state === 'fight' || context.state === 'arena';
       prompt = `${baseInstruction}
@@ -72,7 +65,7 @@ export async function POST(req: Request) {
         : '描写旅途风景、内心感悟、或城镇烟火气。'}
       `;
     }
-    // 5. 神力
+    // 6. 神力
     else if (eventType === 'god_action') {
       const isPunish = userAction.includes('天罚');
       prompt = `${baseInstruction}
