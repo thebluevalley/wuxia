@@ -13,8 +13,9 @@ export async function POST(req: Request) {
     const { context, eventType, userAction } = await req.json();
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // ⚠️ 强制切换为 Gemini 2.0 Flash (实验版)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    // ⚠️ 修复：从 gemini-2.0-flash-exp 回退到 gemini-1.5-flash
+    // 1.5 Flash 稳定版对免费用户有极高的额度，不会轻易报错 429
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // --- Prompt (提示词) ---
     const baseInstruction = `
@@ -45,18 +46,18 @@ export async function POST(req: Request) {
       `;
     }
 
-    console.log(`🤖 [Gemini 2.0] 正在生成 (${eventType})...`);
+    console.log(`🤖 [Gemini 1.5] 正在生成 (${eventType})...`);
     
     const result = await model.generateContent(prompt);
     const text = result.response.text();
     
-    console.log("✅ [Gemini 2.0] 生成成功:", text);
+    console.log("✅ [Gemini 1.5] 生成成功:", text);
 
     return NextResponse.json({ text });
 
   } catch (error: any) {
-    // 打印详细错误信息到终端，方便排查
-    console.error("❌ [Gemini 2.0 Error]:", error.message);
+    console.error("❌ [Gemini Error]:", error.message);
+    // 即使出错，返回 null 让前端用本地文案兜底，保证游戏不卡死
     return NextResponse.json({ text: null });
   }
 }
