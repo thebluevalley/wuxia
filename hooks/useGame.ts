@@ -51,11 +51,14 @@ export function useGame() {
         const { data: created } = await supabase.from('profiles').insert({ username: name, data: newHero }).select().single();
         data = created;
       }
-      // 简单的合并策略，防止老号缺少新字段报错
+      // 简单的合并策略
       const mergedData = { ...newHero, ...data.data };
-      // 补全可能缺失的字段
       if (typeof mergedData.godPower === 'undefined') mergedData.godPower = 100;
       if (!mergedData.unlockedFeatures) mergedData.unlockedFeatures = [];
+      // 兼容旧数据结构：如果 oldQuest 存在，转为对象结构
+      if (typeof mergedData.currentQuest === 'string') {
+         mergedData.currentQuest = generateQuest();
+      }
       
       if (data) setHero(mergedData);
     } else {
@@ -76,7 +79,6 @@ export function useGame() {
     });
   };
 
-  // AI 触发
   const triggerAI = async (eventType: string, action?: string) => {
     if (!hero) return false;
     try {
@@ -99,11 +101,9 @@ export function useGame() {
     return false;
   };
 
-  // 天罚/赐福
   const godAction = async (type: 'bless' | 'punish') => {
     if (!hero) return;
     
-    // 检查神力
     if (hero.godPower < 25) {
       addLog("【神力不足】你的神力已耗尽，请等待恢复。", "system");
       return;
@@ -124,7 +124,6 @@ export function useGame() {
     }
   };
 
-  // 游戏主循环
   useEffect(() => {
     if (!hero) return;
 
@@ -147,7 +146,7 @@ export function useGame() {
         addLog("【境界提升】你的大名传遍江湖，解锁了「竞技场」！", "highlight");
       }
 
-      // 3. 宠物获取 (5% 概率)
+      // 3. 宠物获取
       let newPet = hero.pet;
       if (hero.level >= 5 && !hero.pet && Math.random() < 0.05) {
         const template = PET_TEMPLATES[Math.floor(Math.random() * PET_TEMPLATES.length)];
@@ -155,15 +154,14 @@ export function useGame() {
         addLog(`【奇遇】路边捡到一只流浪的${newPet.type}，决定收养它。`, "highlight");
       }
 
-      // 4. 竞技场遭遇 (10% 概率)
+      // 4. 竞技场
       let newState = hero.state;
       if (hero.level >= 10 && hero.state === 'idle' && Math.random() < 0.1) {
          newState = 'arena';
          const opponent = ARENA_OPPONENTS[Math.floor(Math.random() * ARENA_OPPONENTS.length)];
          addLog(`【竞技场】遇到了对手「${opponent}」，大战一触即发！`, "highlight");
       } else if (hero.state === 'arena') {
-         // 竞技场结算
-         if (Math.random() > 0.4) { // 60% 胜率
+         if (Math.random() > 0.4) { 
            addLog("【竞技胜利】险胜对手，获得了大量声望和金币！", "highlight");
            setHero(h => h ? { ...h, gold: h.gold + 50, stats: {...h.stats, arenaWins: (h.stats.arenaWins || 0) + 1} } : null);
          } else {
@@ -173,14 +171,16 @@ export function useGame() {
          newState = 'idle';
       }
 
-      // 5. 任务进度
-      let newQuestProgress = hero.questProgress + 5 + Math.floor(Math.random() * 5);
+      // 5. 任务进度 (修复点：使用 hero.currentQuest.progress)
+      // ⚠️ 修复：直接读取 currentQuest.progress，不再使用不存在的 questProgress
+      let newQuestProgress = hero.currentQuest.progress + 5 + Math.floor(Math.random() * 5);
       let newQuest = hero.currentQuest;
+      
       if (newQuestProgress >= 100) {
         newQuestProgress = 0;
         const reward = Math.floor(Math.random() * 50) + 20;
         addLog(`【任务完成】${hero.currentQuest.name} 已达成！获得赏金 ${reward} 文。`, 'highlight');
-        newQuest = generateQuest();
+        newQuest = generateQuest(); // 生成新任务对象
         setTimeout(() => addLog(`【新委托】决定开始：${newQuest.name}`, 'system'), 1000);
       }
 
@@ -192,6 +192,7 @@ export function useGame() {
             unlockedFeatures: newFeatures, 
             pet: newPet, 
             state: newState,
+            // ⚠️ 修复：将进度写回对象内部
             currentQuest: { ...newQuest, progress: newQuestProgress >= 100 ? 0 : newQuestProgress },
             gold: newQuestProgress >= 100 ? h.gold + 30 : h.gold
         };
@@ -251,13 +252,10 @@ export function useGame() {
          else if (newState === 'arena') list = STATIC_LOGS.arena || STATIC_LOGS.fight;
          
          let text = list[Math.floor(Math.random() * list.length)];
-         // 去重
          if (!recentLogsRef.current.includes(text)) addLog(text);
       }
 
-      // 8. 随机时间间隔 (30s - 3m)
       const nextTick = Math.floor(Math.random() * (180000 - 30000) + 30000); 
-      // const nextTick = 5000; // 调试用：5秒
       console.log(`Next tick: ${nextTick/1000}s`);
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
