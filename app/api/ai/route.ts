@@ -2,17 +2,22 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
+  // 1. 检查 Key
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
+    console.error("❌ [API Error] GOOGLE_API_KEY 未在环境变量中配置");
     return NextResponse.json({ text: null });
   }
 
   try {
     const { context, eventType, userAction } = await req.json();
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    // ⚠️ 切换为 Gemini 2.0 Flash (实验版)
+    // 注意：如果未来 google 改名，这里可能需要更新为 'gemini-2.0-flash'
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
-    // 强化 Prompt：要求简短、有文采
+    // --- Prompt (提示词) ---
     const baseInstruction = `
       你是一位精通古龙风格的武侠小说旁白。
       请生成一段**极简短**的游戏日志。
@@ -20,7 +25,7 @@ export async function POST(req: Request) {
       1. 字数严格控制在 **35字以内**。
       2. 风格：冷峻、留白、画面感强，或带黑色幽默。
       3. 用“他”代替主角名字，不要出现“少侠”。
-      4. 即使是战斗，也要写出意境，不要记流水账。
+      4. 绝对不要写“接下来的故事”、“未完待续”。
     `;
 
     let prompt = "";
@@ -41,12 +46,18 @@ export async function POST(req: Request) {
       `;
     }
 
+    console.log(`🤖 [Gemini 2.0] 正在生成 (${eventType})...`);
+    
     const result = await model.generateContent(prompt);
     const text = result.response.text();
+    
+    console.log("✅ [Gemini 2.0] 生成成功:", text);
+
     return NextResponse.json({ text });
 
-  } catch (error) {
-    console.error("AI Error:", error);
+  } catch (error: any) {
+    console.error("❌ [Gemini 2.0 Error]:", error.message);
+    // 如果是模型不存在，可能是 Google 改名了，会在终端显示
     return NextResponse.json({ text: null });
   }
 }

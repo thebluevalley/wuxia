@@ -63,7 +63,7 @@ export function useGame() {
 
   // 手动测试 AI (调试用)
   const testAI = async () => {
-    addLog("【系统】正在尝试以此刻心境沟通天道...", "system");
+    addLog("【系统】正在尝试以此刻心境沟通天道(Gemini 2.0)...", "system");
     const success = await triggerAI('auto');
     if (!success) addLog("【系统】天道渺茫，并无回应。(请检查 API Key)", "bad");
   };
@@ -120,10 +120,8 @@ export function useGame() {
       setHero(h => {
         if(!h) return null;
         let newH = {...h};
-        // 10% 概率掉落物品
         if (Math.random() < 0.1) {
            const item = LOOT_TABLE[Math.floor(Math.random() * LOOT_TABLE.length)];
-           // 延迟一下再显示掉落日志，避免和主日志重叠太快
            setTimeout(() => addLog(`意外发现了一个【${item}】。`, 'highlight'), 500);
            const newItem: Item = { id: Date.now().toString(), name: item, desc: "寻常之物。", quality: 'common' };
            newH.inventory = [...newH.inventory, newItem];
