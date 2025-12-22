@@ -11,25 +11,31 @@ export async function POST(req: Request) {
     const { context, eventType, userAction } = await req.json();
     const groq = new Groq({ apiKey });
 
-    // 提取上下文信息
+    // 基础信息
     const questInfo = context.questInfo || "游历江湖";
     const petInfo = context.petInfo || "孤身一人";
+    const stage = context.storyStage || "初出茅庐";
+    const lore = context.worldLore || "江湖动荡";
     
-    // 基础人设
+    // 🔥 核心 Prompt：赋予 AI 文学灵魂
     const baseInstruction = `
-      你是一款放置类武侠游戏《云游江湖》的旁白，风格模仿古龙。
+      你是一位精通金庸、古龙风格的武侠小说家。正在为放置游戏《云游江湖》实时撰写剧情日志。
       
-      当前主角状态：
-      - 任务：${questInfo}
+      【当前主角设定】
+      - 称号：${context.name} (Lv.${context.level})
+      - 人生阶段：【${stage}】 (请根据阶段调整语气，初出茅庐要青涩，一代宗师要孤傲)
+      - 性格：${context.personality} (行为要符合性格)
       - 随从：${petInfo}
-      - 地点：${context.location}
-      - 状态：${context.state}
-      
-      要求：
-      1. 字数严格控制在 **35字以内**。
-      2. 风格：冷峻、简练、画面感强，偶尔带点黑色幽默（Godville风格）。
-      3. **必须**根据主角当前的[状态]和[随从]来描写。
-      4. 用“他”指代主角。
+      - 所在：${context.location}
+      - 任务：${questInfo}
+      - 世界观：${lore}
+
+      【写作要求】
+      1. 字数：30-50字，短小精悍。
+      2. 风格：**极具文学性**。多用四字成语，多写环境氛围（风、雪、酒、剑），多写心理活动。
+      3. 拒绝流水账（如“他打了一下怪”），要写出画面感（如“剑光一闪，那厮的衣角已然碎裂”）。
+      4. 必须用“他”指代主角。
+      5. 结合当前[状态]和[任务]进行描写。
     `;
 
     let prompt = "";
@@ -37,25 +43,28 @@ export async function POST(req: Request) {
     if (eventType === 'god_action') {
       const isPunish = userAction.includes('天罚');
       prompt = `${baseInstruction}
-      事件：神明（玩家）降下了【${userAction}】。
+      【事件】天降异象，主角遭遇了【${userAction}】。
+      【任务】
       ${isPunish 
-        ? '任务：描写他被雷劈的狼狈样，或者被神力强制鞭策去练功。' 
-        : '任务：描写他伤势痊愈，或者感受到一股暖流，甚至有点飘飘然。'}
+        ? '写一段他遭受挫折、被雷劈或运功岔气的狼狈描写。体现出“天将降大任于斯人也”的磨砺感。' 
+        : '写一段他福至心灵、伤势痊愈或顿悟的描写。体现出天道眷顾的喜悦。'}
       `;
     } else if (eventType === 'auto') {
       const isFight = context.state === 'fight' || context.state === 'arena';
       prompt = `${baseInstruction}
+      【状态】${isFight ? '激战中' : '游历/任务中'}。
+      【任务】
       ${isFight 
-        ? '任务：描写战斗瞬间，招式名要像武侠小说（如：黑虎掏心、亢龙有悔）。如果有宠物，让宠物也参与攻击。' 
-        : '任务：描写赶路、发呆或做任务的过程。如果有宠物，描写他和宠物的互动。'}
+        ? '描写战斗的惊险瞬间。使用武侠招式名称（如：黑虎掏心、白鹤亮翅）。如果有宠物，描写宠物如何协助攻击。' 
+        : '描写他在执行任务途中的见闻、风景、内心独白，或者与路人/NPC的简短互动。要体现出江湖的烟火气或肃杀气。'}
       `;
     }
 
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 0.9, 
-      max_tokens: 60,
+      temperature: 1.0, // 提高创造性，避免重复
+      max_tokens: 100,  // 稍微放宽字数限制，允许更优美的句子
     });
 
     const text = completion.choices[0]?.message?.content || "";

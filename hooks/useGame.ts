@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QUEST_SOURCES, QuestType, PERSONALITIES, PET_TEMPLATES, ARENA_OPPONENTS, MAP_LOCATIONS } from '@/app/lib/constants';
+import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QUEST_SOURCES, QuestType, PERSONALITIES, PET_TEMPLATES, ARENA_OPPONENTS, MAP_LOCATIONS, STORY_STAGES, WORLD_LORE } from '@/app/lib/constants';
 
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL 
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
@@ -12,7 +12,13 @@ export function useGame() {
   const recentLogsRef = useRef<string[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 随机生成任务
+  // 辅助函数：根据等级获取当前的故事阶段
+  const getStoryStage = (level: number) => {
+    // 倒序查找，找到第一个符合等级要求的阶段
+    const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
+    return stage ? stage.name : "初出茅庐";
+  };
+
   const generateQuest = (): HeroState['currentQuest'] => {
     const types: QuestType[] = ['search', 'hunt', 'challenge', 'train', 'life'];
     const type = types[Math.floor(Math.random() * types.length)];
@@ -21,13 +27,11 @@ export function useGame() {
     return { name, type, desc: "努力中...", progress: 0, total: 100 };
   };
 
-  // 根据任务类型获取随机地点
   const getLocationByQuest = (questType: QuestType): string => {
     const locations = MAP_LOCATIONS[questType] || MAP_LOCATIONS.common;
     return locations[Math.floor(Math.random() * locations.length)];
   };
 
-  // 登录/初始化
   const login = async (name: string) => {
     setLoading(true);
     const gender = Math.random() > 0.5 ? '男' : '女';
@@ -41,9 +45,10 @@ export function useGame() {
       godPower: 100,      
       unlockedFeatures: [],
       pet: null,
+      storyStage: "初出茅庐", // 初始阶段
       attributes: { constitution: 10, strength: 10, dexterity: 10, intelligence: 10, luck: 10 },
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 0, alignment: 0,
-      location: getLocationByQuest(initialQuest.type), // 初始地点
+      location: getLocationByQuest(initialQuest.type),
       state: 'idle', 
       logs: [], inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       skills: [{ name: '太祖长拳', level: 1, type: 'martial', desc: '入门拳法' }], 
@@ -64,6 +69,8 @@ export function useGame() {
       if (!mergedData.unlockedFeatures) mergedData.unlockedFeatures = [];
       if (typeof mergedData.currentQuest === 'string') mergedData.currentQuest = initialQuest;
       if (!mergedData.majorEvents) mergedData.majorEvents = [];
+      // 兼容旧数据，更新故事阶段
+      mergedData.storyStage = getStoryStage(mergedData.level);
       
       if (data) setHero(mergedData);
     } else {
@@ -84,15 +91,18 @@ export function useGame() {
     });
   };
 
-  // AI 触发
   const triggerAI = async (eventType: string, action?: string) => {
     if (!hero) return false;
     try {
+      // 构造极丰富的上下文，包含世界观和人生阶段
       const context = {
         ...hero,
+        storyStage: getStoryStage(hero.level), // 确保阶段是最新的
+        worldLore: WORLD_LORE,
         questInfo: `[${hero.currentQuest.type}]：${hero.currentQuest.name} (${hero.currentQuest.progress}%)`,
         petInfo: hero.pet ? `携带灵宠：${hero.pet.type}` : "无",
       };
+      
       const res = await fetch('/api/ai', {
         method: 'POST',
         body: JSON.stringify({ context, eventType, userAction: action })
@@ -107,7 +117,6 @@ export function useGame() {
     return false;
   };
 
-  // 天罚/赐福
   const godAction = async (type: 'bless' | 'punish') => {
     if (!hero) return;
     if (hero.godPower < 25) {
@@ -115,10 +124,9 @@ export function useGame() {
       return;
     }
     if (type === 'bless') {
-      // 赐福：+体魄(随机)
       setHero(h => {
         if (!h) return null;
-        const attrBoost = Math.random() < 0.2 ? 1 : 0; // 20% 概率加体魄
+        const attrBoost = Math.random() < 0.2 ? 1 : 0;
         if (attrBoost) addLog("【神恩】体质得到了净化，体魄 +1", "highlight");
         return {
           ...h, hp: h.maxHp, alignment: Math.min(50, h.alignment + 5), godPower: h.godPower - 25,
@@ -145,7 +153,7 @@ export function useGame() {
       // 1. 神力恢复
       setHero(h => h ? { ...h, godPower: Math.min(100, h.godPower + 5) } : null);
 
-      // 2. 解锁与升级
+      // 2. 解锁检测
       let newFeatures = [...hero.unlockedFeatures];
       if (hero.level >= 3 && !newFeatures.includes('motto')) {
         newFeatures.push('motto');
@@ -160,43 +168,20 @@ export function useGame() {
         addLog("【境界提升】你的大名传遍江湖，解锁了「竞技场」！", "highlight");
       }
 
-      // 3. 宠物获取
+      // 3. 宠物 & 竞技场
       let newPet = hero.pet;
       if (hero.level >= 5 && !hero.pet && Math.random() < 0.05) {
         const template = PET_TEMPLATES[Math.floor(Math.random() * PET_TEMPLATES.length)];
         newPet = { name: template.type, type: template.type, level: 1, desc: template.desc };
         addLog(`【奇遇】路边捡到一只流浪的${newPet.type}，决定收养它。`, "highlight");
       }
-      
-      // 4. 任务进度 & 地点变更
-      let newQuestProgress = hero.currentQuest.progress + 5 + Math.floor(Math.random() * 5);
-      let newQuest = hero.currentQuest;
-      let newLocation = hero.location;
-      
-      if (newQuestProgress >= 100) {
-        newQuestProgress = 0;
-        const reward = Math.floor(Math.random() * 50) + 20;
-        
-        // 完成任务：增加悟性 (Intelligence)
-        setHero(h => h ? { ...h, attributes: {...h.attributes, intelligence: h.attributes.intelligence + 1} } : null);
-        addLog(`【任务完成】${hero.currentQuest.name} 达成！阅历增加，悟性 +1。`, 'highlight');
-        
-        // 生成新任务 & 切换地点
-        newQuest = generateQuest();
-        newLocation = getLocationByQuest(newQuest.type); // 核心：地点随任务变化
-        
-        setTimeout(() => addLog(`【新旅程】前往「${newLocation}」执行委托：${newQuest.name}`, 'system'), 1000);
-      }
 
-      // 5. 状态机 (战斗/竞技场/城镇/待机)
       let newState = hero.state;
-      // 竞技场遭遇 (10% 概率, Lv.10+)
       if (hero.level >= 10 && hero.state === 'idle' && Math.random() < 0.1) {
          newState = 'arena';
          const opponent = ARENA_OPPONENTS[Math.floor(Math.random() * ARENA_OPPONENTS.length)];
          addLog(`【竞技场】遇到了对手「${opponent}」，大战一触即发！`, "highlight");
       } else if (hero.state === 'arena') {
-         // 竞技场结算
          if (Math.random() > 0.4) { 
            addLog("【竞技胜利】险胜对手，获得了大量声望和金币！", "highlight");
            setHero(h => h ? { ...h, gold: h.gold + 50, stats: {...h.stats, arenaWins: (h.stats.arenaWins || 0) + 1} } : null);
@@ -206,11 +191,26 @@ export function useGame() {
          }
          newState = 'idle';
       } else if (hero.state !== 'town' && Math.random() < 0.15) {
-          // 普通战斗切换
           newState = hero.state === 'idle' ? 'fight' : 'idle';
       }
 
-      // 6. 属性成长逻辑 (Attribute Growth) & 汇总更新
+      // 4. 任务进度
+      let newQuestProgress = hero.currentQuest.progress + 5 + Math.floor(Math.random() * 5);
+      let newQuest = hero.currentQuest;
+      let newLocation = hero.location;
+      
+      if (newQuestProgress >= 100) {
+        newQuestProgress = 0;
+        const reward = Math.floor(Math.random() * 50) + 20;
+        setHero(h => h ? { ...h, attributes: {...h.attributes, intelligence: h.attributes.intelligence + 1} } : null);
+        addLog(`【任务完成】${hero.currentQuest.name} 达成！阅历增加，悟性 +1。`, 'highlight');
+        
+        newQuest = generateQuest();
+        newLocation = getLocationByQuest(newQuest.type);
+        setTimeout(() => addLog(`【新旅程】前往「${newLocation}」执行委托：${newQuest.name}`, 'system'), 1000);
+      }
+
+      // 5. 更新状态
       setHero(h => {
         if(!h) return null;
         let finalH = { 
@@ -219,11 +219,11 @@ export function useGame() {
             pet: newPet, 
             state: newState,
             location: newLocation,
+            storyStage: getStoryStage(h.level), // 更新人生阶段
             currentQuest: { ...newQuest, progress: newQuestProgress >= 100 ? 0 : newQuestProgress },
             gold: newQuestProgress >= 100 ? h.gold + 30 : h.gold
         };
 
-        // 战斗/竞技场：随机提升臂力(Str) 或 身法(Dex)
         if ((finalH.state === 'fight' || finalH.state === 'arena') && Math.random() < 0.05) {
            const isStr = Math.random() > 0.5;
            if (isStr) {
@@ -235,7 +235,6 @@ export function useGame() {
            }
         }
 
-        // 自动卖垃圾
         if (finalH.inventory.length >= 20 && finalH.state !== 'town') {
              finalH.state = 'town';
              addLog("行囊已满，少侠回城销赃。", "system");
@@ -249,7 +248,6 @@ export function useGame() {
              finalH.state = 'idle';
         }
 
-        // 掉落
         if (finalH.state !== 'town' && Math.random() < 0.05) {
            const template = LOOT_TABLE[Math.floor(Math.random() * LOOT_TABLE.length)];
            const newItem: Item = { 
@@ -257,7 +255,6 @@ export function useGame() {
              name: template.name!, desc: template.desc!, quality: 'common', 
              type: template.type as ItemType, count: 1, price: template.price || 1
            };
-           // 福源(Luck) 提升掉落判定
            const luckBonus = finalH.attributes.luck * 0.01;
            if (Math.random() < luckBonus) {
                addLog("【福源深厚】运气爆发，发现了隐藏的宝物！", "highlight");
@@ -273,38 +270,32 @@ export function useGame() {
               if (idx < 0) setTimeout(() => addLog(`获得：${newItem.name}`, 'normal'), 500);
            }
         }
-
-        // 升级逻辑 & 大事记
+        
         if (finalH.exp >= finalH.maxExp) {
            finalH.level++; finalH.exp = 0; finalH.maxExp = Math.floor(finalH.maxExp * 1.5);
            finalH.maxHp += 20; finalH.hp = finalH.maxHp;
-           
-           // 全属性 +1
            finalH.attributes.constitution++;
            finalH.attributes.strength++;
            finalH.attributes.dexterity++;
            finalH.attributes.intelligence++;
            finalH.attributes.luck++;
-
            const event = `【${new Date().toLocaleTimeString()}】境界突破至 Lv.${finalH.level}，全属性提升！`;
            finalH.majorEvents = [event, ...finalH.majorEvents]; 
            addLog(event, 'highlight');
         }
-        
         return finalH;
       });
 
-      // 7. AI & 本地日志
+      // 6. AI 判定 (提升到 60% 概率，增加文学内容)
       const dice = Math.random();
       let aiTriggered = false;
-      if (dice < 0.5) aiTriggered = await triggerAI('auto');
+      if (dice < 0.6) aiTriggered = await triggerAI('auto'); // 提高 AI 频率
 
       if (!aiTriggered) {
          let list = STATIC_LOGS.idle;
          if (newState === 'fight') list = STATIC_LOGS.fight;
          else if (newState === 'town') list = STATIC_LOGS.town;
          else if (newState === 'arena') list = STATIC_LOGS.arena || STATIC_LOGS.fight;
-         
          let text = list[Math.floor(Math.random() * list.length)];
          if (!recentLogsRef.current.includes(text)) addLog(text);
       }
