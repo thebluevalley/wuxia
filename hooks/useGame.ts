@@ -59,6 +59,9 @@ export function useGame() {
       currentQuest: initialQuest,
     };
     
+    // 初始化时直接设置
+    setHero(newHero); 
+    
     if (supabase) {
       let { data } = await supabase.from('profiles').select('*').eq('username', name).single();
       if (!data) {
@@ -66,20 +69,24 @@ export function useGame() {
         data = created;
       }
       const mergedData = { ...newHero, ...data.data };
+      // 兼容代码...
       if (!mergedData.martialArts) mergedData.martialArts = getInitialSkills();
-      if (!mergedData.lifeSkills) mergedData.lifeSkills = getInitialLifeSkills();
-      if (!mergedData.messages) mergedData.messages = []; // 兼容旧号
+      if (!mergedData.messages) mergedData.messages = [];
       mergedData.storyStage = getStoryStage(mergedData.level);
       
-      if (data) setHero(mergedData);
-    } else {
-      setHero(newHero);
+      setHero(mergedData);
     }
+    
+    // ⚠️ 核心：登录成功后，立即触发“开场”剧情
     setLoading(false);
+    setTimeout(() => {
+       // 需要传当前的 hero 状态
+       triggerAI('start_game', undefined, newHero);
+    }, 500);
   };
 
   const addLog = (text: string, type: LogEntry['type'] = 'normal') => {
-    recentLogsRef.current = [text, ...recentLogsRef.current].slice(0, 5);
+    recentLogsRef.current = [text, ...recentLogsRef.current].slice(0, 3); // 记录最近3条
     setHero(prev => {
       if (!prev) return null;
       const newLog = { 
@@ -90,7 +97,6 @@ export function useGame() {
     });
   };
 
-  // ⚠️ 新增：添加消息（传闻/系统）
   const addMessage = (type: 'rumor' | 'system', title: string, content: string) => {
     setHero(prev => {
       if (!prev) return null;
@@ -100,22 +106,26 @@ export function useGame() {
         time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}),
         isRead: false
       };
-      // 保留最近 50 条消息
       return { ...prev, messages: [newMsg, ...prev.messages].slice(0, 50) };
     });
   };
 
-  const triggerAI = async (eventType: string, action?: string) => {
-    if (!hero) return false;
+  // ⚠️ 升级：传入 explicitHero 以支持在 setHero 生效前调用
+  const triggerAI = async (eventType: string, action?: string, explicitHero?: HeroState) => {
+    const currentHero = explicitHero || hero;
+    if (!currentHero) return false;
+    
     try {
-      const bestSkill = hero.martialArts.sort((a,b) => b.level - a.level)[0];
+      const bestSkill = currentHero.martialArts.sort((a,b) => b.level - a.level)[0];
       const context = {
-        ...hero,
-        storyStage: getStoryStage(hero.level),
+        ...currentHero,
+        storyStage: getStoryStage(currentHero.level),
         worldLore: WORLD_LORE,
-        questInfo: `[${hero.currentQuest.type}] ${hero.currentQuest.name} (${hero.currentQuest.progress}%)`,
-        petInfo: hero.pet ? `携带${hero.pet.type}` : "无",
-        skillInfo: `擅长${bestSkill.name}(Lv.${bestSkill.level})`, 
+        questInfo: `[${currentHero.currentQuest.type}] ${currentHero.currentQuest.name} (${currentHero.currentQuest.progress}%)`,
+        petInfo: currentHero.pet ? `携带${currentHero.pet.type}` : "无",
+        skillInfo: `擅长${bestSkill?.name || '乱拳'}(Lv.${bestSkill?.level || 1})`,
+        // ⚠️ 核心：把最近发生的 3 条日志发给 AI，让它别重复
+        recentLogs: recentLogsRef.current 
       };
       
       const res = await fetch('/api/ai', {
@@ -126,20 +136,17 @@ export function useGame() {
       const data = await res.json();
       
       if (data.text) {
-        // 如果是传闻，添加到消息列表
         if (eventType === 'generate_rumor') {
-           // 简单的正则尝试提取标题，如果 AI 没按格式返回，就用默认标题
            let title = "江湖风声";
            let content = data.text;
            if (data.text.includes("：")) {
              const parts = data.text.split("：");
-             title = parts[0].length < 10 ? parts[0] : "江湖风声";
+             title = parts[0].length < 15 ? parts[0] : "江湖风声";
              content = parts.slice(1).join("：");
            }
            addMessage('rumor', title, content);
         } else {
-           // 普通日志
-           addLog(data.text, eventType === 'god_action' ? 'highlight' : 'normal');
+           addLog(data.text, eventType === 'god_action' || eventType === 'start_game' ? 'highlight' : 'normal');
         }
         return true;
       }
@@ -174,8 +181,11 @@ export function useGame() {
       let newQuestProgress = newQuest.progress + 5 + Math.floor(Math.random() * 5);
       let goldChange = 0;
       let expChange = 0;
+      
+      // ⚠️ 任务推进标记
+      let isQuestUpdate = false; 
 
-      // 任务完成 -> 系统消息
+      // 任务完成
       if (newQuestProgress >= 100) {
         newQuestProgress = 0;
         const reward = Math.floor(Math.random() * 50) + 30;
@@ -183,12 +193,15 @@ export function useGame() {
         expChange += 50;
         setHero(h => h ? { ...h, attributes: {...h.attributes, intelligence: h.attributes.intelligence + 1} } : null);
         
-        addLog(`【委托达成】完成 ${newQuest.name}`, 'highlight');
+        addLog(`【达成】完成 ${newQuest.name}`, 'highlight');
         addMessage('system', '任务完成', `成功完成【${newQuest.name}】，获得赏金 ${reward} 文，经验 +50，悟性 +1。`);
         
         newQuest = generateQuest();
         newLocation = getLocationByQuest(newQuest.type);
         setTimeout(() => addLog(`【新程】前往 ${newLocation} 执行：${newQuest.name}`, 'system'), 1000);
+      } else {
+        // 普通进度增加，标记为任务更新，大概率触发 AI
+        isQuestUpdate = true;
       }
 
       if (hero.level >= 10 && hero.state === 'idle' && Math.random() < 0.15) {
@@ -210,7 +223,6 @@ export function useGame() {
             exp: h.exp + expChange
         };
 
-        // 战斗逻辑
         if (finalH.state === 'fight' || finalH.state === 'arena') {
            if (finalH.martialArts.length > 0) {
              const skillIdx = Math.floor(Math.random() * finalH.martialArts.length);
@@ -218,9 +230,8 @@ export function useGame() {
              skill.exp += (finalH.attributes.intelligence * 0.5) + 2;
              if (skill.exp >= skill.maxExp) {
                skill.level++; skill.exp = 0; skill.maxExp = Math.floor(skill.maxExp * 1.2);
-               // 技能升级 -> 系统消息
                addMessage('system', '武学精进', `你的【${skill.name}】突破到了第 ${skill.level} 层！`);
-               setTimeout(() => addLog(`【武学突破】${skill.name} 晋升至 ${skill.level} 层！`, 'highlight'), 500);
+               setTimeout(() => addLog(`【突破】${skill.name} 晋升至 ${skill.level} 层！`, 'highlight'), 500);
              }
            }
            if (finalH.state === 'arena') {
@@ -235,7 +246,6 @@ export function useGame() {
            }
         }
 
-        // 城镇逻辑
         if (finalH.state === 'town') {
            const sellValue = finalH.inventory.reduce((acc, i) => acc + (i.price * i.count), 0);
            if (sellValue > 0) {
@@ -251,15 +261,13 @@ export function useGame() {
               const newSkillName = SKILL_LIBRARY.inner[Math.floor(Math.random() * SKILL_LIBRARY.inner.length)];
               if (!finalH.martialArts.find(s => s.name === newSkillName)) {
                  finalH.martialArts.push({ name: newSkillName, type: 'inner', level: 1, exp: 0, maxExp: 100, desc: "重金购得的秘籍" });
-                 addLog(`斥资 300 文购得【${newSkillName}】秘籍，开始修习！`, 'highlight');
-                 addMessage('system', '习得神功', `花费重金购得【${newSkillName}】，江湖路远，技多不压身。`);
+                 addLog(`斥资 300 文购得【${newSkillName}】，开始修习！`, 'highlight');
+                 addMessage('system', '习得神功', `花费重金购得【${newSkillName}】。`);
                  finalH.majorEvents.unshift(`${new Date().toLocaleTimeString()} 习得 ${newSkillName}`);
               }
            }
            finalH.state = 'idle';
         }
-        
-        // 掉落逻辑
         else if (Math.random() < 0.15) { 
            const template = LOOT_TABLE[Math.floor(Math.random() * LOOT_TABLE.length)];
            const newItem: Item = { id: Date.now().toString(), name: template.name!, desc: template.desc!, quality: 'common', type: template.type as ItemType, count: 1, price: template.price || 1 };
@@ -284,30 +292,34 @@ export function useGame() {
            }
         }
 
-        // 升级 -> 系统消息
         if (finalH.exp >= finalH.maxExp) {
            finalH.level++; finalH.exp = 0; finalH.maxExp = Math.floor(finalH.maxExp * 1.5);
            finalH.maxHp += 30; finalH.hp = finalH.maxHp;
            Object.keys(finalH.attributes).forEach(k => finalH.attributes[k as keyof typeof finalH.attributes]++);
            finalH.majorEvents.unshift(`${new Date().toLocaleTimeString()} 突破至 Lv.${finalH.level}`);
-           
-           addMessage('system', '境界提升', `恭喜！你的境界突破至 Lv.${finalH.level}，全属性提升！`);
+           addMessage('system', '境界提升', `恭喜！你的境界突破至 Lv.${finalH.level}！`);
            addLog(`【境界突破】气冲斗牛，晋升 Lv.${finalH.level}！`, 'highlight');
         }
 
         return finalH;
       });
 
-      // AI 触发逻辑
+      // ⚠️ AI 触发逻辑优化
       const dice = Math.random();
-      // 5% 概率触发江湖传闻 (低频)
+      
+      // 1. 传闻 (5%)
       if (dice < 0.05) {
          await triggerAI('generate_rumor');
       } 
-      // 60% 概率触发普通日志
-      else if (dice < 0.65) {
+      // 2. 任务推进 (如果任务有进度更新，50% 概率触发 AI 描写具体过程)
+      else if (isQuestUpdate && dice < 0.5) {
+         await triggerAI('quest_update');
+      }
+      // 3. 普通日志 (30%)
+      else if (dice < 0.8) {
          await triggerAI('auto');
       }
+      // 4. 本地兜底
       else {
          let list = STATIC_LOGS.idle;
          if (newState === 'fight') list = STATIC_LOGS.fight;

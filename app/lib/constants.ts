@@ -46,7 +46,6 @@ export type Skill = {
   desc: string;
 };
 
-// ⚠️ 新增：消息系统类型
 export type MessageType = 'rumor' | 'system';
 export type Message = {
   id: string;
@@ -83,9 +82,7 @@ export type HeroState = {
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   
   logs: LogEntry[];
-  // ⚠️ 新增：消息列表 (用于告示页面)
   messages: Message[];
-  // majorEvents 保留作为简略历史，messages 作为详细记录
   majorEvents: string[]; 
   
   inventory: Item[];
