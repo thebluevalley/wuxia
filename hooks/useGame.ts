@@ -51,21 +51,28 @@ export function useGame() {
         method: 'POST',
         body: JSON.stringify({ context: hero, eventType, userAction: action })
       });
+      
+      // 增加错误处理，防止静默失败
+      if (!res.ok) {
+        console.error("API请求失败:", res.status, res.statusText);
+        return false;
+      }
+
       const data = await res.json();
       if (data.text) {
         addLog(data.text, eventType === 'god_action' ? 'highlight' : 'ai');
         lastLogText.current = data.text;
         return true;
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("前端调用错误:", e); }
     return false;
   };
 
-  // 手动测试 AI (调试用)
+  // 手动测试 AI (文案已更新为 Groq)
   const testAI = async () => {
-    addLog("【系统】正在尝试以此刻心境沟通天道(Gemini 2.0)...", "system");
+    addLog("【系统】正在尝试沟通天道 (Groq Llama3)...", "system");
     const success = await triggerAI('auto');
-    if (!success) addLog("【系统】天道渺茫，并无回应。(请检查 API Key)", "bad");
+    if (!success) addLog("【系统】天道渺茫。(请检查 .env.local 是否配置了 GROQ_API_KEY 并重启了终端)", "bad");
   };
 
   // 拾取物品
@@ -103,7 +110,7 @@ export function useGame() {
         aiTriggered = await triggerAI('auto');
       }
 
-      // 兜底文案 (去重)
+      // 兜底文案
       if (!aiTriggered) {
         const list = hero.state === 'fight' ? STATIC_LOGS.fight : STATIC_LOGS.idle;
         let text = list[Math.floor(Math.random() * list.length)];
