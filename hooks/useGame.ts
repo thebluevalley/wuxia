@@ -1,23 +1,23 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { HeroState, LogEntry, STATIC_EVENTS } from '@/app/lib/constants';
+import { HeroState, LogEntry, STATIC_LOGS } from '@/app/lib/constants';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL 
+  ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
+  : null;
 
 export function useGame() {
   const [hero, setHero] = useState<HeroState | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 登录逻辑
+  // 登录/初始化
   const login = async (name: string) => {
     setLoading(true);
     const newHero: HeroState = {
       name, level: 1, hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 0,
-      location: '荒野古道', logs: []
+      location: '荒野古道', state: 'idle', logs: []
     };
-
+    
     if (supabase) {
       let { data } = await supabase.from('profiles').select('*').eq('username', name).single();
       if (!data) {
@@ -26,68 +26,92 @@ export function useGame() {
       }
       if (data) setHero(data.data);
     } else {
-      setHero(newHero); // 无数据库模式
+      setHero(newHero);
     }
     setLoading(false);
   };
 
-  // 增加日志
   const addLog = (text: string, type: LogEntry['type'] = 'normal') => {
     setHero(prev => {
       if (!prev) return null;
       const newLog = { 
-        id: Date.now().toString(), 
-        text, type, 
+        id: Date.now().toString(), text, type, 
         time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}) 
       };
       return { ...prev, logs: [...prev.logs, newLog].slice(-50) };
     });
   };
 
-  // 游戏主循环 (每5秒一次)
+  // 触发 AI 生成
+  const triggerAI = async (eventType: string, action?: string) => {
+    if (!hero) return false;
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        body: JSON.stringify({ context: hero, eventType, userAction: action })
+      });
+      const data = await res.json();
+      if (data.text) {
+        addLog(data.text, eventType === 'god_action' ? 'highlight' : 'ai');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    return false;
+  };
+
+  // 玩家干预 (上帝之手)
+  const godAction = async (type: 'bless' | 'punish') => {
+    if (!hero) return;
+    // 立即反馈 UI (乐观更新)
+    if (type === 'bless') {
+      setHero(h => h ? {...h, hp: h.maxHp} : null);
+      // 异步调用 AI 描述神迹
+      triggerAI('god_action', '赐福(加血)');
+    } else {
+      setHero(h => h ? {...h, hp: Math.max(1, h.hp - 10), exp: h.exp + 20} : null);
+      triggerAI('god_action', '天罚(雷劈)');
+    }
+  };
+
+  // 自动循环 (每4秒)
   useEffect(() => {
     if (!hero) return;
     const tick = setInterval(async () => {
-      // 30% 概率触发 AI，让游戏更有灵性
-      const useAI = Math.random() < 0.3;
-      let aiSuccess = false;
+      // 简单的状态机
+      const dice = Math.random();
+      let aiTriggered = false;
 
-      if (useAI) {
-        try {
-          const res = await fetch('/api/ai', {
-            method: 'POST',
-            body: JSON.stringify({ context: hero, eventType: 'idle' })
-          });
-          const data = await res.json();
-          if (data.text) {
-            addLog(data.text, 'highlight');
-            setHero(h => h ? {...h, exp: h.exp + 20} : null); // AI事件奖励更高
-            aiSuccess = true;
-          }
-        } catch (e) { console.error(e); }
+      // 30% 概率触发 AI 旁白
+      if (dice < 0.3) {
+        aiTriggered = await triggerAI('auto');
       }
 
-      // 如果AI没触发或失败，使用本地文案
-      if (!aiSuccess) {
-        const randomText = STATIC_EVENTS[Math.floor(Math.random() * STATIC_EVENTS.length)];
-        addLog(randomText);
-        setHero(h => h ? {...h, gold: h.gold + 2} : null);
+      if (!aiTriggered) {
+        // AI 没触发，走本地逻辑
+        const list = hero.state === 'fight' ? STATIC_LOGS.fight : STATIC_LOGS.idle;
+        const text = list[Math.floor(Math.random() * list.length)];
+        addLog(text);
       }
-    }, 5000);
+
+      // 数值变化模拟
+      setHero(h => {
+        if(!h) return null;
+        let newH = {...h};
+        // 自动回血/扣血逻辑
+        if (h.hp < h.maxHp && h.state === 'idle') newH.hp += 2;
+        if (Math.random() < 0.2) newH.gold += 1;
+        
+        // 升级检查
+        if (newH.exp >= newH.maxExp) {
+           newH.level++; newH.exp = 0; newH.maxExp *= 1.5; newH.maxHp += 20; newH.hp = newH.maxHp;
+           addLog(`【境界突破】金光透体！少侠突破至 Lv.${newH.level}`, 'highlight');
+        }
+        return newH;
+      });
+    }, 4000);
+
     return () => clearInterval(tick);
-  }, [hero ? hero.name : null]);
+  }, [hero?.name]);
 
-  // 自动存档与升级
-  useEffect(() => {
-    if (!hero) return;
-    if (hero.exp >= hero.maxExp) {
-      setHero(h => h ? { ...h, level: h.level + 1, exp: 0, maxExp: Math.floor(h.maxExp * 1.5), maxHp: h.maxHp + 50, hp: h.maxHp + 50 } : null);
-      addLog(`【境界突破】丹田滚烫，金光透体而出！境界提升至 Lv.${hero.level + 1}`, 'highlight');
-    }
-    if (supabase) {
-      supabase.from('profiles').update({ data: hero, updated_at: new Date() }).eq('username', hero.name).then(()=>{});
-    }
-  }, [hero]);
-
-  return { hero, login, addLog, setHero, loading };
+  return { hero, login, godAction, loading };
 }
