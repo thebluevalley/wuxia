@@ -1,63 +1,37 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// app/api/ai/route.ts (Groq 版本)
+import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
 
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
 export async function POST(req: Request) {
-  // 1. 检查 Key 是否存在
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) {
-    console.error("❌ [API Error] GOOGLE_API_KEY 未在环境变量中配置");
-    return NextResponse.json({ text: null });
-  }
+  if (!process.env.GROQ_API_KEY) return NextResponse.json({ text: null });
 
   try {
     const { context, eventType, userAction } = await req.json();
-    const genAI = new GoogleGenerativeAI(apiKey);
     
-    // ⚠️ 修复：从 gemini-2.0-flash-exp 回退到 gemini-1.5-flash
-    // 1.5 Flash 稳定版对免费用户有极高的额度，不会轻易报错 429
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    // --- Prompt (提示词) ---
-    const baseInstruction = `
-      你是一位精通古龙风格的武侠小说旁白。
-      请生成一段**极简短**的游戏日志。
-      要求：
-      1. 字数严格控制在 **35字以内**。
-      2. 风格：冷峻、留白、画面感强，或带黑色幽默。
-      3. 用“他”代替主角名字，不要出现“少侠”。
-      4. 绝对不要写“接下来的故事”、“未完待续”。
-    `;
-
-    let prompt = "";
+    // --- Prompt 构建逻辑同上 ---
+    const baseInstruction = "...(同上)..."; 
+    // ...构建 prompt 变量...
+    let prompt = ""; 
+    // (此处省略 Prompt 拼接逻辑，请复制上面的 Prompt 部分)
     if (eventType === 'god_action') {
-      prompt = `${baseInstruction}
-      情境：主角${context.name}遭遇突发事件。
-      事件：天降异象，【${userAction}】。
-      任务：描写该现象对他的影响。
-      范例：“一道惊雷落下，他手中的剑竟隐隐泛起蓝光，整个人杀气更盛。”`;
-    } else if (eventType === 'auto') {
-      const isFight = context.state === 'fight';
-      prompt = `${baseInstruction}
-      情境：主角${context.name}（Lv.${context.level}）在${context.location}。
-      状态：${isFight ? '激战中' : '独行中'}。
-      ${isFight 
-        ? '任务：描写一个精彩绝伦的攻防瞬间。范例：“刀锋擦着鼻尖掠过，他连眼皮都没眨，反手一剑刺入对方衣袖。”' 
-        : '任务：描写环境氛围或内心瞬间的感悟。范例：“风停了，残阳如血，他忽然觉得手中的酒壶有些空荡。”'}
-      `;
+       prompt = `${baseInstruction} 情境：主角${context.name}遭遇突发事件...`; // 请补全
+    } else {
+       prompt = `${baseInstruction} 情境：主角${context.name}...`; // 请补全
     }
 
-    console.log(`🤖 [Gemini 1.5] 正在生成 (${eventType})...`);
-    
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    
-    console.log("✅ [Gemini 1.5] 生成成功:", text);
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "llama3-70b-8192", // 免费且强大的模型
+      temperature: 0.8,
+      max_tokens: 50,
+    });
 
+    const text = completion.choices[0]?.message?.content || "";
     return NextResponse.json({ text });
-
-  } catch (error: any) {
-    console.error("❌ [Gemini Error]:", error.message);
-    // 即使出错，返回 null 让前端用本地文案兜底，保证游戏不卡死
+  } catch (error) {
+    console.error("Groq Error:", error);
     return NextResponse.json({ text: null });
   }
 }
