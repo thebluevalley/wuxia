@@ -3,7 +3,8 @@ export type Item = {
   name: string;
   desc: string;
   quality: 'common' | 'rare' | 'legendary';
-  type: 'weapon' | 'armor' | 'misc'; // 新增类型
+  // ⚠️ 修复点：在这里增加了 'accessory'
+  type: 'weapon' | 'armor' | 'accessory' | 'misc'; 
 };
 
 export type Skill = {
@@ -21,9 +22,9 @@ export type Equipment = {
 export type HeroState = {
   name: string;
   level: number;
-  gender: '男' | '女'; // 新增
-  age: number;        // 新增
-  cultivation: string; // 武学修为 (如: 初窥门径)
+  gender: '男' | '女';
+  age: number;
+  cultivation: string;
   
   hp: number;
   maxHp: number;
@@ -35,15 +36,15 @@ export type HeroState = {
   
   logs: LogEntry[];
   inventory: Item[];
-  equipment: Equipment; // 新增：装备槽
+  equipment: Equipment;
   
-  skills: Skill[];     // 新增：武功
-  lifeSkills: Skill[]; // 新增：生活技能
+  skills: Skill[];
+  lifeSkills: Skill[];
   
-  stats: {             // 新增：战斗记录
+  stats: {
     kills: number;
     deaths: number;
-    days: number;      // 游历天数
+    days: number;
   };
 };
 
