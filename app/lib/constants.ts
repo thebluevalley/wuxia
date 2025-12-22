@@ -3,11 +3,28 @@ export type Item = {
   name: string;
   desc: string;
   quality: 'common' | 'rare' | 'legendary';
+  type: 'weapon' | 'armor' | 'misc'; // 新增类型
+};
+
+export type Skill = {
+  name: string;
+  level: number;
+  desc: string;
+};
+
+export type Equipment = {
+  weapon: Item | null;
+  armor: Item | null;
+  accessory: Item | null;
 };
 
 export type HeroState = {
   name: string;
   level: number;
+  gender: '男' | '女'; // 新增
+  age: number;        // 新增
+  cultivation: string; // 武学修为 (如: 初窥门径)
+  
   hp: number;
   maxHp: number;
   exp: number;
@@ -15,8 +32,19 @@ export type HeroState = {
   gold: number;
   location: string;
   state: 'idle' | 'fight' | 'sleep';
+  
   logs: LogEntry[];
-  inventory: Item[]; // 新增：背包
+  inventory: Item[];
+  equipment: Equipment; // 新增：装备槽
+  
+  skills: Skill[];     // 新增：武功
+  lifeSkills: Skill[]; // 新增：生活技能
+  
+  stats: {             // 新增：战斗记录
+    kills: number;
+    deaths: number;
+    days: number;      // 游历天数
+  };
 };
 
 export type LogEntry = {
@@ -27,45 +55,35 @@ export type LogEntry = {
 };
 
 // 掉落物品库
-export const LOOT_TABLE = [
-  "半个冷馒头", "生锈的铁剑", "不知名的野花", "奇怪的蓝色石头", 
-  "破损的护身符", "一封未寄出的家书", "空酒壶", "刚掉下来的鸟羽"
+export const LOOT_TABLE: Partial<Item>[] = [
+  { name: "半个冷馒头", type: 'misc', desc: "硬得像石头，但能填饱肚子。" },
+  { name: "生锈的铁剑", type: 'weapon', desc: "虽然锈迹斑斑，但也勉强能用。" },
+  { name: "不知名的野花", type: 'misc', desc: "路边采的，有一股淡淡的幽香。" },
+  { name: "粗布麻衣", type: 'armor', desc: "满是补丁，聊胜于无。" },
+  { name: "破损的护身符", type: 'accessory', desc: "似乎是某个寺庙求来的，绳子都断了。" },
+  { name: "家书", type: 'misc', desc: "不知是谁遗落的，字迹已经模糊。" },
 ];
 
-// 静态文案兜底
 export const STATIC_LOGS = {
   idle: [
     "微风拂过，路边的狗尾巴草挠得少侠鼻子发痒。",
     "少侠停下脚步，抖了抖鞋里的沙子，顺便看了一眼远处的青山。",
     "路过一片竹林，少侠试图用剑劈开落叶，结果差点扭了腰。",
-    "肚子咕咕叫了一声，少侠摸出半个冷馒头啃了起来，略感凄凉。",
+    "肚子咕咕叫了一声，少侠摸出半个冷馒头啃了起来。",
     "远处传来几声鸦啼，江湖路远，少侠紧了紧背后的包袱。",
-    "遇到一个算命瞎子，非说少侠印堂发黑，少侠没理他，快步走开。",
-    "天色渐暗，路边的野花倒是开得正好，少侠忍不住多看了两眼。",
-    "路过一间破败的山神庙，少侠进去躲了会儿雨，听见梁上有老鼠打架。",
-    "溪水潺潺，少侠捧起一捧清水洗了把脸，顿觉神清气爽。",
-    "忽闻一阵酒香飘来，少侠咽了口唾沫，摸了摸干瘪的钱袋，叹气离去。",
-    "一只松鼠从头顶跳过，丢下一颗松果，正砸在少侠脑门上。",
-    "少侠坐在路边的大青石上歇脚，看着蚂蚁搬家发了会儿呆。",
-    "一阵秋风卷起枯叶，少侠忽然想起那年在华山顶上喝过的雪水。",
-    "路遇一队镖车，镖师们个个神情严肃，少侠知趣地让开了道。",
-    "天边划过一只孤雁，少侠驻足良久，不知在想些什么。",
-    "脚下踢到一个硬物，扒开土一看，竟是一块断裂的石碑。",
+    "遇到一个算命瞎子，非说少侠印堂发黑，少侠没理他。",
+    "天色渐暗，路边的野花倒是开得正好。",
+    "路过一间破败的山神庙，少侠进去躲了会儿雨。",
   ],
   fight: [
     "那毛贼不知死活，挥舞着生锈的片刀冲了上来。",
     "少侠侧身一闪，脚下使了个绊子，那恶霸便摔了个狗吃屎。",
     "剑光一闪！少侠并未拔剑，仅用剑鞘便点中了对方的麻穴。",
     "对方使出一招'黑虎掏心'，少侠冷笑一声，反手一掌将其击退。",
-    "那厮见势不妙，撒了一把石灰粉转身就跑，少侠也不追赶。",
     "一番缠斗，少侠衣衫虽有些凌乱，但眼神却愈发锐利。",
-    "少侠使出一招'白云出岫'，剑尖颤动，化作点点寒星。",
-    "只听'当'的一声，少侠手中的铁剑架住了对方的狼牙棒。",
-    "对手是个练家子，少侠不得不打起十二分精神应对。",
   ],
   sleep: [
     "夜深了，少侠找了棵避风的老树，和衣而卧。",
     "梦里，少侠似乎又回到了那个桃花盛开的小村庄。",
-    "篝火噼啪作响，少侠抱着剑，半睡半醒地守着夜。",
   ]
 };
