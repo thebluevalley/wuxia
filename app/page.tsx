@@ -4,48 +4,50 @@ import { useEffect, useRef, useState, memo } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank, SkillType, HeroState } from '@/app/lib/constants';
 
-// --- 组件提取区 (防止父组件重渲染导致子组件销毁) ---
-
-// 1. 打字机组件
-const TypewriterText = ({ text, className }: { text: string, className?: string }) => {
-  const [displayedText, setDisplayedText] = useState('');
-  // 使用 ref 记录是否已经播放过，防止重播
-  const hasPlayedRef = useRef(false);
-  // 记录上一次的文本，用于检测文本是否真的变更
-  const lastTextRef = useRef(text);
+// ⚠️ 核心修复：防重播打字机
+// 如果 text 没变，就直接显示最终结果，不再打字
+const TypewriterText = memo(({ text, className }: { text: string, className?: string }) => {
+  const [displayedText, setDisplayedText] = useState(text); // 默认直接显示全文，防止闪烁
+  const hasAnimatedRef = useRef(false); // 记录是否已经动画过
+  const lastTextRef = useRef(text); // 记录上一次的文本
 
   useEffect(() => {
-    // 如果文本没变且已经播放过，直接显示全文，跳过动画
-    if (text === lastTextRef.current && hasPlayedRef.current) {
-        setDisplayedText(text);
-        return;
+    // 如果文本变了，说明是新消息，开始打字
+    if (text !== lastTextRef.current) {
+      hasAnimatedRef.current = false;
+      lastTextRef.current = text;
+      setDisplayedText(''); // 清空，准备打字
     }
 
-    // 如果文本变了，重置状态
-    if (text !== lastTextRef.current) {
-        hasPlayedRef.current = false;
-        lastTextRef.current = text;
-        setDisplayedText('');
+    // 如果已经动画过，直接保持全文，不执行定时器
+    if (hasAnimatedRef.current) {
+      setDisplayedText(text);
+      return;
     }
 
     let index = 0;
+    setDisplayedText(''); 
+    
     const timer = setInterval(() => {
       if (index < text.length) {
-        setDisplayedText((prev) => prev + text.charAt(index));
+        // 使用函数式更新，确保闭包最新
+        setDisplayedText((prev) => text.substring(0, index + 1));
         index++;
       } else {
         clearInterval(timer);
-        hasPlayedRef.current = true; // 标记完成
+        hasAnimatedRef.current = true; // 标记为已完成
       }
-    }, 80); 
+    }, 50); // 50ms 速度
 
     return () => clearInterval(timer);
   }, [text]);
 
   return <span className={className}>{displayedText}</span>;
-};
+});
+TypewriterText.displayName = 'TypewriterText';
 
-// 2. 头部组件
+// --- 子组件 (全部 memo 化以提升性能) ---
+
 const Header = memo(({ hero }: { hero: HeroState }) => {
   const questPercent = hero.currentQuest 
     ? Math.min(100, Math.floor((hero.currentQuest.progress / hero.currentQuest.total) * 100)) 
@@ -117,13 +119,11 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
 });
 Header.displayName = 'Header';
 
-// 3. 故事日志组件
 const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type: 'bless'|'punish') => void }) => {
   return (
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
         {hero.logs.map((log, index) => {
-          // 仅最新的高光日志使用打字机
           const isLatest = index === 0; 
           const isNarrative = log.type === 'highlight';
 
@@ -138,7 +138,7 @@ const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type:
                    className="text-[15px] leading-8 text-justify font-medium text-black" 
                  />
               ) : (
-                 <span className="text-[15px] leading-8 text-justify font-medium text-black opacity-80">
+                 <span className="text-[15px] leading-8 text-justify font-medium text-black opacity-90">
                    {log.text}
                  </span>
               )}
@@ -163,7 +163,8 @@ const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type:
 });
 LogsView.displayName = 'LogsView';
 
-// 4. 辅助：装备槽
+// ... (EquipSlot, AttributeRow, HeroView, BagView, MessagesView, TavernView 代码保持不变，为节省篇幅省略，请确保文件中保留完整) ...
+// ⚠️ 请务必保留其他 View 组件的完整代码
 const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
     <div className="flex flex-col items-center bg-white p-2 rounded border border-stone-100">
        <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${item ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-300'}`}>{icon}</div>
@@ -172,10 +173,8 @@ const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon:
     </div>
 );
 
-// 5. 辅助：属性行
 const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
 
-// 6. 人物视图
 const HeroView = memo(({ hero }: { hero: HeroState }) => {
   const getStageColor = (stage: string) => {
     switch (stage) {
@@ -185,15 +184,6 @@ const HeroView = memo(({ hero }: { hero: HeroState }) => {
       case '领主': return 'text-purple-800 bg-purple-50 border-purple-200';
       case '王者': return 'text-orange-800 bg-orange-50 border-orange-200';
       default: return 'text-stone-500 bg-stone-100 border-stone-200';
-    }
-  };
-
-  const getQualityColor = (q: Quality) => {
-    switch (q) {
-      case 'legendary': return 'text-orange-900 font-bold';
-      case 'epic': return 'text-purple-800 font-bold';
-      case 'rare': return 'text-blue-700 font-bold';
-      default: return 'text-stone-600';
     }
   };
 
@@ -305,7 +295,6 @@ const HeroView = memo(({ hero }: { hero: HeroState }) => {
 });
 HeroView.displayName = 'HeroView';
 
-// 7. 行囊视图
 const BagView = memo(({ hero }: { hero: HeroState }) => {
   const getQualityColor = (q: Quality) => {
     switch (q) {
@@ -340,7 +329,6 @@ const BagView = memo(({ hero }: { hero: HeroState }) => {
 });
 BagView.displayName = 'BagView';
 
-// 8. 消息视图
 const MessagesView = memo(({ hero }: { hero: HeroState }) => { 
     const rumors = hero.messages.filter(m => m.type === 'rumor'); 
     const systems = hero.messages.filter(m => m.type === 'system'); 
@@ -348,7 +336,6 @@ const MessagesView = memo(({ hero }: { hero: HeroState }) => {
 });
 MessagesView.displayName = 'MessagesView';
 
-// 9. 酒馆视图
 const TavernView = memo(({ hero, hireCompanion, acceptQuest }: { hero: HeroState, hireCompanion: (id: string) => void, acceptQuest: (id: string) => void }) => {
     const refreshTimeLeft = Math.max(0, 6 * 60 * 60 * 1000 - (Date.now() - (hero.lastQuestRefresh || 0)));
     const hours = Math.floor(refreshTimeLeft / (1000 * 60 * 60));
