@@ -4,24 +4,21 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank } from '@/app/lib/constants';
 
-// ⚠️ 核心新增：打字机效果组件
-// 文字逐字显示，且每个字都有淡入效果，模拟墨水晕染/打字感
+// 打字机效果组件
 const TypewriterText = ({ text, className }: { text: string, className?: string }) => {
   const [displayedText, setDisplayedText] = useState('');
   
   useEffect(() => {
     let index = 0;
-    // 每次挂载时，重置并开始动画
     setDisplayedText(''); 
     const timer = setInterval(() => {
       if (index < text.length) {
-        // 使用函数式更新，确保状态正确
         setDisplayedText((prev) => prev + text.charAt(index));
         index++;
       } else {
         clearInterval(timer);
       }
-    }, 40); // 打字速度：40ms/字，既有呼吸感又不拖沓
+    }, 40); 
 
     return () => clearInterval(timer);
   }, [text]);
@@ -36,13 +33,11 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'messages' | 'tavern'>('logs');
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // 自动滚动到底部
   useEffect(() => {
     if (activeTab === 'logs') {
-       // 稍微延迟一点滚动，等待打字机效果开始
        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     }
-  }, [hero?.logs.length, activeTab]); // 监听 logs 长度变化
+  }, [hero?.logs.length, activeTab]); 
 
   const getQualityColor = (q: Quality) => {
     switch (q) {
@@ -158,31 +153,31 @@ export default function Home() {
   const LogsView = () => (
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
-        {hero.logs.map((log, index) => (
-          <div key={log.id} className="flex gap-2 items-baseline mb-2">
-            <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
-            {/* ⚠️ 应用 TypewriterText 组件 */}
-            {/* 只有最新的 3 条日志才使用打字机效果，旧的直接显示，优化性能 */}
-            {index >= hero.logs.length - 3 ? (
-               <TypewriterText 
-                 text={log.text} 
-                 className={`text-[14px] leading-7 text-justify font-medium ${
-                   log.type === 'highlight' ? 'text-amber-900' : 
-                   log.type === 'system' ? 'text-stone-400 text-xs italic' : 
-                   'text-black' 
-                 }`} 
-               />
-            ) : (
-               <span className={`text-[14px] leading-7 text-justify font-medium ${
-                   log.type === 'highlight' ? 'text-amber-900' : 
-                   log.type === 'system' ? 'text-stone-400 text-xs italic' : 
-                   'text-black' 
-                 }`}>
-                 {log.text}
-               </span>
-            )}
-          </div>
-        ))}
+        {hero.logs.map((log, index) => {
+          // ⚠️ 核心修正：仅最新的 highlight 日志使用打字机效果
+          const isLatest = index >= hero.logs.length - 2; // 最近两句允许动画
+          const isNarrative = log.type === 'highlight';
+
+          return (
+            <div key={log.id} className="flex gap-2 items-baseline mb-2">
+              <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
+              {isLatest && isNarrative ? (
+                 <TypewriterText 
+                   text={log.text} 
+                   className="text-[14px] leading-7 text-justify font-medium text-amber-900" 
+                 />
+              ) : (
+                 <span className={`text-[14px] leading-7 text-justify font-medium ${
+                     log.type === 'highlight' ? 'text-amber-900' : 
+                     log.type === 'system' ? 'text-stone-400 text-xs italic' : 
+                     'text-black' 
+                   }`}>
+                   {log.text}
+                 </span>
+              )}
+            </div>
+          );
+        })}
         <div ref={bottomRef} className="h-4" />
       </div>
       <div className="p-4 bg-gradient-to-t from-[#fcf9f2] via-[#fcf9f2] to-transparent">
@@ -225,7 +220,6 @@ export default function Home() {
            <div className="text-center flex-1"><div className="text-xs text-stone-400">岁数</div><div className="font-bold text-stone-700">{hero.age}</div></div>
         </div>
         
-        {/* 江湖风评 */}
         <div className="mb-4 bg-stone-50 p-3 rounded border border-stone-100 relative">
            <div className="absolute top-2 right-2 text-stone-300 opacity-20"><ScrollText size={48}/></div>
            <div className="text-xs font-bold text-stone-700 mb-2 flex items-center gap-1"><Info size={12}/> 江湖风评</div>
@@ -234,14 +228,12 @@ export default function Home() {
            </div>
         </div>
 
-        {/* 装备外观描述 + 装备槽位展示 */}
         <div className="mb-4 bg-stone-50 p-3 rounded border border-stone-100 relative">
            <div className="absolute top-2 right-2 text-stone-300 opacity-20"><Shield size={48}/></div>
            <div className="text-xs font-bold text-stone-700 mb-2 flex items-center gap-1"><Shirt size={12}/> 穿戴</div>
            <div className="text-[11px] text-stone-600 leading-relaxed font-serif italic mb-3">
              “{hero.equipmentDescription || "衣着朴素，风尘仆仆。"}”
            </div>
-           {/* 装备槽位 Grid */}
            <div className="grid grid-cols-3 gap-2">
               <EquipSlot label="兵器" item={hero.equipment.weapon} icon={<Sword size={12}/>} />
               <EquipSlot label="头饰" item={hero.equipment.head} icon={<HardHat size={12}/>} />

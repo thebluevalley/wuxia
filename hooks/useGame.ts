@@ -6,6 +6,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
   : null;
 
+// 缩短刷新间隔，防止长时间无响应
 const REFRESH_INTERVAL = 3 * 60 * 60 * 1000; 
 const QUEST_REFRESH_INTERVAL = 6 * 60 * 60 * 1000; 
 
@@ -159,7 +160,7 @@ export function useGame() {
       tags: ["初出茅庐"], 
       actionCounts: { kills: 0, retreats: 0, gambles: 0, charity: 0, betrayals: 0, shopping: 0, drinking: 0 },
       description: "初入江湖，默默无闻。",
-      equipmentDescription: "一身布衣，手无寸铁。" // Initial description
+      equipmentDescription: "一身布衣，手无寸铁。" 
     };
 
     if (!supabase) { setHero(newHero); setLoading(false); setTimeout(() => triggerAI('start_game', undefined, undefined, newHero), 500); return; }
@@ -251,7 +252,6 @@ export function useGame() {
         recentLogs: recentLogsRef.current, 
         lastLogLen: recentLogsRef.current[0]?.length || 0,
         tags: currentHero.tags || [],
-        // Pass equipment for equip description generation
         equipment: currentHero.equipment
       };
       const res = await fetch('/api/ai', { method: 'POST', body: JSON.stringify({ context, eventType, userAction: action }) });
@@ -273,7 +273,9 @@ export function useGame() {
            addMessage('rumor', title, content);
         } else {
            const fullText = suffix ? `${data.text} ${suffix}` : data.text;
-           addLog(fullText, ['god_action','start_game','resume_game','recruit_companion','quest_start','quest_climax','quest_end'].includes(eventType) ? 'highlight' : 'normal');
+           // ⚠️ 关键修正：确保剧情事件类型为 'highlight'，以便触发打字机效果
+           const logType = ['god_action','start_game','resume_game','recruit_companion','quest_start','quest_climax','quest_end','quest_journey','idle_event'].includes(eventType) ? 'highlight' : 'normal';
+           addLog(fullText, logType);
         }
         return true;
       }
@@ -377,7 +379,6 @@ export function useGame() {
     }
 
     if (equipChanged) {
-        // Trigger equipment description update outside of render cycle
         setTimeout(() => triggerAI('generate_equip_desc', '', undefined, hero), 100);
     }
 
@@ -392,7 +393,7 @@ export function useGame() {
       if (!currentHero) return;
 
       const { hero: managedHero, logs: autoLogs, tagsChanged } = autoManageInventory(currentHero);
-      if (autoLogs.length > 0) { setHero(managedHero); autoLogs.forEach(l => addLog(l, 'highlight')); }
+      if (autoLogs.length > 0) { setHero(managedHero); autoLogs.forEach(l => addLog(l, 'system')); } // 系统日志用 'system'
       const activeHero = managedHero;
 
       if (tagsChanged) {
@@ -530,20 +531,21 @@ export function useGame() {
         return finalH;
       });
 
-      // ⚠️ 核心调整：心跳加速 (15s ~ 60s)
+      // ⚠️ 核心调整：频率提高 (8s - 20s)，并大幅增加事件概率
       if (aiEvent) {
          await triggerAI(aiEvent, logSuffix);
-      } else if (!aiEvent && newQuest && newQuest.stage === 'road' && Math.random() < 0.4) {
+      } else if (!aiEvent && newQuest && newQuest.stage === 'road' && Math.random() < 0.7) { // 概率提升到 0.7
          await triggerAI('quest_journey', logSuffix);
-      } else if (!aiEvent && !newQuest && Math.random() < 0.3) {
+      } else if (!aiEvent && !newQuest && Math.random() < 0.6) { // 概率提升到 0.6
          await triggerAI('idle_event', logSuffix);
-      } else if (Math.random() < 0.05) {
+      } else if (Math.random() < 0.1) {
          await triggerAI('generate_rumor');
       } else if (logSuffix) {
          addLog(logSuffix, 'system');
       }
       
-      const nextTick = Math.floor(Math.random() * (60000 - 15000) + 15000); 
+      // ⚠️ 缩短心跳
+      const nextTick = Math.floor(Math.random() * (20000 - 8000) + 8000); 
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
     timerRef.current = setTimeout(gameLoop, 2000);
