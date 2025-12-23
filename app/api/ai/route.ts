@@ -13,37 +13,37 @@ export async function POST(req: Request) {
     const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
     const loreSnippet = WORLD_ARCHIVE[Math.floor(Math.random() * WORLD_ARCHIVE.length)];
 
-    const stage = context.storyStage || "微尘";
+    const stage = context.storyStage || "私生子";
     const tags = context.tags ? context.tags.join("、") : "无";
     
+    // 设定基调：Grimdark, Political, Realistic
     let toneInstruction = "";
-    if (stage === "微尘") {
-        toneInstruction = "Tone: Down-to-earth, Vibrant, Humorous.";
-    } else if (stage === "棋子") {
-        toneInstruction = "Tone: Suspenseful, Intriguing.";
-    } else if (stage === "破局者") {
-        toneInstruction = "Tone: Determined, Heroic.";
-    } else if (stage === "国士" || stage === "传说") {
-        toneInstruction = "Tone: Epic, Melancholic.";
+    if (stage === "私生子") {
+        toneInstruction = "Tone: Gritty, Harsh, Survivalist. You are nothing in this world.";
+    } else if (stage === "侍从") {
+        toneInstruction = "Tone: Cynical, Observant. You see the ugliness behind the knight's armor.";
+    } else if (stage === "骑士") {
+        toneInstruction = "Tone: Honorable but conflicted. Duty vs. Survival.";
+    } else if (stage === "领主" || stage === "王者") {
+        toneInstruction = "Tone: Machiavellian, Grand, Heavy. Heavy is the head that wears the crown.";
     }
 
-    // ⚠️ 核心调整：长短句分布调整 (70% 概率为短句，创造呼吸感)
     const isLong = Math.random() > 0.7; 
     const lengthInstruction = isLong 
-        ? "Length: A descriptive paragraph (40-60 words). Paint a scene." 
-        : "Length: A single, punchy sentence (5-15 words). A fleeting thought or action.";
+        ? "Length: A descriptive paragraph (40-60 words). Paint a dark, realistic scene." 
+        : "Length: A single, punchy sentence (5-15 words). Cold and sharp.";
 
     const baseInstruction = `
-      You are a Wuxia Storyteller (Jin Yong style). 
+      You are a Grimdark Fantasy Storyteller (Game of Thrones style). 
       Language: SIMPLIFIED CHINESE ONLY.
       ${toneInstruction}
       ${lengthInstruction}
       Lore Context: ${loreSnippet}
       
       CRITICAL RULES:
-      1. COMPLETENESS: Every output must be a COMPLETE thought. No trailing sentences. No "and then...".
-      2. INDEPENDENCE: The text must make sense on its own.
-      3. SHOW, DON'T TELL: Use sensory details (smell, sound, temperature).
+      1. STYLE: Realistic, brutal, low-magic. Focus on politics, betrayal, and the cold reality of war.
+      2. COMPLETENESS: Every output must be a COMPLETE thought.
+      3. SHOW, DON'T TELL: Describe the mud, the blood, the cold, the smell of wine and lies.
       
       Hero: ${context.name} (${stage}).
       Tags: [${tags}].
@@ -56,8 +56,8 @@ export async function POST(req: Request) {
       case 'generate_description':
         prompt = `
           Task: Write a character portrait based strictly on tags: [${tags}].
-          STRICT RULES: CHINESE ONLY. Max 50 chars. Combine tags into a visual image.
-          Example: "他斜倚在墙角，腹部的伤口还在渗血，却仍举着酒壶狂饮。"
+          STRICT RULES: CHINESE ONLY. Max 50 chars.
+          Example: "他穿着染血的黑衣，眼神像临冬城的雪一样冷，手中紧握着那枚无面者的硬币。"
           Your Description:
         `;
         break;
@@ -67,50 +67,51 @@ export async function POST(req: Request) {
         const body = context.equipment?.body?.name || "布衣";
         prompt = `
           Task: Describe appearance based on gear: Weapon [${weapon}], Armor [${body}].
-          STRICT RULES: CHINESE ONLY. Max 40 chars. Visual & Cool.
+          STRICT RULES: CHINESE ONLY. Max 40 chars. Grimdark style.
+          Example: "他身披兰尼斯特的金甲，手持瓦雷利亚钢剑，宛如一头准备噬人的雄狮。"
           Your Description:
         `;
         break;
 
       case 'start_game':
-        prompt = `${baseInstruction} Write an opening scene. The hero stands in ${context.location}. Atmosphere is key.`;
+        prompt = `${baseInstruction} Write an opening scene. The hero stands in ${context.location}. The atmosphere is ominous.`;
         break;
       
       case 'quest_start':
-        prompt = `${baseInstruction} Event: Start "${context.questScript?.title}". Details: ${context.questScript?.description}. Action: The hero sets off.`;
+        prompt = `${baseInstruction} Event: Start "${context.questScript?.title}". Details: ${context.questScript?.description}. Action: The hero accepts the burden.`;
         break;
 
       case 'quest_journey':
         prompt = `${baseInstruction} 
         Event: A moment on the road. 
-        Action: A slice-of-life scene or scenery description. 
+        Action: Describe a scene of the war-torn land or the beauty of the desolate north.
         Mandatory: Use flavor text "${envFlavor}".`;
         break;
 
       case 'idle_event':
         prompt = `${baseInstruction} 
         Event: Wandering in ${context.location}. 
-        Action: A small interaction (drinking, observing, resting). Reflect tags [${tags}].`;
+        Action: A moment of reflection on the chaos of the realm. Reflect tags [${tags}].`;
         break;
 
       case 'quest_climax':
-        prompt = `${baseInstruction} Event: Climax vs ${context.questScript?.antagonist}. Action: A decisive moment. Focus on the clash of wills.`;
+        prompt = `${baseInstruction} Event: Climax vs ${context.questScript?.antagonist}. Twist: ${context.questScript?.twist}. Action: A brutal, realistic fight. No flashy magic.`;
         break;
 
       case 'quest_end':
-        prompt = `${baseInstruction} Event: Conclusion. Objective: ${context.questScript?.objective}. Action: The dust settles. How does the hero feel?`;
+        prompt = `${baseInstruction} Event: Conclusion. Objective: ${context.questScript?.objective}. Action: The cost of victory.`;
         break;
         
       case 'recruit_companion':
-        prompt = `${baseInstruction} Hero meets a new companion. A shared glance or words.`;
+        prompt = `${baseInstruction} Hero meets a new companion. A shared ambition or desperation.`;
         break;
         
       case 'god_action':
-        prompt = `${baseInstruction} A moment of serendipity.`;
+        prompt = `${baseInstruction} A rare moment of luck or a sign from the Old Gods.`;
         break;
         
       case 'generate_rumor':
-        prompt = `Write a rumor about the Jianghu. Format: "【Title】Content". Chinese Only.`;
+        prompt = `Write a rumor about the War of the Five Kings or the White Walkers. Format: "【Title】Content". Chinese Only.`;
         break;
 
       default:
@@ -126,7 +127,6 @@ export async function POST(req: Request) {
 
     let text = completion.choices[0]?.message?.content || "";
     
-    // 清洗：移除可能的英文解释或引号
     if (eventType.includes('generate')) {
         text = text.replace(/^(Based on|The hero|Here is).*:[\s\n]*/i, '');
         text = text.replace(/^["']|["']$/g, ''); 

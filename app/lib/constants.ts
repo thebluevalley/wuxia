@@ -24,17 +24,18 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-export type Faction = 'alliance' | 'freedom' | 'court' | 'sword' | 'healer' | 'cult' | 'invader' | 'hidden' | 'neutral';
+// ⚠️ 核心重构：七国势力 (The Seven Kingdoms & Beyond)
+export type Faction = 'stark' | 'lannister' | 'targaryen' | 'baratheon' | 'watch' | 'wildling' | 'citadel' | 'neutral' | 'faith';
 export const FACTIONS: Record<Faction, string> = {
-  alliance: "长生盟",
-  freedom: "自在门",
-  court: "锦衣卫",
-  sword: "东海剑阁",
-  healer: "药王谷",
-  cult: "拜火教",
-  invader: "北莽",
-  hidden: "悲酥清风",
-  neutral: "市井"
+  stark: "北境家族 (狼)",
+  lannister: "西境金狮 (狮)",
+  targaryen: "流亡真龙 (龙)",
+  baratheon: "铁王座 (鹿)",
+  watch: "守夜人军团 (黑)",
+  wildling: "塞外野人 (自由民)",
+  citadel: "学城 (知识)",
+  faith: "七神教会 (信仰)",
+  neutral: "平民百姓"
 };
 
 export type QuestCategory = 'combat' | 'life';
@@ -65,7 +66,8 @@ export type Quest = {
   rewards: { gold: number; exp: number; item?: Item; };
 };
 
-export type SkillType = 'attack' | 'inner' | 'speed' | 'medical' | 'trade';
+// 技能重构：中世纪战技与权谋
+export type SkillType = 'combat' | 'intrigue' | 'survival' | 'knowledge' | 'command';
 export type Skill = { name: string; type: SkillType; level: number; exp: number; maxExp: number; desc: string; };
 
 export type MessageType = 'rumor' | 'system';
@@ -88,11 +90,12 @@ export type Pet = { name: string; type: string; level: number; desc: string; };
 
 export type HeroState = {
   name: string; level: number; gender: '男' | '女'; age: number; personality: string; title: string; motto: string;
-  godPower: number; unlockedFeatures: string[]; storyStage: string;
+  godPower: number; // 改为 "命运值/旧神眷顾"
+  unlockedFeatures: string[]; storyStage: string;
   pet: Pet | null;
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
   stamina: number; maxStamina: number;
-  hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
+  hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number; // Gold -> Gold Dragons (金龙)
   reputation: Record<Faction, number>;
   
   tags: string[]; 
@@ -105,8 +108,8 @@ export type HeroState = {
     shopping: number;     
     drinking: number;     
   }; 
-  description: string; // 只有性格/状态描述
-  equipmentDescription: string; // ⚠️ 新增：专门的装备外观描述
+  description: string; 
+  equipmentDescription: string; 
 
   currentQuest: Quest | null;
   queuedQuest: Quest | null;
@@ -124,195 +127,172 @@ export type HeroState = {
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
-// --- 典故系统 ---
+// --- 典故系统 (Lore of Westeros-like World) ---
 export const WORLD_ARCHIVE = [
-  "【天机榜】：百晓生所著，记录天下兵器。排名第一的'天问剑'已失踪六十年。",
-  "【胭脂泪】：三十年前，魔教圣女爱上了少林方丈，最终在断肠崖自尽。",
-  "【北拒狼烟】：大将军李牧之死守孤城十三年，城破之日，满城百姓无一人投降。",
-  "【药王试毒】：为了研制解药，药王谷谷主以身试毒，变成了一个半人半鬼的怪物。",
-  "【剑阁闭门】：东海剑阁宣布封岛五十年，传闻是在参悟'无剑之境'。",
-  "【长生之谜】：据说皇宫深处藏着半张残卷，记载了长生不老的秘密。",
-  "【酒神咒】：喝得越醉，剑法越强。这是失传已久的'醉仙望月步'的心法。",
-  "【红尘客栈】：江湖中唯一不能动手的地方。老板娘风情万种，但没人见过她出手。"
+  "【篡夺者战争】：十五年前，鹿家联合狼家推翻了疯王的统治，真龙血脉流亡海外。",
+  "【长夜传说】：八千年前，异鬼从极北之地南下，几乎毁灭了人类文明，直到筑城者布兰登建立了绝境长城。",
+  "【血色婚礼】：在孪河城，宾客权利被践踏，北境之王惨遭背叛，狼头被缝在了尸体上。",
+  "【守夜人誓言】：长夜将至，我从今开始守望，至死方休。我是黑暗中的利剑，长城上的守卫。",
+  "【兰尼斯特有债必偿】：西境守护家族的非官方族语，既是承诺，也是威胁。",
+  "【凡人皆有一死 (Valar Morghulis)】：来自狭海对岸的古老谚语。",
+  "【无面者】：布拉佛斯的刺客组织，他们没有名字，也没有脸。",
+  "【旧神与七神】：北境人依然信仰鱼梁木上的旧神，而南方人则在圣堂祈祷七神保佑。"
 ];
 
-export const PERSONALITIES = ["侠义", "乐天", "狂放", "儒雅", "贪财", "痴情", "机灵", "中庸", "逍遥", "阴狠", "慈悲"];
-export const NPC_NAMES_MALE = ["苏", "萧", "叶", "顾", "沈", "陆", "江", "楚", "独孤", "西门", "诸葛", "慕容", "李", "王", "张", "刘", "陈"];
-export const NPC_NAMES_FEMALE = ["灵儿", "语嫣", "婉清", "盈盈", "莫愁", "芷若", "敏", "蓉", "念慈", "素素", "红药", "师师"];
-export const NPC_NAMES_LAST = ["无忌", "一刀", "留香", "不败", "寻欢", "风", "云", "雷", "电", "靖", "康", "峰", "平", "冲"];
+export const PERSONALITIES = ["荣誉", "狡诈", "残酷", "忠诚", "贪婪", "虔诚", "疯癫", "冷漠", "野心"];
+export const NPC_NAMES_MALE = ["琼恩", "泰温", "詹姆", "艾德", "罗柏", "提利昂", "培提尔", "瓦里斯", "劳勃", "雷加", "布兰", "山姆", "乔里克", "达里奥"];
+export const NPC_NAMES_FEMALE = ["丹妮莉丝", "瑟曦", "珊莎", "艾莉亚", "凯特琳", "玛格丽", "布蕾妮", "耶哥蕊特", "莱安娜", "梅丽珊卓"];
+export const NPC_NAMES_LAST = ["史塔克", "兰尼斯特", "坦格利安", "拜拉席恩", "徒利", "提利尔", "马泰尔", "格雷乔伊", "雪诺(私生子)", "石东(私生子)", "佛雷", "波顿"];
 
 export const NPC_ARCHETYPES = {
   common: [
-    { job: "茶博士", buff: "luck", desc: "提着长嘴铜壶，听遍了南来北往的故事。" },
-    { job: "落魄书生", buff: "exp", desc: "背着书箱，希望能考取功名，或者练成绝世武功。" },
-    { job: "卖花姑娘", buff: "heal", desc: "在这乱世中，她是唯一的一抹亮色。" }, 
-    { job: "市井泼皮", buff: "attack", desc: "虽然无赖，但却是打探消息的好手。" }
+    { job: "酒馆老板", buff: "luck", desc: "擦着杯子，听着来自维斯特洛各地的流言。" },
+    { job: "流浪歌手", buff: "exp", desc: "弹着竖琴，唱着《卡斯特梅的雨季》。" },
+    { job: "妓院老鸨", buff: "luck", desc: "她知道这城里所有大人物的秘密。" }, 
+    { job: "君临城卫兵", buff: "attack", desc: "穿着金袍子，比起抓贼更擅长收受贿赂。" }
   ],
   rare: [
-    { job: "铃医", buff: "heal", desc: "摇着串铃走街串巷，专治疑难杂症。" },
-    { job: "退伍老兵", buff: "defense", desc: "一条腿留在了北疆战场，但手里的刀依然锋利。" },
-    { job: "算命先生", buff: "luck", desc: "铁口直断，据说曾是钦天监的官员。" },
-    { job: "赏金猎人", buff: "attack", desc: "只要给钱，连鬼都敢抓。" }
+    { job: "学士", buff: "exp", desc: "颈上挂着重重的金属链条，代表着渊博的知识。" },
+    { job: "佣兵", buff: "attack", desc: "只认金龙，不认骑士精神。" },
+    { job: "红袍祭司", buff: "luck", desc: "在火焰中看到了未来，嘴里念叨着光之王。" },
+    { job: "守夜人游骑兵", buff: "defense", desc: "黑衣如墨，这是他在长城外活下来的第十个年头。" }
   ],
   epic: [
-    { job: "锦衣卫百户", buff: "attack", desc: "飞鱼服，绣春刀，令人闻风丧胆。" },
-    { job: "苗疆蛊女", buff: "attack", desc: "美丽的背后是致命的毒药。" }, 
-    { job: "少林武僧", buff: "defense", desc: "铜皮铁骨，慈悲为怀。" }, 
-    { job: "丐帮长老", buff: "exp", desc: "身披九袋，通晓天下大事。" }
+    { job: "御林铁卫", buff: "defense", desc: "身披白甲，誓死守护国王，虽说现在的国王不值得守护。" },
+    { job: "无面者", buff: "attack", desc: "不仅能杀人，还能变成死者的模样。" }, 
+    { job: "龙石岛法师", buff: "exp", desc: "掌握着失传已久的瓦雷利亚巫术。" }, 
+    { job: "北境封臣", buff: "attack", desc: "虽然粗鲁，但绝对忠诚。" }
   ],
   legendary: [
-    { job: "白发魔女", buff: "attack", desc: "为情所困，一夜白头，武功深不可测。" },
-    { job: "剑圣传人", buff: "attack", desc: "背负着振兴剑阁的重任，剑气冲天。" }, 
-    { job: "隐世国师", buff: "exp", desc: "看破红尘，却又放不下苍生。" }
+    { job: "龙之母", buff: "attack", desc: "不焚者，带着三条龙重返维斯特洛。" },
+    { job: "弑君者", buff: "attack", desc: "金发飘扬，剑术无双，背负着一生的骂名。" }, 
+    { job: "三眼乌鸦", buff: "exp", desc: "坐在鱼梁木的树根中，看穿了过去与未来。" }
   ]
 };
 
-export const NPC_TRAITS = ["豪爽", "阴险", "痴情", "贪财", "愚忠", "避世", "狂妄", "儒雅", "粗鲁", "神秘"];
+export const NPC_TRAITS = ["私生子", "侏儒", "弑亲者", "守夜人", "骑士", "学士", "野人", "太监", "酒鬼", "美人"];
 
 export const SKILL_LIBRARY = {
-  attack: ["太祖长拳", "降龙十八掌", "独孤九剑", "打狗棒法", "六脉神剑", "辟邪剑法", "七伤拳"],
-  inner:  ["易筋经", "九阳神功", "北冥神功", "九阴真经", "葵花宝典", "吸星大法"],
-  speed:  ["凌波微步", "梯云纵", "神行百变", "水上漂", "踏雪无痕"],
-  medical:["平一指医经", "毒经", "洗髓经", "神农百草诀"],
-  trade:  ["富国策", "聚宝盆", "千金方", "鬼谷纵横术"]
+  combat: ["水舞者剑术", "双手巨剑精通", "长矛方阵", "骑枪冲锋", "多斯拉克弯刀", "十字弓射击"],
+  intrigue: ["谎言织造", "情报收集", "毒药调配", "政治联姻", "收买人心"],
+  survival: ["绝境求生", "雪地追踪", "草药识别", "生火取暖"],
+  knowledge: ["高等瓦雷利亚语", "历史学", "战术指挥", "渡鸦传信"],
+  command: ["鼓舞士气", "阵型指挥", "后勤管理", "攻城术"]
 };
 
 export const PET_TEMPLATES = [
-  { type: "海东青", desc: "万鹰之神，飞得最高，看得最远。" },
-  { type: "莽牯朱蛤", desc: "万毒之王，百毒不侵，叫声如牛。" },
-  { type: "白猿", desc: "通人性，据说腹中藏有经书。" },
-  { type: "汗血马", desc: "日行千里，流汗如血，将士的生死伙伴。" },
-  { type: "黑背", desc: "忠诚的猎犬，嗅觉灵敏，不死不休。" }
+  { type: "冰原狼", desc: "北境的图腾，比普通的狼大两倍，忠诚且凶猛。" },
+  { type: "幼龙", desc: "虽然还小，但喷出的火焰已能融化钢铁。" },
+  { type: "三眼乌鸦", desc: "神秘的向导，总是在梦中出现。" },
+  { type: "影子山猫", desc: "潜伏在明月山脉的杀手。" },
+  { type: "信鸦", desc: "虽然不能战斗，但能带来远方的消息。" }
 ];
 
-export const ARENA_OPPONENTS = ["长生盟执法长老", "锦衣卫千户", "北莽第一勇士", "西域法王", "东瀛剑豪", "隐居的扫地僧", "疯癫的武痴"];
+export const ARENA_OPPONENTS = ["魔山", "猎狗", "红毒蛇", "巴利斯坦爵士", "詹姆·兰尼斯特", "美人布蕾妮", "巨人旺旺", "卓戈卡奥"];
 
 export const MAP_LOCATIONS = {
-  common: ["悦来客栈", "城隍庙", "风波亭", "乱葬岗", "渡口", "集市", "驿站"],
-  search: ["楼兰古城", "剑冢", "藏经阁密室", "皇宫大内", "桃花岛"],
-  hunt:   ["黑风寨", "野猪林", "北莽大营", "快活林", "五毒教总坛"],
-  challenge: ["华山之巅", "紫禁之巅", "雁门关外", "聚贤庄", "侠客岛"],
-  train:  ["寒玉床", "思过崖", "达摩洞", "冰火岛", "洗剑池"],
-  life:   ["扬州画舫", "汴京夜市", "杏花村", "同福客栈", "醉仙楼"]
+  common: ["十字路口客栈", "跳蚤窝", "君临城下水道", "鼹鼠村", "避冬市镇", "孪河城"],
+  search: ["旧镇学城", "龙石岛地下", "赫伦堡废墟", "先民拳峰", "瓦雷利亚废墟"],
+  hunt:   ["御林", "鬼影森林", "多恩沙漠", "铁群岛", "颈泽"],
+  challenge: ["比武审判场", "绝境长城之巅", "鹰巢城月门", "极乐塔", "弥林竞技场"],
+  train:  ["布拉佛斯黑白之院", "红堡地牢", "心树之下", "长夜堡", "风息堡"],
+  life:   ["小指头的妓院", "高庭花园", "奔流城", "凯岩城", "临冬城大厅"]
 };
 
 export const WORLD_MAP = [
-  { name: "杏花村", type: "life", minLv: 1 }, { name: "山神庙", type: "common", minLv: 1 }, { name: "后山竹林", type: "train", minLv: 1 }, { name: "野猪林", type: "hunt", minLv: 1 },
-  { name: "扬州城", type: "life", minLv: 10 }, { name: "快活林", type: "hunt", minLv: 10 }, { name: "悦来客栈", type: "common", minLv: 10 }, { name: "长生盟分舵", type: "challenge", minLv: 15 },
-  { name: "汴京", type: "life", minLv: 30 }, { name: "锦衣卫诏狱", type: "hunt", minLv: 30 }, { name: "皇宫大内", type: "search", minLv: 35 }, { name: "太医院", type: "train", minLv: 35 },
-  { name: "雁门关", type: "challenge", minLv: 40 }, { name: "北莽大营", type: "hunt", minLv: 45 }, { name: "大漠龙门", type: "life", minLv: 50 },
-  { name: "昆仑山", type: "train", minLv: 60 }, { name: "光明顶", type: "challenge", minLv: 65 }, { name: "西域圣坛", type: "search", minLv: 70 },
-  { name: "东海剑阁", type: "train", minLv: 80 }, { name: "侠客岛", type: "search", minLv: 85 }, { name: "剑冢", type: "search", minLv: 90 }, { name: "破碎虚空", type: "common", minLv: 99 }
+  { name: "临冬城", type: "life", minLv: 1 }, { name: "狼林", type: "hunt", minLv: 1 }, { name: "避冬市镇", type: "common", minLv: 1 }, { name: "心树神木林", type: "train", minLv: 1 },
+  { name: "国王大道", type: "common", minLv: 10 }, { name: "十字路口客栈", type: "life", minLv: 10 }, { name: "孪河城", type: "challenge", minLv: 15 }, { name: "颈泽", type: "hunt", minLv: 15 },
+  { name: "君临城", type: "life", minLv: 30 }, { name: "跳蚤窝", type: "common", minLv: 30 }, { name: "红堡", type: "search", minLv: 35 }, { name: "贝勒大圣堂", type: "train", minLv: 35 },
+  { name: "御林", type: "hunt", minLv: 40 }, { name: "鹰巢城", type: "challenge", minLv: 45 }, { name: "高庭", type: "life", minLv: 50 },
+  { name: "绝境长城", type: "train", minLv: 60 }, { name: "黑城堡", type: "common", minLv: 60 }, { name: "鬼影森林", type: "hunt", minLv: 65 }, { name: "先民拳峰", type: "search", minLv: 70 },
+  { name: "艰难屯", type: "challenge", minLv: 80 }, { name: "永冬之地", type: "search", minLv: 90 }, { name: "铁王座", type: "common", minLv: 99 }
 ];
 
 export const STORY_STAGES = [
-  { level: 1, name: "微尘", desc: "在这个巨大的时代里，你只是一粒微不足道的尘埃。" },
-  { level: 15, name: "棋子", desc: "你开始有了一些利用价值，各大势力试图掌控你的命运。" },
-  { level: 40, name: "破局者", desc: "你不再甘心被摆布，开始用剑为自己杀出一条路。" },
-  { level: 70, name: "国士", desc: "你的名字，成了这个摇摇欲坠的国家的最后希望。" },
-  { level: 100, name: "传说", desc: "后世的书里，将会用最浓墨重彩的一笔来记录你。" }
+  { level: 1, name: "私生子", desc: "你是这个残酷世界中被遗忘的角落，连姓氏都是耻辱。" },
+  { level: 15, name: "侍从", desc: "你学会了擦亮盔甲，也学会了在权力的游戏中低头。" },
+  { level: 40, name: "骑士", desc: "你被涂抹了圣油，宣誓效忠，但你发现誓言在欲望面前一文不值。" },
+  { level: 70, name: "领主", desc: "你拥有了自己的城堡和旗帜，但背后的匕首也更多了。" },
+  { level: 100, name: "王者", desc: "你赢得了权力的游戏，或者...你死得稍微晚了一些。" }
 ];
 
 export const FLAVOR_TEXTS = {
-  environment: ["夕阳染红了古道", "江南烟雨迷蒙", "大漠孤烟直", "京城繁华如梦", "边关风雪交加", "竹林幽静深邃"],
-  action: ["温了一壶老酒", "擦拭着剑上的血迹", "望着远方出神", "与路人闲聊", "大笑三声", "低头沉思"],
-  object: ["半卷残书", "一串铜钱", "断裂的箭头", "胭脂盒", "发黄的信纸", "无主的孤坟"]
+  environment: ["凛冬的寒风呼啸", "君临城的腐臭味", "学士塔的乌鸦叫声", "铁王座的阴影", "狭海的咸湿海风", "北境的皑皑白雪"],
+  action: ["擦拭瓦雷利亚钢剑", "喝了一口酸涩的红酒", "把玩着金龙币", "在神木林中祈祷", "低声密谋", "裹紧了毛皮斗篷"],
+  object: ["龙晶匕首", "学士的项链", "无面者的硬币", "族谱", "半个洋葱", "染血的白袍"]
 };
 
+// ⚠️ 核心重构：权游风格剧本 (Grimdark)
 export const QUEST_SCRIPTS = {
-  "微尘": [
-    { title: "那碗阳春面", desc: "这世道，一碗热面能救一条命。", obj: "分享食物", antagonist: "冷漠的店小二", twist: "小乞丐吃完面，在桌上画了一张前朝皇宫的密道图。", faction: 'neutral' },
-    { title: "替死鬼", desc: "长生盟的少爷杀了人，管家让你去顶罪。", obj: "抉择", antagonist: "长生盟管家", twist: "在牢里，你遇到了被关押二十年的“前任武林盟主”。", faction: 'alliance' }
+  "私生子": [
+    { title: "凛冬将至", desc: "绝境长城的逃兵带来了关于'异鬼'的消息，但没人相信他。", obj: "调查逃兵", antagonist: "守夜人征兵官", twist: "逃兵其实是被自己人吓疯的，但长城外真的有东西在动。", faction: 'watch' },
+    { title: "比武大会的赌注", desc: "国王之手的比武大会即将开始，你需要弄到一副盔甲。", obj: "筹集装备", antagonist: "势利的铁匠", twist: "你偷来的盔甲上刻着一个已经灭绝家族的纹章。", faction: 'neutral' }
   ],
-  "棋子": [
-    { title: "押运生辰纲", desc: "锦衣卫委托你押送给当朝太师的寿礼。", obj: "护送镖车", antagonist: "自在门劫匪", twist: "箱子里装的不是金银，而是三千童男童女。", faction: 'court' },
-    { title: "刺杀清官", desc: "悲酥清风下单，要买扬州知府的人头。", obj: "执行刺杀", antagonist: "知府的护卫", twist: "知府是唯一在开仓放粮的好官，买凶的人是粮商。", faction: 'hidden' }
+  "侍从": [
+    { title: "小指头的任务", desc: "培提尔·贝里席大人让你去妓院送一封信。", obj: "送信", antagonist: "金袍子卫兵", twist: "信里是前任首相被毒死的真相，你成了唯一的知情者。", faction: 'baratheon' },
+    { title: "保护小恶魔", desc: "提利昂·兰尼斯特在跳蚤窝喝醉了，有人想借机杀他。", obj: "护送侏儒", antagonist: "雇佣刺客", twist: "刺客是他的姐姐瑟曦派来的。", faction: 'lannister' }
   ],
-  "破局者": [
-    { title: "血染金銮殿", desc: "皇帝昏庸，听信谗言要割让燕云十六州。", obj: "夜闯皇宫", antagonist: "大内总管", twist: "皇帝也是傀儡，真正的幕后黑手是长生盟。", faction: 'invader' },
-    { title: "剑阁问剑", desc: "为了对抗北莽，你需要借东海剑阁的镇阁之宝。", obj: "挑战剑圣", antagonist: "剑圣", twist: "剑圣已经老死了，守剑的是他的一道执念。", faction: 'sword' }
+  "骑士": [
+    { title: "血色婚礼的请以此", desc: "佛雷家族邀请你去参加一场婚礼，据说有美酒和美食。", obj: "赴宴", antagonist: "佛雷家族士兵", twist: "乐队开始演奏《卡斯特梅的雨季》，门被锁上了。", faction: 'stark' },
+    { title: "审判", desc: "你被指控谋杀国王，要在比武审判中证明清白。", obj: "决斗", antagonist: "魔山", twist: "你的代理骑士在决斗前夜被毒死了，你必须亲自上场。", faction: 'baratheon' }
   ],
-  "国士": [
-    { title: "死守襄阳", desc: "北莽四十万大军压境，朝廷已弃城。", obj: "守城三日", antagonist: "北莽狼主", twist: "城内粮草已尽，你用自己的血唤醒了全城百姓的血性。", faction: 'invader' }
+  "领主": [
+    { title: "长夜之战", desc: "夜王攻破了长城，死人军团南下。", obj: "死守临冬城", antagonist: "夜王", twist: "龙妈的龙变成了尸龙，正在向你喷吐蓝色的火焰。", faction: 'watch' }
   ],
   "default": [
-    { title: "江湖夜话", desc: "雨夜，破庙，两人，一壶酒。", obj: "聆听", antagonist: "无", twist: "他对面的那个人，其实是他自己。", faction: 'neutral' }
+    { title: "权力的游戏", desc: "混乱不是深渊，混乱是阶梯。", obj: "往上爬", antagonist: "昨日的盟友", twist: "在权力的游戏中，你不当赢家，就只有死路一条。", faction: 'neutral' }
   ]
 };
 
 export const WORLD_LORE = `
-背景：王朝末年，内忧外患。北莽扣关，朝廷腐败。
-核心：从微尘到国士的成长之路。
+背景：七大王国，铁王座之争。疯王已死，篡夺者劳勃坐镇君临，但兰尼斯特家族暗中掌权。
+威胁：北境长城之外，异鬼苏醒，凛冬将至；狭海对岸，真龙血脉正在崛起。
+基调：凡人皆有一死 (Valar Morghulis)。没有绝对的正义，只有家族利益和生存。
 `;
 
 export const QUEST_SOURCES = {
-  search: ["寻找失传的《武穆遗书》"], hunt: ["追捕江洋大盗"], challenge: ["华山论剑"], train: ["闭关修炼"], life: ["游历红尘"]
+  search: ["寻找瓦雷利亚钢"], hunt: ["猎杀冰原狼"], challenge: ["比武审判"], train: ["黑白之院受训"], life: ["参与御前会议"]
 };
 
 export const LOOT_TABLE: Partial<Item>[] = [
-  { name: "女儿红(二十年)", type: 'consumable', desc: "埋在地下二十年的好酒，喝一口少一口。", price: 100, minLevel: 20, quality: 'rare', effect: 200 },
-  { name: "叫花鸡", type: 'consumable', desc: "荷叶包着的美味，香飘十里。", price: 50, minLevel: 10, quality: 'common', effect: 80 },
-  { name: "《广陵散》残谱", type: 'book', desc: "嵇康绝响，曲意高古。", price: 2000, minLevel: 40, quality: 'epic', effect: "音波功" },
-  { name: "半个冷馒头", type: 'consumable', desc: "干硬难咽，聊胜于无。", price: 1, minLevel: 1, quality: 'common', effect: 10 }, 
-  { name: "金疮药", type: 'consumable', desc: "江湖常备跌打药。", price: 50, minLevel: 15, quality: 'common', effect: 100 },
-  { name: "清心丹", type: 'consumable', desc: "压制心魔，恢复神智。", price: 100, minLevel: 10, quality: 'rare', effect: 150 }, 
-  { name: "九花玉露丸", type: 'consumable', desc: "桃花岛秘药，清香袭人。", price: 300, minLevel: 30, quality: 'rare', effect: 300 },
-  { name: "黑玉断续膏", type: 'consumable', desc: "西域灵药，可续断骨。", price: 500, minLevel: 40, quality: 'rare', effect: 500 },
-  { name: "天山雪莲", type: 'consumable', desc: "生于绝壁，不仅回血还能精进修为。", price: 1000, minLevel: 50, quality: 'epic', effect: 1000 },
-  { name: "血菩提", type: 'consumable', desc: "生长在火麒麟洞内，传说能起死回生。", price: 2000, minLevel: 60, quality: 'epic', effect: 2000 },
-  { name: "《长拳图解》", type: 'book', desc: "太祖长拳的入门图谱。", price: 50, minLevel: 1, quality: 'common', effect: "太祖长拳" },
-  { name: "《吐纳心法》", type: 'book', desc: "道家基础呼吸法门。", price: 100, minLevel: 5, quality: 'common', effect: "吐纳法" },
-  { name: "《草上飞秘籍》", type: 'book', desc: "轻功入门，身轻如燕。", price: 200, minLevel: 10, quality: 'common', effect: "草上飞" },
-  { name: "《打狗棒法残卷》", type: 'book', desc: "丐帮绝学，虽然残缺但精妙无比。", price: 800, minLevel: 20, quality: 'rare', effect: "打狗棒法" },
-  { name: "《落英神剑掌谱》", type: 'book', desc: "姿态优美，虚实难测。", price: 1000, minLevel: 25, quality: 'rare', effect: "落英神剑掌" },
-  { name: "《易筋经》", type: 'book', desc: "少林至宝，改易筋骨。", price: 5000, minLevel: 50, quality: 'legendary', effect: "易筋经" },
-  { name: "《独孤剑意》", type: 'book', desc: "无招胜有招，只有剑意传承。", price: 6000, minLevel: 60, quality: 'legendary', effect: "独孤九剑" },
-  { name: "《疯魔录》", type: 'book', desc: "记载了禁忌武学的邪书，读之令人心神不宁。", price: 4000, minLevel: 45, quality: 'epic', effect: "逆转经脉" },
-  { name: "生锈的铁剑", type: 'weapon', desc: "勉强能砍东西。", price: 10, minLevel: 1, quality: 'common', power: 5 },
-  { name: "哨棒", type: 'weapon', desc: "结实的木棒。", price: 5, minLevel: 1, quality: 'common', power: 3 },
-  { name: "精钢剑", type: 'weapon', desc: "百炼精钢打造。", price: 150, minLevel: 10, quality: 'common', power: 20 },
-  { name: "百炼钢刀", type: 'weapon', desc: "刀背厚实，利于劈砍。", price: 180, minLevel: 12, quality: 'rare', power: 35 },
-  { name: "判官笔", type: 'weapon', desc: "精铁所制，专点穴道。", price: 300, minLevel: 20, quality: 'rare', power: 50 },
-  { name: "玄铁重剑(仿)", type: 'weapon', desc: "重剑无锋，大巧不工。", price: 1000, minLevel: 40, quality: 'epic', power: 120 },
-  { name: "倚天剑", type: 'weapon', desc: "安得倚天抽宝剑，跨海斩长鲸。", price: 5000, minLevel: 60, quality: 'legendary', power: 300 },
-  { name: "屠龙刀", type: 'weapon', desc: "武林至尊，宝刀屠龙。", price: 5500, minLevel: 65, quality: 'legendary', power: 320 },
-  { name: "打狗棒", type: 'weapon', desc: "通体碧绿，坚韧无比。", price: 4500, minLevel: 55, quality: 'epic', power: 250 },
-  { name: "粗布头巾", type: 'head', desc: "遮风挡雨。", price: 5, minLevel: 1, quality: 'common', power: 2 },
-  { name: "麻布衣", type: 'body', desc: "寻常百姓的衣物。", price: 10, minLevel: 1, quality: 'common', power: 5 },
-  { name: "草鞋", type: 'feet', desc: "走久了脚会磨泡。", price: 2, minLevel: 1, quality: 'common', power: 1 },
-  { name: "皮甲", type: 'body', desc: "硬皮硝制，有一定防御力。", price: 80, minLevel: 10, quality: 'common', power: 15 },
-  { name: "虎皮裙", type: 'legs', desc: "看起来很威风。", price: 150, minLevel: 15, quality: 'rare', power: 20 },
-  { name: "神行太保靴", type: 'feet', desc: "穿上后健步如飞。", price: 300, minLevel: 20, quality: 'rare', power: 25 },
-  { name: "金丝软甲", type: 'body', desc: "刀枪不入，轻便贴身。", price: 4000, minLevel: 55, quality: 'legendary', power: 150 },
-  { name: "软猬甲", type: 'body', desc: "桃花岛至宝，满布倒刺。", price: 4200, minLevel: 58, quality: 'legendary', power: 160 },
-  { name: "平安符", type: 'accessory', desc: "庙里求来的，保平安。", price: 20, minLevel: 1, quality: 'common', power: 5 },
-  { name: "精铁护腕", type: 'accessory', desc: "保护手腕，增加臂力。", price: 100, minLevel: 10, quality: 'rare', power: 15 },
-  { name: "温玉佩", type: 'accessory', desc: "冬暖夏凉，凝神静气。", price: 500, minLevel: 30, quality: 'epic', power: 40 },
-  { name: "通灵宝玉", type: 'accessory', desc: "似乎蕴含着某种灵性。", price: 2000, minLevel: 50, quality: 'legendary', power: 100 },
+  { name: "青亭岛红酒", type: 'consumable', desc: "口感醇厚，贵族的最爱。", price: 100, minLevel: 10, quality: 'common', effect: 50 },
+  { name: "黑面包", type: 'consumable', desc: "硬得像石头，但能填饱肚子。", price: 1, minLevel: 1, quality: 'common', effect: 10 },
+  { name: "罂粟花奶", type: 'consumable', desc: "强效止痛药，喝多了会让人迟钝。", price: 50, minLevel: 15, quality: 'rare', effect: 100 },
+  { name: "野火", type: 'consumable', desc: "绿色的液体，极不稳定，能燃烧一切。", price: 500, minLevel: 40, quality: 'epic', effect: 1000 },
+  { name: "《七星圣经》", type: 'book', desc: "教会的经典。", price: 50, minLevel: 5, quality: 'common', effect: "虔诚" },
+  { name: "《龙的族谱》", type: 'book', desc: "记载了坦格利安家族的历史。", price: 200, minLevel: 20, quality: 'rare', effect: "瓦雷利亚语" },
+  { name: "瓦雷利亚钢匕首", type: 'weapon', desc: "削铁如泥，据说曾用来刺杀布兰。", price: 5000, minLevel: 50, quality: 'legendary', power: 150 },
+  { name: "长爪", type: 'weapon', desc: "莫尔蒙家族的祖传宝剑，现属于琼恩·雪诺。", price: 6000, minLevel: 60, quality: 'legendary', power: 200 },
+  { name: "缝衣针", type: 'weapon', desc: "艾莉亚的佩剑，小巧锋利。", price: 3000, minLevel: 30, quality: 'epic', power: 80 },
+  { name: "劳勃的战锤", type: 'weapon', desc: "沉重无比，一击曾击碎雷加的胸甲。", price: 4000, minLevel: 40, quality: 'epic', power: 120 },
+  { name: "守夜人黑衣", type: 'body', desc: "厚重保暖，也许还能挡几刀。", price: 50, minLevel: 10, quality: 'common', power: 20 },
+  { name: "兰尼斯特金甲", type: 'body', desc: "华丽耀眼，防御力极高。", price: 5000, minLevel: 50, quality: 'legendary', power: 150 },
+  { name: "国王之手胸针", type: 'accessory', desc: "权力的象征，也是靶子。", price: 1000, minLevel: 40, quality: 'epic', power: 50 },
+  { name: "无面者硬币", type: 'accessory', desc: "Valar Dohaeris。", price: 500, minLevel: 30, quality: 'rare', power: 30 },
 ];
 
 export const STATIC_LOGS = {
   idle: [
-    "雨打芭蕉，点点滴滴，勾起了对故人的思念。",
-    "集市上，卖糖葫芦的老汉吆喝声依旧，仿佛这乱世与他无关。",
-    "路过书院，听到郎朗读书声：'为天地立心，为生民立命'。",
-    "在酒馆角落，看到一个断臂刀客在用左手艰难地夹花生米。",
-    "天边的云彩像极了那年离开家乡时看到的晚霞。",
+    "凛冬的寒风吹过，你裹紧了破旧的斗篷。",
+    "远处君临城的钟声敲响了，那是国王驾崩的丧钟吗？",
+    "一只乌鸦落在枝头，黑色的眼睛死死盯着你。",
+    "路边的乞丐在唱着关于美人和熊的下流歌曲。",
+    "你擦拭着剑上的锈迹，在这乱世，这是你唯一的朋友。",
   ],
   fight: [
-    "这一剑，不为杀人，只为问道。",
-    "刀光剑影中，你仿佛看到了对手眼中的无奈。",
-    "胜负只在一念之间，生死往往身不由己。",
-    "周围的空气仿佛凝固，只有心跳声清晰可闻。",
+    "这是为了家族的荣誉，也是为了生存。",
+    "鲜血染红了雪地，像极了那一年的心树叶子。",
+    "对手的眼神中充满了恐惧，但他别无选择。",
+    "钢铁碰撞的声音在空旷的战场上回荡。",
   ],
   town: [
-    "青楼楚馆依然歌舞升平，商女不知亡国恨。",
-    "米店门口的施粥棚前排起了长龙，都是逃难来的流民。",
-    "几个锦衣卫骑马冲过街道，撞翻了路边的小摊，无人敢言。",
+    "跳蚤窝的街道上流淌着污水，散发着腐烂的味道。",
+    "红堡高耸入云，那是权力的中心，也是谎言的温床。",
+    "金袍子卫兵粗暴地推开路人，为一辆装饰华丽的马车开道。",
   ],
   arena: [
-    "擂台上，两位成名已久的高手正在比拼内力，头顶冒出白烟。",
-    "台下有人在开盘口，押注谁能站到最后。",
-    "虽是比武，亦是搏命，江湖路远，谁也不想就在这里倒下。",
+    "这里是比武审判，只有胜利者才是无罪的。",
+    "观众们高呼着嗜血的口号，他们渴望看到鲜血。",
+    "魔山那庞大的身躯像一座小山，遮住了阳光。",
   ]
 };
