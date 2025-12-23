@@ -16,38 +16,21 @@ export async function POST(req: Request) {
     const stage = context.storyStage || "私生子";
     const tags = context.tags ? context.tags.join("、") : "无";
     
-    // 设定基调
-    let toneInstruction = "";
-    if (stage === "私生子") {
-        toneInstruction = "Tone: Gritty, Harsh, Survivalist. You are mud under the feet of lords.";
-    } else if (stage === "侍从") {
-        toneInstruction = "Tone: Cynical, Observant. You see the ugliness behind the knight's shining armor.";
-    } else if (stage === "骑士") {
-        toneInstruction = "Tone: Honorable but conflicted. Duty vs. Survival. Blood and rust.";
-    } else if (stage === "领主" || stage === "王者") {
-        toneInstruction = "Tone: Grand, Heavy, Machiavellian. Heavy is the head that wears the crown.";
-    }
-
-    // 默认长度指令 (针对普通事件)
-    const isLong = Math.random() > 0.1; // 90% 概率长文
-    const lengthInstruction = isLong 
-        ? "Length: A rich, detailed paragraph (100-150 Chinese characters)." 
-        : "Length: A punchy, atmospheric sentence (30-50 Chinese characters).";
-
+    // 基础人设：乔治·R·R·马丁
     const baseInstruction = `
-      You are George R.R. Martin writing a Grimdark Wuxia/Fantasy novel. 
+      You are George R.R. Martin writing the "Game of Thrones".
       Language: SIMPLIFIED CHINESE ONLY.
-      ${toneInstruction}
-      ${lengthInstruction}
-      Lore Context: ${loreSnippet}
+      Style: Grimdark, Realistic, Political, Detailed.
       
-      CRITICAL RULES:
-      1. IMMERSION: Use sensory details (smell, cold, pain).
-      2. SHOW, DON'T TELL.
+      CORE RULES:
+      1. LENGTH: Write a RICH, LONG paragraph (120-180 Chinese characters). No short summaries.
+      2. DETAILS: Describe the mud on the boots, the rust on the mail, the smell of sour wine, the biting cold.
+      3. INTERACTION: Mention specific House names (Stark, Lannister, etc.) and their banners.
+      4. ATMOSPHERE: The world is dying. Winter is coming.
       
-      Hero: ${context.name} (${stage}).
-      Tags: [${tags}].
-      Quest: ${context.questScript?.title || "Wandering"}.
+      Context: Hero ${context.name} (${stage}). Tags: [${tags}].
+      Location: ${context.location}.
+      Lore: ${loreSnippet}.
     `;
 
     let prompt = "";
@@ -56,8 +39,8 @@ export async function POST(req: Request) {
       case 'generate_description':
         prompt = `
           Task: Write a character portrait based strictly on tags: [${tags}].
-          STRICT RULES: CHINESE ONLY. Max 80 chars. Vivid imagery.
-          Example: "他裹着满是污泥的守夜人黑衣，眼神像临冬城的雪一样冷，手中紧握着那枚无面者的硬币。"
+          STRICT RULES: CHINESE ONLY. Max 80 chars. 
+          Example: "他裹着满是污泥的守夜人黑衣，眼神像临冬城的雪一样冷，手中紧握着那枚无面者的硬币，仿佛那是世上最后的余温。"
           Your Description:
         `;
         break;
@@ -68,81 +51,99 @@ export async function POST(req: Request) {
         prompt = `
           Task: Describe appearance based on gear: Weapon [${weapon}], Armor [${body}].
           STRICT RULES: CHINESE ONLY. Max 60 chars. Grimdark style.
-          Example: "他身披兰尼斯特的金甲，手持瓦雷利亚钢剑，宛如一头准备噬人的雄狮。"
+          Example: "他身披兰尼斯特的金甲，手持瓦雷利亚钢剑，宛如一头准备噬人的雄狮，盔甲上的红宝石在火光下如血般猩红。"
           Your Description:
         `;
         break;
 
       case 'start_game':
-        // ⚠️ 核心调整：开局特供版 Prompt (写序章)
+        // ⚠️ 核心：开局定场诗 - 极长文本 + 强剧情互动
         prompt = `
-          Task: Write the OPENING PROLOGUE of a Grimdark Fantasy novel (Game of Thrones style).
-          Language: SIMPLIFIED CHINESE ONLY.
+          Task: Write the OPENING CHAPTER of a new Game of Thrones story.
           
-          Context: The hero ${context.name} (${stage}) stands in ${context.location}.
+          Situation: The hero ${context.name} is a ${stage} in ${context.location}.
           
-          Requirements:
-          1. LENGTH: LONG and IMMERSIVE (150-200 Chinese characters). 
-          2. CONTENT: Establish the harsh setting (The Long Night is coming, the War of Five Kings has left scars). Describe the biting cold, the smell of rot or snow, and the hero's desperate physical state.
-          3. ATMOSPHERE: Ominous, heavy, realistic.
-          4. ACTION: End with the hero taking a small action (tightening a cloak, checking a rusty blade) to start their journey.
+          REQUIREMENTS:
+          1. LENGTH: 150-200 Chinese characters. Do not stop until the scene is set.
+          2. SCENE: Describe the sensory details of ${context.location}. (e.g. Winterfell's hot springs steam, King's Landing's stench).
+          3. CAMEO: Include a brief interaction or sighting of a major character (e.g. Ned Stark passing by, Tyrion drinking).
+          4. MOOD: Ominous. The hero feels small in the game of thrones.
           
-          Your Prologue:
+          Start directly with the scene description.
         `;
         break;
       
       case 'quest_start':
-        prompt = `${baseInstruction} Event: Start "${context.questScript?.title}". Details: ${context.questScript?.description}. Action: The hero prepares to leave. Describe the weight of the mission.`;
+        prompt = `${baseInstruction} 
+        Event: Starting Quest "${context.questScript?.title}". 
+        Details: ${context.questScript?.description}.
+        Instruction: Describe the hero preparing for this task. The weight of the armor, the cold wind, the fear of death.
+        `;
         break;
 
       case 'quest_journey':
         prompt = `${baseInstruction} 
-        Event: A scene on the road. 
-        Action: Describe the harsh landscape, a fleeting encounter, or a moment of reflection.
-        Mandatory: Use flavor text "${envFlavor}".`;
+        Event: Traveling on the road.
+        Instruction: Describe a vivid scene. A hanged man on a tree? A direwolf howling? A Lannister patrol?
+        Mandatory: Incorporate "${envFlavor}".
+        `;
         break;
 
       case 'idle_event':
         prompt = `${baseInstruction} 
-        Event: Wandering in ${context.location}. 
-        Action: Describe a detailed interaction with the world (e.g., eavesdropping, feeling the cold). Reflect tags [${tags}].`;
+        Event: Idling in ${context.location}.
+        Instruction: Describe a small, realistic moment. Eating a stale piece of bread? Watching a blacksmith forge a sword? Hearing a rumor about the King?
+        `;
         break;
 
       case 'quest_climax':
-        prompt = `${baseInstruction} Event: Climax vs ${context.questScript?.antagonist}. Twist: ${context.questScript?.twist}. Action: A brutal, realistic fight scene.`;
+        prompt = `${baseInstruction} 
+        Event: Battle vs ${context.questScript?.antagonist}. Twist: ${context.questScript?.twist}.
+        Instruction: Write a brutal fight scene. Steel clashes, blood sprays, bones break. No magic, just cold steel.
+        `;
         break;
 
       case 'quest_end':
-        prompt = `${baseInstruction} Event: Conclusion. Objective: ${context.questScript?.objective}. Action: The aftermath. The hero is tired but alive.`;
+        prompt = `${baseInstruction} 
+        Event: Quest Completed. Objective: ${context.questScript?.objective}.
+        Instruction: The adrenaline fades. The hero is exhausted, bleeding, or looking at the gold with cynicism.
+        `;
         break;
         
       case 'recruit_companion':
-        prompt = `${baseInstruction} Hero meets a new companion. Describe their appearance and the tension.`;
+        prompt = `${baseInstruction} 
+        Event: Meeting a new companion. 
+        Instruction: Describe them in detail. A scarred sellsword? A mysterious red priestess? Why do they join?
+        `;
         break;
         
       case 'god_action':
-        prompt = `${baseInstruction} A moment of inexplicable fate or a sign from the Old Gods.`;
+        prompt = `${baseInstruction} 
+        Event: Divine Intervention.
+        Instruction: A moment of strange luck. Was it the Seven? The Old Gods? Or just chance?
+        `;
         break;
         
       case 'generate_rumor':
-        prompt = `Write a dark rumor about the War or the White Walkers. Format: "【Title】Content". Chinese Only.`;
+        prompt = `Write a dark rumor from Westeros (e.g. Joffrey is a bastard, Dragons in the East). Format: "【Title】Content". Chinese Only.`;
         break;
 
       default:
-        prompt = `${baseInstruction} Describe a brief moment.`;
+        prompt = `${baseInstruction} Describe a brief moment in the life of the hero.`;
     }
 
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
       temperature: 0.9, 
-      max_tokens: 800, 
+      max_tokens: 1024, // ⚠️ 允许生成更长的文本
     });
 
     let text = completion.choices[0]?.message?.content || "";
     
+    // 清洗多余的前缀
     if (eventType.includes('generate')) {
-        text = text.replace(/^(Based on|The hero|Here is).*:[\s\n]*/i, '');
+        text = text.replace(/^(Based on|The hero|Here is|Scene:|Chapter 1).*:[\s\n]*/i, '');
         text = text.replace(/^["']|["']$/g, ''); 
     }
 
