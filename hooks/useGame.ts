@@ -22,25 +22,25 @@ const calculateTags = (hero: HeroState): string[] => {
   if (hp < maxHp * 0.1) tags.add("濒死");
   else if (hp < maxHp * 0.3) tags.add("重伤");
   
-  if (stamina < 20) tags.add("精疲力竭");
-  else if (stamina > 100) tags.add("精力充沛");
+  if (stamina < 20) tags.add("力竭");
+  else if (stamina > 100) tags.add("充沛");
 
-  if (gold > 50000) tags.add("兰尼斯特之富");
-  else if (gold < 50) tags.add("穷困");
+  if (gold > 50000) tags.add("巨富");
+  else if (gold < 50) tags.add("赤贫");
 
   if (actionCounts.kills > 100) tags.add("屠夫");
   if (actionCounts.drinking > 20) tags.add("酒鬼");
 
-  if (attributes.strength > 20) tags.add("魔山之力");
-  if (attributes.intelligence > 20) tags.add("小恶魔之智");
+  if (attributes.strength > 20) tags.add("神力");
+  if (attributes.intelligence > 20) tags.add("智者");
 
   const weaponName = equipment.weapon?.name || "";
-  if (weaponName.includes("剑")) tags.add("剑士");
-  else if (weaponName.includes("锤")) tags.add("战士");
+  if (weaponName.includes("剑")) tags.add("剑客");
+  else if (weaponName.includes("锤")) tags.add("力士");
   else if (weaponName.includes("匕首")) tags.add("刺客");
-  else if (!equipment.weapon) tags.add("赤手空拳");
+  else if (!equipment.weapon) tags.add("空手");
   
-  if (stats.arenaWins > 50) tags.add("竞技场之王");
+  if (stats.arenaWins > 50) tags.add("角斗士");
 
   return Array.from(tags).slice(0, 10);
 };
@@ -147,7 +147,7 @@ export function useGame() {
       stamina: 120, maxStamina: 120,
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 200, 
       alignment: 0, location: "临冬城", state: 'idle', 
-      logs: [{ id: "init", text: "北境的寒风凛冽，你裹紧了破旧的斗篷，望着灰暗的天空，心中知道——凛冬将至。", type: "highlight", time: "00:00" }], 
+      logs: [], 
       messages: [], majorEvents: [`${new Date().toLocaleDateString()}：${name} 踏入维斯特洛。`],
       inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
@@ -171,11 +171,13 @@ export function useGame() {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
         if (!mergedData.equipmentDescription) mergedData.equipmentDescription = "衣着朴素。";
+        // 如果没有日志，手动推一条 AI 触发，而不是静态文本
         if (!mergedData.logs || mergedData.logs.length === 0) {
-            mergedData.logs = [{ id: "init_resume", text: "你从沉睡中醒来，周围的一切既熟悉又陌生。战乱的硝烟似乎从未散去。", type: "highlight", time: "08:00" }];
+            setTimeout(() => triggerAI('start_game', '', undefined, mergedData), 1000);
+        } else {
+            setHero(mergedData);
+            setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
         }
-        setHero(mergedData);
-        setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
       } else {
         await supabase.from('profiles').insert({ username: name, password: password, data: newHero });
         setHero(newHero);
@@ -196,7 +198,7 @@ export function useGame() {
     const finalType: LogEntry['type'] = 'highlight'; 
     setHero(prev => {
       if (!prev) return null;
-      const newHistory = (prev.narrativeHistory + " " + text).slice(-500);
+      const newHistory = (prev.narrativeHistory + " " + text).slice(-1000); // 增加历史记录长度以支持长文本
       const newLog: LogEntry = { id: Date.now().toString(), text, type: finalType, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}) };
       return { ...prev, logs: [newLog, ...prev.logs].slice(0, 50), narrativeHistory: newHistory };
     });
@@ -283,13 +285,18 @@ export function useGame() {
       }
     } catch (e) { 
         console.error(e); 
-        // ⚠️ 兜底生成：防止 AI 挂了之后一直空白
-        const fallback = STATIC_LOGS.idle[Math.floor(Math.random() * STATIC_LOGS.idle.length)];
-        addLog(fallback, "highlight");
+        // ⚠️ 本地兜底：如果 AI 挂了，生成一段比较有味道的本地文本
+        const failbackTexts = [
+            "风雪太大了，你看不清前方的路，只能暂时在原地休整，哈出的热气瞬间结成了冰。",
+            "远处的狼嚎声此起彼伏，提醒着你，在这片土地上，人类并不是唯一的猎手。",
+            "你听到了一阵盔甲摩擦的声音，下意识地握紧了武器，但那只是风吹过枯树的声响。"
+        ];
+        addLog(failbackTexts[Math.floor(Math.random() * failbackTexts.length)], "highlight");
     }
     return false;
   };
 
+  // ... (godAction, autoManageInventory 逻辑保持不变) ...
   const godAction = async (type: 'bless' | 'punish') => {
     if (!hero) return;
     if (hero.godPower < 25) { addMessage('system', '命运', "命运值不足。"); return; }
@@ -465,6 +472,7 @@ export function useGame() {
          }
       }
 
+      // ⚠️ 核心：频率保持 95%
       if (aiEvent) {
          setHero(managedHero);
          await triggerAI(aiEvent);
@@ -480,7 +488,7 @@ export function useGame() {
          setHero(managedHero);
       }
       
-      const nextTick = Math.floor(Math.random() * (25000 - 15000) + 15000); 
+      const nextTick = Math.floor(Math.random() * (20000 - 12000) + 12000); 
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
     timerRef.current = setTimeout(gameLoop, 2000);

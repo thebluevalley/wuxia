@@ -4,40 +4,90 @@ import { useEffect, useRef, useState, memo } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank, SkillType, HeroState } from '@/app/lib/constants';
 
-// ⚠️ 核心修复：防重播打字机
-// 如果 text 没变，就直接显示最终结果，不再打字
+// --- 全局辅助函数 (移出组件以复用，防止未定义错误) ---
+
+const getQualityColor = (q: Quality) => {
+  switch (q) {
+    case 'legendary': return 'text-orange-900 font-bold';
+    case 'epic': return 'text-purple-800 font-bold';
+    case 'rare': return 'text-blue-700 font-bold';
+    default: return 'text-stone-600';
+  }
+};
+
+const getQualityBadgeClass = (q: Quality) => {
+  switch (q) {
+    case 'legendary': return 'bg-orange-50 text-orange-800 border-orange-200';
+    case 'epic': return 'bg-purple-50 text-purple-800 border-purple-200';
+    case 'rare': return 'bg-blue-50 text-blue-800 border-blue-200';
+    default: return 'bg-stone-50 text-stone-500 border-stone-200';
+  }
+};
+
+const getStageColor = (stage: string) => {
+  switch (stage) {
+    case '私生子': return 'text-stone-500 bg-stone-100 border-stone-200';
+    case '侍从': return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+    case '骑士': return 'text-blue-700 bg-blue-50 border-blue-200';
+    case '领主': return 'text-purple-800 bg-purple-50 border-purple-200';
+    case '王者': return 'text-orange-800 bg-orange-50 border-orange-200';
+    default: return 'text-stone-500 bg-stone-100 border-stone-200';
+  }
+};
+
+const getJobIcon = (job: string) => {
+  if (!job) return <User size={24} className="text-stone-800"/>;
+  if (job.includes('剑') || job.includes('骑士') || job.includes('刺客') || job.includes('卫兵')) return <Sword size={24} className="text-stone-800"/>;
+  if (job.includes('守夜人') || job.includes('铁卫')) return <Shield size={24} className="text-stone-800"/>;
+  if (job.includes('学士') || job.includes('祭司')) return <BookOpen size={24} className="text-stone-800"/>;
+  return <ScrollText size={24} className="text-stone-800"/>;
+};
+
+const getSkillLabel = (type: SkillType) => {
+  switch (type) {
+      case 'combat': return '战技';
+      case 'intrigue': return '权谋';
+      case 'survival': return '求生';
+      case 'knowledge': return '学识';
+      case 'command': return '统帅';
+      default: return '技能';
+  }
+};
+
+// --- 核心组件：防重播打字机 ---
+
 const TypewriterText = memo(({ text, className }: { text: string, className?: string }) => {
-  const [displayedText, setDisplayedText] = useState(text); // 默认直接显示全文，防止闪烁
-  const hasAnimatedRef = useRef(false); // 记录是否已经动画过
-  const lastTextRef = useRef(text); // 记录上一次的文本
+  const [displayedText, setDisplayedText] = useState(text);
+  const hasAnimatedRef = useRef(false);
+  const lastTextRef = useRef(text);
 
   useEffect(() => {
-    // 如果文本变了，说明是新消息，开始打字
+    // 1. 如果文本内容变了，说明是新的一句话 -> 重置状态，开始打字
     if (text !== lastTextRef.current) {
       hasAnimatedRef.current = false;
       lastTextRef.current = text;
-      setDisplayedText(''); // 清空，准备打字
+      setDisplayedText(''); 
     }
 
-    // 如果已经动画过，直接保持全文，不执行定时器
+    // 2. 如果已经动画过（且文本没变），直接显示全文，不再打字
     if (hasAnimatedRef.current) {
       setDisplayedText(text);
       return;
     }
 
+    // 3. 执行打字逻辑
     let index = 0;
     setDisplayedText(''); 
     
     const timer = setInterval(() => {
       if (index < text.length) {
-        // 使用函数式更新，确保闭包最新
         setDisplayedText((prev) => text.substring(0, index + 1));
         index++;
       } else {
         clearInterval(timer);
-        hasAnimatedRef.current = true; // 标记为已完成
+        hasAnimatedRef.current = true; // 标记完成
       }
-    }, 50); // 50ms 速度
+    }, 60); // 60ms 速度，适中
 
     return () => clearInterval(timer);
   }, [text]);
@@ -46,30 +96,19 @@ const TypewriterText = memo(({ text, className }: { text: string, className?: st
 });
 TypewriterText.displayName = 'TypewriterText';
 
-// --- 子组件 (全部 memo 化以提升性能) ---
+// --- 子视图组件 (Memoized) ---
 
 const Header = memo(({ hero }: { hero: HeroState }) => {
   const questPercent = hero.currentQuest 
     ? Math.min(100, Math.floor((hero.currentQuest.progress / hero.currentQuest.total) * 100)) 
     : 0;
 
-  const getStageColor = (stage: string) => {
-    switch (stage) {
-      case '私生子': return 'text-stone-500 bg-stone-100 border-stone-200';
-      case '侍从': return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-      case '骑士': return 'text-blue-700 bg-blue-50 border-blue-200';
-      case '领主': return 'text-purple-800 bg-purple-50 border-purple-200';
-      case '王者': return 'text-orange-800 bg-orange-50 border-orange-200';
-      default: return 'text-stone-500 bg-stone-100 border-stone-200';
-    }
-  };
-
   return (
     <header className="p-4 pb-2 flex-none z-10 bg-[#fcf9f2]/90 backdrop-blur-sm border-b border-stone-200">
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-2xl font-bold text-stone-900 tracking-wide">{hero.name}</h2>
+            <h2 className="text-2xl font-bold text-stone-900 tracking-wide font-serif">{hero.name}</h2>
             <div className={`text-[10px] px-2 py-0.5 rounded border ${getStageColor(hero.storyStage)}`}>{hero.storyStage}</div>
           </div>
           <div className="flex items-center gap-2 text-stone-500 text-xs">
@@ -122,29 +161,31 @@ Header.displayName = 'Header';
 const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type: 'bless'|'punish') => void }) => {
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
+      <div className="flex-1 overflow-y-auto p-5 space-y-8 scroll-smooth">
         {hero.logs.map((log, index) => {
+          // 仅最新的一条，且必须是 highlight 才打字
           const isLatest = index === 0; 
           const isNarrative = log.type === 'highlight';
 
           if (!isNarrative) return null;
 
           return (
-            <div key={log.id} className="flex gap-2 items-baseline mb-4">
-              <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
+            <div key={log.id} className="flex gap-3 items-baseline">
+              <span className="text-[10px] text-stone-400 font-sans shrink-0 w-8 text-right tabular-nums opacity-50 pt-1">{log.time}</span>
               {isLatest ? (
                  <TypewriterText 
                    text={log.text} 
-                   className="text-[15px] leading-8 text-justify font-medium text-black" 
+                   className="text-[15px] leading-8 text-justify font-medium text-stone-900 font-serif" 
                  />
               ) : (
-                 <span className="text-[15px] leading-8 text-justify font-medium text-black opacity-90">
+                 <span className="text-[15px] leading-8 text-justify font-medium text-stone-900 font-serif opacity-90">
                    {log.text}
                  </span>
               )}
             </div>
           );
         })}
+        {hero.logs.length === 0 && <div className="text-center text-stone-300 py-10 font-serif italic">凛冬将至，历史正在书写...</div>}
       </div>
       <div className="p-4 bg-gradient-to-t from-[#fcf9f2] via-[#fcf9f2] to-transparent">
          <div className="flex justify-between gap-4">
@@ -163,8 +204,6 @@ const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type:
 });
 LogsView.displayName = 'LogsView';
 
-// ... (EquipSlot, AttributeRow, HeroView, BagView, MessagesView, TavernView 代码保持不变，为节省篇幅省略，请确保文件中保留完整) ...
-// ⚠️ 请务必保留其他 View 组件的完整代码
 const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
     <div className="flex flex-col items-center bg-white p-2 rounded border border-stone-100">
        <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${item ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-300'}`}>{icon}</div>
@@ -176,36 +215,6 @@ const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon:
 const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
 
 const HeroView = memo(({ hero }: { hero: HeroState }) => {
-  const getStageColor = (stage: string) => {
-    switch (stage) {
-      case '私生子': return 'text-stone-500 bg-stone-100 border-stone-200';
-      case '侍从': return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-      case '骑士': return 'text-blue-700 bg-blue-50 border-blue-200';
-      case '领主': return 'text-purple-800 bg-purple-50 border-purple-200';
-      case '王者': return 'text-orange-800 bg-orange-50 border-orange-200';
-      default: return 'text-stone-500 bg-stone-100 border-stone-200';
-    }
-  };
-
-  const getJobIcon = (job: string) => {
-    if (!job) return <User size={24} className="text-stone-800"/>;
-    if (job.includes('剑') || job.includes('骑士') || job.includes('刺客') || job.includes('卫兵')) return <Sword size={24} className="text-stone-800"/>;
-    if (job.includes('守夜人') || job.includes('铁卫')) return <Shield size={24} className="text-stone-800"/>;
-    if (job.includes('学士') || job.includes('祭司')) return <BookOpen size={24} className="text-stone-800"/>;
-    return <ScrollText size={24} className="text-stone-800"/>;
-  };
-
-  const getSkillLabel = (type: SkillType) => {
-    switch (type) {
-        case 'combat': return '战技';
-        case 'intrigue': return '权谋';
-        case 'survival': return '求生';
-        case 'knowledge': return '学识';
-        case 'command': return '统帅';
-        default: return '技能';
-    }
-  };
-
   return (
     <div className="p-6 overflow-y-auto h-full space-y-6">
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
@@ -296,15 +305,6 @@ const HeroView = memo(({ hero }: { hero: HeroState }) => {
 HeroView.displayName = 'HeroView';
 
 const BagView = memo(({ hero }: { hero: HeroState }) => {
-  const getQualityColor = (q: Quality) => {
-    switch (q) {
-      case 'legendary': return 'text-orange-900 font-bold';
-      case 'epic': return 'text-purple-800 font-bold';
-      case 'rare': return 'text-blue-700 font-bold';
-      default: return 'text-stone-600';
-    }
-  };
-
   return (
     <div className="p-4 h-full overflow-y-auto">
       <div className="flex justify-between items-center mb-4 px-2">
@@ -340,32 +340,6 @@ const TavernView = memo(({ hero, hireCompanion, acceptQuest }: { hero: HeroState
     const refreshTimeLeft = Math.max(0, 6 * 60 * 60 * 1000 - (Date.now() - (hero.lastQuestRefresh || 0)));
     const hours = Math.floor(refreshTimeLeft / (1000 * 60 * 60));
     const mins = Math.floor((refreshTimeLeft % (1000 * 60 * 60)) / (1000 * 60));
-
-    const getQualityColor = (q: Quality) => {
-        switch (q) {
-          case 'legendary': return 'text-orange-900 font-bold';
-          case 'epic': return 'text-purple-800 font-bold';
-          case 'rare': return 'text-blue-700 font-bold';
-          default: return 'text-stone-600';
-        }
-    };
-
-    const getQualityBadgeClass = (q: Quality) => {
-        switch (q) {
-          case 'legendary': return 'bg-orange-50 text-orange-800 border-orange-200';
-          case 'epic': return 'bg-purple-50 text-purple-800 border-purple-200';
-          case 'rare': return 'bg-blue-50 text-blue-800 border-blue-200';
-          default: return 'bg-stone-50 text-stone-500 border-stone-200';
-        }
-    };
-
-    const getJobIcon = (job: string) => {
-        if (!job) return <User size={24} className="text-stone-800"/>;
-        if (job.includes('剑') || job.includes('骑士') || job.includes('刺客') || job.includes('卫兵')) return <Sword size={24} className="text-stone-800"/>;
-        if (job.includes('守夜人') || job.includes('铁卫')) return <Shield size={24} className="text-stone-800"/>;
-        if (job.includes('学士') || job.includes('祭司')) return <BookOpen size={24} className="text-stone-800"/>;
-        return <ScrollText size={24} className="text-stone-800"/>;
-    };
 
     return (
     <div className="p-4 h-full overflow-y-auto">
@@ -452,6 +426,7 @@ export default function Home() {
     <div className="flex flex-col h-[100dvh] bg-[#fcf9f2] text-stone-800 font-serif max-w-md mx-auto shadow-2xl relative">
       <Header hero={hero} />
       <main className="flex-1 overflow-hidden bg-[#fcf9f2]">
+        {/* ⚠️ 核心修复：使用 CSS hidden，保持组件活性，防止打字机重置 */}
         <div className={activeTab === 'logs' ? 'block h-full' : 'hidden'}><LogsView hero={hero} godAction={godAction} /></div>
         <div className={activeTab === 'hero' ? 'block h-full' : 'hidden'}><HeroView hero={hero} /></div>
         <div className={activeTab === 'bag' ? 'block h-full' : 'hidden'}><BagView hero={hero} /></div>
