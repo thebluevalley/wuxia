@@ -6,6 +6,8 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
   : null;
 
+const REFRESH_INTERVAL = 6 * 60 * 60 * 1000; // 6小时
+
 // --- 辅助函数 ---
 
 const getStoryStage = (level: number) => {
@@ -13,17 +15,14 @@ const getStoryStage = (level: number) => {
   return stage ? stage.name : "初出茅庐";
 };
 
-// ⚠️ 核心逻辑：生成悬赏榜
+// 生成正式悬赏任务 (收益高)
 const generateQuestBoard = (level: number, stageName: string): Quest[] => {
   const quests: Quest[] = [];
-  const count = 4; 
-
-  // 根据境界选择模板，回退到初级
   // @ts-ignore
   const templates = QUEST_TEMPLATES[stageName] || QUEST_TEMPLATES["初出茅庐"];
 
-  for (let i = 0; i < count; i++) {
-    const isCombat = Math.random() > 0.4; // 60% 战斗，40% 生活
+  for (let i = 0; i < 3; i++) { // 每次刷新3个
+    const isCombat = Math.random() > 0.4;
     const category = isCombat ? 'combat' : 'life';
     const pool = isCombat ? templates.combat : templates.life;
     const name = pool[Math.floor(Math.random() * pool.length)];
@@ -31,32 +30,45 @@ const generateQuestBoard = (level: number, stageName: string): Quest[] => {
     // 随机星级 (1-5)
     const rand = Math.random();
     let rank: QuestRank = 1;
-    if (rand < 0.1) rank = 5;      // 10% 传说
-    else if (rand < 0.3) rank = 4; // 20% 困难
-    else if (rand < 0.6) rank = 3; // 30% 普通
-    else rank = 2;                 // 40% 简单
+    if (rand < 0.1) rank = 5; else if (rand < 0.3) rank = 4; else if (rand < 0.6) rank = 3; else rank = 2;
 
-    // 奖励随等级和星级膨胀
     const baseGold = level * 20 + 50;
     const baseExp = level * 50 + 100;
     const multiplier = rank * 1.5;
 
     quests.push({
       id: Date.now() + i + Math.random().toString(),
-      name: name,
-      category,
-      rank,
-      desc: isCombat ? "此去凶险，务必带足丹药。" : "需细心行事，不可鲁莽。",
-      progress: 0,
-      total: 100,
+      name: `[${rank}星] ${name}`,
+      category, rank,
+      desc: isCombat ? "悬赏委托，凶险异常。" : "诚聘高人，报酬丰厚。",
+      progress: 0, total: 100,
       reqLevel: Math.max(1, level - 2 + Math.floor(Math.random() * 5)),
-      rewards: {
-        gold: Math.floor(baseGold * multiplier),
-        exp: Math.floor(baseExp * multiplier)
-      }
+      isAuto: false,
+      rewards: { gold: Math.floor(baseGold * multiplier), exp: Math.floor(baseExp * multiplier) }
     });
   }
   return quests;
+};
+
+// ⚠️ 生成自动挂机任务 (收益低，日常)
+const generateFillerQuest = (level: number, stageName: string): Quest => {
+  // @ts-ignore
+  const templates = QUEST_TEMPLATES[stageName] || QUEST_TEMPLATES["初出茅庐"];
+  const isCombat = Math.random() > 0.5;
+  const pool = isCombat ? templates.combat : templates.life;
+  const name = pool[Math.floor(Math.random() * pool.length)];
+  
+  return {
+    id: 'auto_' + Date.now(),
+    name: name, // 不带星级前缀
+    category: isCombat ? 'combat' : 'life',
+    rank: 1, // 默认为1星
+    desc: "日常琐事...",
+    progress: 0, total: 100,
+    reqLevel: 1,
+    isAuto: true, // 标记为自动
+    rewards: { gold: level * 5 + 10, exp: level * 10 + 20 } // 收益很低
+  };
 };
 
 const getLocationByQuest = (questType: QuestType, level: number): string => {
@@ -123,9 +135,10 @@ export function useGame() {
 
   const login = async (name: string, password: string) => {
     setLoading(true); setError(null);
-    
-    // 初始生成悬赏榜
     const initialStage = "初出茅庐";
+    
+    // 初始生成一个挂机任务
+    const initialQuest = generateFillerQuest(1, initialStage); 
     const initialBoard = generateQuestBoard(1, initialStage);
 
     const newHero: HeroState = {
@@ -141,9 +154,10 @@ export function useGame() {
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
       stats: { kills: 0, days: 1, arenaWins: 0 },
       
-      // ⚠️ 任务系统初始化
-      currentQuest: null, 
+      currentQuest: initialQuest, 
+      queuedQuest: null, // 初始无预约
       questBoard: initialBoard,
+      lastQuestRefresh: Date.now(), // 记录刷新时间
 
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0
@@ -157,9 +171,8 @@ export function useGame() {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
         if (!mergedData.tavern) mergedData.tavern = { visitors: generateVisitors(), lastRefresh: Date.now() };
-        // 兼容旧数据
         if (!mergedData.questBoard) mergedData.questBoard = generateQuestBoard(mergedData.level, mergedData.storyStage);
-        
+        if (!mergedData.lastQuestRefresh) mergedData.lastQuestRefresh = Date.now();
         setHero(mergedData);
         setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
       } else {
@@ -191,7 +204,7 @@ export function useGame() {
     setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; });
   };
 
-  // ⚠️ 核心：接取任务
+  // ⚠️ 核心：接取任务逻辑更新 (预约制)
   const acceptQuest = (questId: string) => {
     if (!heroRef.current) return;
     const hero = heroRef.current;
@@ -202,33 +215,17 @@ export function useGame() {
       addLog(`【接取失败】此任务凶险，建议达到 Lv.${quest.reqLevel} 再尝试。`, 'system');
       return;
     }
+    
+    if (hero.queuedQuest) {
+      addLog(`【接取失败】你已经预约了下一个任务，请先完成。`, 'system');
+      return;
+    }
 
     const newBoard = hero.questBoard.filter(q => q.id !== questId); 
-    if (newBoard.length === 0) newBoard.push(...generateQuestBoard(hero.level, hero.storyStage).slice(0, 1));
-
-    // 计算地点
-    const targetLoc = getLocationByQuest(quest.category === 'combat' ? 'hunt' : 'life', hero.level);
-
-    setHero(prev => prev ? { 
-      ...prev, 
-      currentQuest: quest, 
-      questBoard: newBoard, 
-      location: targetLoc, // 移动到任务地点
-      state: quest.category === 'combat' ? 'fight' : 'idle' 
-    } : null);
     
-    addLog(`【揭榜】前往 ${targetLoc} 执行：${quest.name}`, 'highlight');
-  };
-
-  // ⚠️ 核心：刷新悬赏榜
-  const refreshQuestBoard = () => {
-    if (!heroRef.current) return;
-    const hero = heroRef.current;
-    if (hero.gold < 50) { addLog("打点包打听需要 50 文。", 'system'); return; }
-    
-    const newBoard = generateQuestBoard(hero.level, hero.storyStage);
-    setHero(prev => prev ? { ...prev, gold: prev.gold - 50, questBoard: newBoard } : null);
-    addLog("【包打听】送来了一批新的委托。", 'system');
+    // 放入预约队列
+    setHero(prev => prev ? { ...prev, queuedQuest: quest, questBoard: newBoard } : null);
+    addLog(`【揭榜】已接下委托：${quest.name}，将在当前事务完成后执行。`, 'highlight');
   };
 
   const hireCompanion = (visitorId: string) => {
@@ -324,18 +321,27 @@ export function useGame() {
 
       setHero(h => h ? { ...h, godPower: Math.min(100, h.godPower + 5) } : null);
       
+      // 1. 伙伴过期
       if (currentHero.companion && Date.now() > currentHero.companionExpiry) {
          addLog(`【离别】${currentHero.companion.name} 拱手道别：“青山不改，绿水长流！”`, "system");
          setHero(h => h ? { ...h, companion: null } : null);
       }
 
+      // 2. 酒馆刷新
       if (Date.now() - currentHero.tavern.lastRefresh > 3 * 60 * 60 * 1000) { refreshTavern(false); }
+
+      // 3. 悬赏榜 6 小时自动刷新 (无需手动)
+      if (Date.now() - (currentHero.lastQuestRefresh || 0) > REFRESH_INTERVAL) {
+         const newBoard = generateQuestBoard(currentHero.level, currentHero.storyStage);
+         setHero(h => h ? { ...h, questBoard: newBoard, lastQuestRefresh: Date.now() } : null);
+         addLog("【包打听】送来了一批新的悬赏委托。", 'system');
+         addMessage('system', '悬赏更新', '悬赏榜已刷新，快去看看有没有适合的委托吧。');
+      }
 
       let newState = currentHero.state;
       let newLocation = currentHero.location;
-      
-      // ⚠️ 任务推进逻辑
       let newQuest = currentHero.currentQuest;
+      let queued = currentHero.queuedQuest;
       let newQuestProgress = newQuest ? newQuest.progress : 0;
       
       let suffix = "";
@@ -344,32 +350,45 @@ export function useGame() {
       let isQuestUpdate = false; 
 
       if (newQuest) {
-        // 有任务，推进
         newQuestProgress += 5 + Math.floor(Math.random() * 5); 
-        // 属性加成
         if (newQuest.category === 'combat') newQuestProgress += Math.floor(currentHero.attributes.strength / 5);
         else newQuestProgress += Math.floor(currentHero.attributes.luck / 5);
 
         if (newQuestProgress >= 100) {
-          // 完成
+          // 任务完成
           goldChange += newQuest.rewards.gold;
           expChange += newQuest.rewards.exp;
           setHero(h => h ? { ...h, attributes: {...h.attributes, intelligence: h.attributes.intelligence + 1} } : null);
           addLog(`【达成】完成 ${newQuest.name}`, 'highlight');
           addMessage('system', '任务完成', `完成【${newQuest.name}】，赏金 ${newQuest.rewards.gold}，经验 ${newQuest.rewards.exp}。`);
-          newQuest = null; // 任务结束，置空，等待接取
-          addLog("【闲暇】暂无委托，在江湖中随意游历...", 'system');
+          
+          // ⚠️ 队列逻辑：如果有预约，自动接取；否则生成挂机任务
+          if (queued) {
+             const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', currentHero.level);
+             newQuest = queued;
+             queued = null;
+             newLocation = targetLoc; // 移动
+             newState = newQuest.category === 'combat' ? 'fight' : 'idle';
+             addLog(`【新程】开始执行预约委托：${newQuest.name}`, 'highlight');
+          } else {
+             // 自动生成挂机任务
+             const filler = generateFillerQuest(currentHero.level, currentHero.storyStage);
+             newQuest = filler;
+             // 挂机任务不需要特意移动，就在当前位置附近
+             addLog(`【日常】顺手做些杂事：${filler.name}`, 'system');
+          }
         } else {
           isQuestUpdate = true;
         }
+      } else {
+         // 理论上不会走到这里，因为初始化给了任务，且完成后会续杯。防止万一
+         newQuest = generateFillerQuest(currentHero.level, currentHero.storyStage);
       }
 
-      // 状态切换逻辑
       if (currentHero.level >= 10 && currentHero.state === 'idle' && Math.random() < 0.15) newState = 'arena';
       else if (currentHero.inventory.length >= 15 && currentHero.state !== 'town') newState = 'town';
-      else if (currentHero.state !== 'town' && Math.random() < 0.2) newState = currentHero.state === 'idle' ? 'fight' : 'idle';
+      // 注意：如果有任务，状态会跟随任务类型，这里不再随意覆盖
 
-      // 批量更新状态
       setHero(h => {
         if(!h) return null;
         const companion = h.companion;
@@ -378,6 +397,7 @@ export function useGame() {
         let finalH = { 
             ...h, state: newState, location: newLocation, storyStage: getStoryStage(h.level),
             currentQuest: newQuest ? { ...newQuest, progress: newQuestProgress } : null,
+            queuedQuest: queued, // 更新队列状态
             gold: h.gold + goldChange, exp: h.exp + expChange
         };
 
@@ -452,5 +472,5 @@ export function useGame() {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [hero?.name]);
 
-  return { hero, login, godAction, loading, error, clearError: () => setError(null), refreshTavern, hireCompanion, acceptQuest, refreshQuestBoard };
+  return { hero, login, godAction, loading, error, clearError: () => setError(null), refreshTavern, hireCompanion, acceptQuest };
 }

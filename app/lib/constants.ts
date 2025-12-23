@@ -21,9 +21,7 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-// ⚠️ 核心修复：确保 QuestType 被正确导出
 export type QuestType = 'search' | 'hunt' | 'challenge' | 'train' | 'life';
-
 export type QuestCategory = 'combat' | 'life';
 export type QuestRank = 1 | 2 | 3 | 4 | 5;
 
@@ -36,6 +34,7 @@ export type Quest = {
   progress: number; 
   total: number;
   reqLevel: number;
+  isAuto?: boolean; // ⚠️ 标记是否为自动生成的挂机任务
   rewards: {
     gold: number;
     exp: number;
@@ -70,8 +69,11 @@ export type HeroState = {
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
   
-  currentQuest: Quest | null;
+  // ⚠️ 任务系统升级
+  currentQuest: Quest | null; 
+  queuedQuest: Quest | null;  // 预约队列
   questBoard: Quest[];
+  lastQuestRefresh: number;   // 上次刷新时间戳
   
   location: string; 
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
@@ -244,6 +246,7 @@ export const STATIC_LOGS = {
     "街道两旁叫卖声不绝于耳，充满了红尘烟火气。",
     "酒楼上推杯换盏，几位豪客正在高谈阔论。",
     "市井之中卧虎藏龙，那卖菜的老翁眼神竟如鹰隼般锐利。",
+    "由于囊中羞涩，只能看着路边的酱牛肉咽口水。",
   ],
   arena: [
     "四周看台座无虚席，欢呼声震耳欲聋。",
