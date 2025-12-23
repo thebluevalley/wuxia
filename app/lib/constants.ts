@@ -21,9 +21,11 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-// ⚠️ 任务系统核心定义
-export type QuestCategory = 'combat' | 'life'; // 武道 vs 红尘
-export type QuestRank = 1 | 2 | 3 | 4 | 5;     // 难度星级 (1=白, 2=绿, 3=蓝, 4=紫, 5=橙)
+// ⚠️ 核心修复：确保 QuestType 被正确导出
+export type QuestType = 'search' | 'hunt' | 'challenge' | 'train' | 'life';
+
+export type QuestCategory = 'combat' | 'life';
+export type QuestRank = 1 | 2 | 3 | 4 | 5;
 
 export type Quest = { 
   id: string;
@@ -33,7 +35,7 @@ export type Quest = {
   desc: string; 
   progress: number; 
   total: number;
-  reqLevel: number; // 建议等级
+  reqLevel: number;
   rewards: {
     gold: number;
     exp: number;
@@ -68,9 +70,8 @@ export type HeroState = {
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
   
-  // ⚠️ 任务相关
-  currentQuest: Quest | null; // 当前正在做的任务
-  questBoard: Quest[];        // 悬赏榜上的可选任务
+  currentQuest: Quest | null;
+  questBoard: Quest[];
   
   location: string; 
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
@@ -163,7 +164,6 @@ export const STORY_STAGES = [
   { level: 100, name: "破碎虚空", desc: "羽化登仙，留下传说" }
 ];
 
-// ⚠️ 核心新增：各境界的任务剧本库
 export const QUEST_TEMPLATES = {
   "初出茅庐": {
     combat: ["清理后山野狼", "教训村头恶霸", "驱赶偷鸡贼", "巡逻村口", "切磋武艺"],
@@ -197,7 +197,6 @@ export const WORLD_LORE = `
 体系：内练一口气，外练筋骨皮。武学分外功、内功、轻功。
 `;
 
-// 兼容旧代码，保留 QUEST_SOURCES
 export const QUEST_SOURCES = {
   search: ["寻找失传的《易筋经》残卷"], hunt: ["讨伐黑风寨"], challenge: ["挑战华山"], train: ["修炼"], life: ["打杂"]
 };
