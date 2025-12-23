@@ -16,66 +16,32 @@ const getStoryStage = (level: number) => {
   return stage ? stage.name : "微尘";
 };
 
-// ⚠️ 核心升级：全息标签矩阵 (Holographic Tag Matrix)
 const calculateTags = (hero: HeroState): string[] => {
   const tags: Set<string> = new Set();
   const { hp, maxHp, stamina, gold, attributes, actionCounts, inventory, equipment, level, companion, stats } = hero;
 
-  // 1. 生理维度 (Physiological)
   if (hp < maxHp * 0.1) tags.add("命悬一线");
   else if (hp < maxHp * 0.3) tags.add("重伤");
-  else if (hp < maxHp * 0.7) tags.add("轻伤");
   
   if (stamina < 20) tags.add("精疲力竭");
   else if (stamina > 100) tags.add("龙精虎猛");
 
-  // 2. 物质维度 (Material)
   if (gold > 50000) tags.add("富可敌国");
-  else if (gold > 10000) tags.add("挥金如土");
-  else if (gold > 2000) tags.add("衣食无忧");
   else if (gold < 50) tags.add("穷困潦倒");
 
-  // 3. 行为/心理维度 (Psychological - Based on Action Counts)
   if (actionCounts.kills > 100) tags.add("杀人如麻");
-  else if (actionCounts.kills > 20) tags.add("见过血");
-  else if (actionCounts.kills === 0) tags.add("清白之身");
-
-  if (actionCounts.retreats > 10) tags.add("谨小慎微");
-  if (actionCounts.gambles > 10) tags.add("赌徒");
   if (actionCounts.drinking > 20) tags.add("酒鬼");
-  if (actionCounts.shopping > 50) tags.add("购物狂");
 
-  // 4. 社交维度 (Social)
-  if (companion) {
-      if (companion.quality === 'legendary') tags.add("名士相伴");
-      if (companion.personality.includes("毒舌")) tags.add("受气包");
-  } else {
-      tags.add("独行侠");
-  }
-
-  // 5. 属性/天赋维度 (Attributes)
   if (attributes.strength > 20) tags.add("天生神力");
   if (attributes.intelligence > 20) tags.add("多智近妖");
-  if (attributes.luck > 20) tags.add("天选之子");
-  if (attributes.luck < 5) tags.add("霉运当头");
 
-  // 6. 装备/职业维度 (Equipment)
   const weaponName = equipment.weapon?.name || "";
   if (weaponName.includes("剑")) tags.add("剑客");
   else if (weaponName.includes("刀")) tags.add("刀客");
-  else if (weaponName.includes("杖")) tags.add("行者");
   else if (!equipment.weapon) tags.add("拳师");
   
-  // 7. 物品风味 (Flavor Items)
-  if (inventory.some(i => i.name.includes("酒"))) tags.add("嗜酒");
-  if (inventory.some(i => i.name.includes("书") || i.type === 'book')) tags.add("书卷气");
-  if (inventory.some(i => i.name.includes("毒"))) tags.add("深谙毒理");
-
-  // 8. 传奇度 (Legend)
   if (stats.arenaWins > 50) tags.add("武林神话");
-  if (level > 60) tags.add("一代宗师");
 
-  // 转换为数组并截取前 8 个最重要的 (防止 Token 爆炸)
   return Array.from(tags).slice(0, 10);
 };
 
@@ -191,9 +157,9 @@ export function useGame() {
       reputation: { alliance: 0, freedom: 0, court: 0, sword: 0, healer: 0, cult: 0, invader: 0, hidden: 0, neutral: 0 },
       narrativeHistory: "初入江湖，一切未卜。",
       tags: ["初出茅庐"], 
-      // ⚠️ 初始化 actionCounts
       actionCounts: { kills: 0, retreats: 0, gambles: 0, charity: 0, betrayals: 0, shopping: 0, drinking: 0 },
-      description: "初入江湖，默默无闻。"
+      description: "初入江湖，默默无闻。",
+      equipmentDescription: "一身布衣，手无寸铁。" // Initial description
     };
 
     if (!supabase) { setHero(newHero); setLoading(false); setTimeout(() => triggerAI('start_game', undefined, undefined, newHero), 500); return; }
@@ -203,14 +169,7 @@ export function useGame() {
       if (user) {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
-        if (!mergedData.tavern) mergedData.tavern = { visitors: generateVisitors(), lastRefresh: Date.now() };
-        if (!mergedData.questBoard) mergedData.questBoard = generateQuestBoard(mergedData.level, mergedData.storyStage);
-        if (!mergedData.lastQuestRefresh) mergedData.lastQuestRefresh = Date.now();
-        if (mergedData.stamina === undefined) { mergedData.stamina = 120; mergedData.maxStamina = 120; }
-        if (!mergedData.narrativeHistory) mergedData.narrativeHistory = "江湖路远，重新启程。";
-        if (!mergedData.tags) mergedData.tags = ["回归江湖"];
-        if (!mergedData.description) mergedData.description = "重返江湖，风采依旧。";
-        if (!mergedData.actionCounts) mergedData.actionCounts = { kills: 0, retreats: 0, gambles: 0, charity: 0, betrayals: 0, shopping: 0, drinking: 0 };
+        if (!mergedData.equipmentDescription) mergedData.equipmentDescription = "衣着朴素，风尘仆仆。";
         
         setHero(mergedData);
         setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
@@ -291,7 +250,9 @@ export function useGame() {
         narrativeHistory: currentHero.narrativeHistory,
         recentLogs: recentLogsRef.current, 
         lastLogLen: recentLogsRef.current[0]?.length || 0,
-        tags: currentHero.tags || []
+        tags: currentHero.tags || [],
+        // Pass equipment for equip description generation
+        equipment: currentHero.equipment
       };
       const res = await fetch('/api/ai', { method: 'POST', body: JSON.stringify({ context, eventType, userAction: action }) });
       if (!res.ok) return false;
@@ -299,6 +260,10 @@ export function useGame() {
       if (data.text) {
         if (eventType === 'generate_description') {
             setHero(h => h ? { ...h, description: data.text } : null);
+            return true;
+        }
+        if (eventType === 'generate_equip_desc') {
+            setHero(h => h ? { ...h, equipmentDescription: data.text } : null);
             return true;
         }
 
@@ -334,9 +299,7 @@ export function useGame() {
     let hero = { ...currentHero };
     const logs: string[] = [];
     let updated = false;
-
-    // ⚠️ 更新计数器 (简单模拟，实际应在事件发生处更新)
-    if (hero.gold < 10) hero.actionCounts.shopping = Math.max(0, hero.actionCounts.shopping - 1); // 穷了就不买了
+    let equipChanged = false;
 
     const newTags = calculateTags(hero);
     const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(hero.tags);
@@ -366,6 +329,7 @@ export function useGame() {
             if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
             logs.push(`【换装】装备了更强的 ${item.name} (强度 ${equipPower})`);
             updated = true;
+            equipChanged = true;
           }
         }
       }
@@ -407,9 +371,14 @@ export function useGame() {
           logs.push(`【补给】体力不支服下 ${food.name}，精力恢复 ${regen}。`);
           const idx = hero.inventory.findIndex(i => i.id === food.id);
           if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
-          hero.actionCounts.drinking++; // 增加饮酒计数
+          hero.actionCounts.drinking++; 
           updated = true;
        }
+    }
+
+    if (equipChanged) {
+        // Trigger equipment description update outside of render cycle
+        setTimeout(() => triggerAI('generate_equip_desc', '', undefined, hero), 100);
     }
 
     return { hero: updated ? hero : currentHero, logs, tagsChanged };
@@ -530,7 +499,6 @@ export function useGame() {
             stamina: Math.min(h.maxStamina, h.stamina + (h.state === 'idle' ? 1 : 0.5)),
             godPower: Math.min(100, h.godPower + 5)
         };
-        // ⚠️ 行为追踪更新
         if (lootItem) {
            const idx = finalH.inventory.findIndex(i => i.name === lootItem!.name);
            if (idx >= 0) finalH.inventory[idx].count++; else finalH.inventory.push(lootItem);
@@ -549,7 +517,7 @@ export function useGame() {
              skill.exp += (finalH.attributes.intelligence * 0.5) + 5;
              if (skill.exp >= skill.maxExp) { skill.level++; skill.exp = 0; skill.maxExp = Math.floor(skill.maxExp * 1.2); }
            }
-           if (finalH.state === 'fight') finalH.actionCounts.kills++; // 增加击杀数
+           if (finalH.state === 'fight') finalH.actionCounts.kills++; 
            if (finalH.state === 'arena') {
               if (Math.random() < 0.4) { finalH.stats.arenaWins++; finalH.gold += 100; } else { finalH.hp = Math.floor(finalH.hp * 0.6); }
               finalH.state = 'idle';
@@ -562,6 +530,7 @@ export function useGame() {
         return finalH;
       });
 
+      // ⚠️ 核心调整：心跳加速 (15s ~ 60s)
       if (aiEvent) {
          await triggerAI(aiEvent, logSuffix);
       } else if (!aiEvent && newQuest && newQuest.stage === 'road' && Math.random() < 0.4) {
@@ -574,7 +543,7 @@ export function useGame() {
          addLog(logSuffix, 'system');
       }
       
-      const nextTick = Math.floor(Math.random() * (180000 - 30000) + 30000); 
+      const nextTick = Math.floor(Math.random() * (60000 - 15000) + 15000); 
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
     timerRef.current = setTimeout(gameLoop, 2000);

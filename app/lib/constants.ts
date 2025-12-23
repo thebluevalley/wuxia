@@ -96,17 +96,17 @@ export type HeroState = {
   reputation: Record<Faction, number>;
   
   tags: string[]; 
-  // ⚠️ 隐性计数器：用于分析玩家性格
   actionCounts: {
-    kills: number;        // 杀敌数
-    retreats: number;     // 逃跑/撤退数
-    gambles: number;      // 赌博/冒险次数
-    charity: number;      // 施舍/助人次数
-    betrayals: number;    // 背叛/行恶次数
-    shopping: number;     // 购物次数
-    drinking: number;     // 饮酒次数
+    kills: number;        
+    retreats: number;     
+    gambles: number;      
+    charity: number;      
+    betrayals: number;    
+    shopping: number;     
+    drinking: number;     
   }; 
-  description: string; 
+  description: string; // 只有性格/状态描述
+  equipmentDescription: string; // ⚠️ 新增：专门的装备外观描述
 
   currentQuest: Quest | null;
   queuedQuest: Quest | null;
@@ -117,7 +117,7 @@ export type HeroState = {
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   logs: LogEntry[]; messages: Message[]; majorEvents: string[];
   inventory: Item[]; equipment: Equipment; martialArts: Skill[]; lifeSkills: Skill[];
-  stats: { kills: number; days: number; arenaWins: number; }; // 基础统计
+  stats: { kills: number; days: number; arenaWins: number; }; 
   tavern: { visitors: Companion[]; lastRefresh: number; };
   companion: Companion | null; companionExpiry: number;
 };

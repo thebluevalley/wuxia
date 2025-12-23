@@ -8,7 +8,8 @@ export default function Home() {
   const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'equip' | 'messages' | 'tavern'>('logs');
+  // ⚠️ 移除 'equip' tab
+  const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'messages' | 'tavern'>('logs');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,12 +36,11 @@ export default function Home() {
 
   const getStageColor = (stage: string) => {
     switch (stage) {
-      case '初出茅庐': return 'text-stone-500 bg-stone-100 border-stone-200';
-      case '锋芒初露': return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-      case '名动一方': return 'text-blue-700 bg-blue-50 border-blue-200';
-      case '开宗立派': return 'text-purple-800 bg-purple-50 border-purple-200';
-      case '一代宗师': return 'text-orange-800 bg-orange-50 border-orange-200';
-      case '破碎虚空': return 'text-red-800 bg-red-50 border-red-200';
+      case '微尘': return 'text-stone-500 bg-stone-100 border-stone-200';
+      case '棋子': return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+      case '破局者': return 'text-blue-700 bg-blue-50 border-blue-200';
+      case '国士': return 'text-purple-800 bg-purple-50 border-purple-200';
+      case '传说': return 'text-orange-800 bg-orange-50 border-orange-200';
       default: return 'text-stone-500 bg-stone-100 border-stone-200';
     }
   };
@@ -134,9 +134,9 @@ export default function Home() {
           <div key={log.id} className="animate-in fade-in slide-in-from-bottom-2 duration-700 flex gap-2 items-baseline">
             <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
             <span className={`text-[14px] leading-7 text-justify ${
-              log.type === 'highlight' ? 'text-amber-900' : // 重点事件用深琥珀色
+              log.type === 'highlight' ? 'text-amber-900' : 
               log.type === 'system' ? 'text-stone-400 text-xs italic' : 
-              'text-black' // ⚠️ 剧情正文改为纯黑色
+              'text-black' 
             }`}>
               {log.text}
             </span>
@@ -176,12 +176,30 @@ export default function Home() {
            <div className="text-center flex-1"><div className="text-xs text-stone-400">岁数</div><div className="font-bold text-stone-700">{hero.age}</div></div>
         </div>
         
-        {/* ⚠️ 核心新增：江湖风评 (侧写展示) */}
+        {/* 江湖风评 */}
         <div className="mb-4 bg-stone-50 p-3 rounded border border-stone-100 relative">
            <div className="absolute top-2 right-2 text-stone-300 opacity-20"><ScrollText size={48}/></div>
            <div className="text-xs font-bold text-stone-700 mb-2 flex items-center gap-1"><Info size={12}/> 江湖风评</div>
            <div className="text-[11px] text-stone-600 leading-relaxed font-serif italic">
              “{hero.description || "初入江湖，默默无闻。"}”
+           </div>
+        </div>
+
+        {/* ⚠️ 新增：装备外观描述 + 装备槽位展示 */}
+        <div className="mb-4 bg-stone-50 p-3 rounded border border-stone-100 relative">
+           <div className="absolute top-2 right-2 text-stone-300 opacity-20"><Shield size={48}/></div>
+           <div className="text-xs font-bold text-stone-700 mb-2 flex items-center gap-1"><Shirt size={12}/> 穿戴</div>
+           <div className="text-[11px] text-stone-600 leading-relaxed font-serif italic mb-3">
+             “{hero.equipmentDescription || "衣着朴素，风尘仆仆。"}”
+           </div>
+           {/* 装备槽位 Grid */}
+           <div className="grid grid-cols-3 gap-2">
+              <EquipSlot label="兵器" item={hero.equipment.weapon} icon={<Sword size={12}/>} />
+              <EquipSlot label="头饰" item={hero.equipment.head} icon={<HardHat size={12}/>} />
+              <EquipSlot label="衣甲" item={hero.equipment.body} icon={<Shirt size={12}/>} />
+              <EquipSlot label="护腿" item={hero.equipment.legs} icon={<Shield size={12}/>} />
+              <EquipSlot label="鞋靴" item={hero.equipment.feet} icon={<Footprints size={12}/>} />
+              <EquipSlot label="饰品" item={hero.equipment.accessory} icon={<Gem size={12}/>} />
            </div>
         </div>
 
@@ -231,6 +249,15 @@ export default function Home() {
     </div>
   );
 
+  // ⚠️ 辅助组件：装备槽
+  const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
+    <div className="flex flex-col items-center bg-white p-2 rounded border border-stone-100">
+       <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${item ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-300'}`}>{icon}</div>
+       <div className="text-[9px] text-stone-400 mb-0.5">{label}</div>
+       <div className={`text-[9px] font-bold truncate max-w-full ${item ? 'text-stone-700' : 'text-stone-300'}`}>{item ? item.name : "空"}</div>
+    </div>
+  );
+
   const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
 
   const BagView = () => (
@@ -255,7 +282,8 @@ export default function Home() {
     </div>
   );
 
-  const EquipView = () => { const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; return (<div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className={`text-sm ${getQualityColor(item.quality)}`}>{item.name} <span className="text-[10px] text-stone-400 ml-1">(强度 {item.power})</span></div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>);};
+  // EquipView 已整合到 HeroView 中，此处删除
+
   const MessagesView = () => { 
     const rumors = hero.messages.filter(m => m.type === 'rumor'); 
     const systems = hero.messages.filter(m => m.type === 'system'); 
@@ -328,7 +356,6 @@ export default function Home() {
         {activeTab === 'logs' && <LogsView />}
         {activeTab === 'hero' && <HeroView />}
         {activeTab === 'bag' && <BagView />}
-        {activeTab === 'equip' && <EquipView />}
         {activeTab === 'messages' && <MessagesView />}
         {activeTab === 'tavern' && <TavernView />}
       </main>
@@ -337,7 +364,6 @@ export default function Home() {
          <button onClick={() => setActiveTab('hero')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'hero' ? 'text-stone-800' : 'text-stone-400'}`}><User size={18} strokeWidth={activeTab === 'hero' ? 2.5 : 2} /><span className="text-[9px] font-bold">侠客</span></button>
          <button onClick={() => setActiveTab('tavern')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'tavern' ? 'text-stone-800' : 'text-stone-400'}`}><Beer size={18} strokeWidth={activeTab === 'tavern' ? 2.5 : 2} /><span className="text-[9px] font-bold">酒馆</span></button>
          <button onClick={() => setActiveTab('bag')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'bag' ? 'text-stone-800' : 'text-stone-400'}`}><Package size={18} strokeWidth={activeTab === 'bag' ? 2.5 : 2} /><span className="text-[9px] font-bold">行囊</span></button>
-         <button onClick={() => setActiveTab('equip')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'equip' ? 'text-stone-800' : 'text-stone-400'}`}><Shield size={18} strokeWidth={activeTab === 'equip' ? 2.5 : 2} /><span className="text-[9px] font-bold">装备</span></button>
          <button onClick={() => setActiveTab('messages')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'messages' ? 'text-stone-800' : 'text-stone-400'}`}><Bell size={18} strokeWidth={activeTab === 'messages' ? 2.5 : 2} /><span className="text-[9px] font-bold">告示</span></button>
       </nav>
     </div>

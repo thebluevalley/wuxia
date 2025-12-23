@@ -14,11 +14,12 @@ export async function POST(req: Request) {
     const loreSnippet = WORLD_ARCHIVE[Math.floor(Math.random() * WORLD_ARCHIVE.length)];
 
     const stage = context.storyStage || "微尘";
-    const tags = context.tags && context.tags.length > 0 ? context.tags.join("、") : "初入江湖";
+    const tags = context.tags ? context.tags.join("、") : "无";
     
+    // Tone Setup
     let toneInstruction = "";
     if (stage === "微尘") {
-        toneInstruction = "Tone: Down-to-earth, Vibrant, Humorous. Focus on small struggles.";
+        toneInstruction = "Tone: Down-to-earth, Vibrant, Humorous.";
     } else if (stage === "棋子") {
         toneInstruction = "Tone: Suspenseful, Intriguing.";
     } else if (stage === "破局者") {
@@ -49,71 +50,65 @@ export async function POST(req: Request) {
     switch (eventType) {
       case 'generate_description':
         prompt = `
-          Task: Write a character portrait based strictly on these visual tags: [${tags}].
-          
-          Rules:
-          1. OUTPUT CHINESE ONLY. No English.
-          2. Combine ALL tags into ONE fluid, descriptive sentence.
-          3. Show, Don't Tell.
-          4. Max 50 characters.
-          
-          Example: "他斜倚在墙角，腹部的伤口还在渗血，却仍举着酒壶狂饮，那柄生锈的铁剑被随意扔在脚边。"
-          
+          Task: Write a character portrait based strictly on tags: [${tags}].
+          STRICT RULES: CHINESE ONLY. Max 50 chars. Show, Don't Tell.
+          Example: "他斜倚在墙角，腹部的伤口还在渗血，却仍举着酒壶狂饮。"
+          Your Description:
+        `;
+        break;
+
+      case 'generate_equip_desc':
+        // ⚠️ 新增：装备外观描写
+        const weapon = context.equipment?.weapon?.name || "空手";
+        const body = context.equipment?.body?.name || "布衣";
+        const head = context.equipment?.head?.name || "无";
+        prompt = `
+          Task: Describe the hero's appearance based on their gear.
+          Weapon: ${weapon}, Body: ${body}, Head: ${head}.
+          STRICT RULES: CHINESE ONLY. Max 40 chars. Visualize the combination.
+          Example: "他身披重甲，手持巨剑，宛如一尊不可战胜的铁塔。"
           Your Description:
         `;
         break;
 
       case 'start_game':
-        prompt = `${baseInstruction} Write an opening scene. The hero stands in ${context.location}. Describe the noise and smell of the surroundings.`;
+        prompt = `${baseInstruction} Write an opening scene. The hero stands in ${context.location}.`;
         break;
       
       case 'quest_start':
-        prompt = `${baseInstruction} 
-        Event: Quest Start "${context.questScript?.title}".
-        Details: ${context.questScript?.description}.
-        Action: The hero accepts the quest. Describe their demeanor based on tags [${tags}].`;
+        prompt = `${baseInstruction} Event: Start "${context.questScript?.title}". Details: ${context.questScript?.description}. Action: Set off.`;
         break;
 
       case 'quest_journey':
-        prompt = `${baseInstruction} 
-        Event: A moment on the road.
-        Action: A slice-of-life scene. Mandatory: Use flavor text "${envFlavor}".`;
+        prompt = `${baseInstruction} Event: On the road. Action: Slice-of-life scene. Mandatory: Use flavor text "${envFlavor}".`;
         break;
 
       case 'idle_event':
-        prompt = `${baseInstruction} 
-        Event: Wandering in ${context.location}.
-        Action: Describe a small interaction with the world based on tags [${tags}].`;
+        prompt = `${baseInstruction} Event: Wandering in ${context.location}. Action: Reflect tags [${tags}].`;
         break;
 
       case 'quest_climax':
-        prompt = `${baseInstruction} 
-        Event: Climax vs ${context.questScript?.antagonist}.
-        Twist: ${context.questScript?.twist}.
-        Action: A tense confrontation. Dialogue or Action.`;
+        prompt = `${baseInstruction} Event: Climax vs ${context.questScript?.antagonist}. Twist: ${context.questScript?.twist}. Action: Confrontation.`;
         break;
 
       case 'quest_end':
-        prompt = `${baseInstruction} 
-        Event: Conclusion.
-        Objective: ${context.questScript?.objective}.
-        Action: The task is done. How does the hero feel?`;
+        prompt = `${baseInstruction} Event: Conclusion. Objective: ${context.questScript?.objective}. Action: Aftermath.`;
         break;
         
       case 'recruit_companion':
-        prompt = `${baseInstruction} Hero recruits a companion. Describe the connection formed.`;
+        prompt = `${baseInstruction} Hero meets a new companion. Bond formed.`;
         break;
         
       case 'god_action':
-        prompt = `${baseInstruction} A moment of destiny or luck.`;
+        prompt = `${baseInstruction} A moment of destiny.`;
         break;
         
       case 'generate_rumor':
-        prompt = `Write a rumor about the war or a sect secret. Format: "【Title】Content". Max 25 words. Chinese Only.`;
+        prompt = `Write a rumor about the Jianghu. Format: "【Title】Content". Chinese Only.`;
         break;
 
       default:
-        prompt = `${baseInstruction} Describe a brief moment of the hero's journey.`;
+        prompt = `${baseInstruction} Describe a brief moment.`;
     }
 
     const completion = await groq.chat.completions.create({
@@ -125,7 +120,7 @@ export async function POST(req: Request) {
 
     let text = completion.choices[0]?.message?.content || "";
     
-    if (eventType === 'generate_description') {
+    if (eventType === 'generate_description' || eventType === 'generate_equip_desc') {
         text = text.replace(/^(Based on|The hero|Here is).*:[\s\n]*/i, '');
         text = text.replace(/^["']|["']$/g, ''); 
     }
