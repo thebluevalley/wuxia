@@ -9,7 +9,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 3 * 60 * 60 * 1000; 
 const QUEST_REFRESH_INTERVAL = 6 * 60 * 60 * 1000; 
 
-// --- Helper Functions ---
+// --- 辅助函数 ---
 
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
@@ -128,7 +128,7 @@ const rollLoot = (level: number, luck: number): Partial<Item> | null => {
     return pool[Math.floor(Math.random() * pool.length)];
 };
 
-// --- Main Hook ---
+// --- 主 Hook ---
 
 export function useGame() {
   const [hero, setHero] = useState<HeroState | null>(null);
@@ -394,6 +394,9 @@ export function useGame() {
       let lootItem: Item | null = null;
       let logSuffix = "";
       
+      // ⚠️ 核心修复：在这里声明 isQuestUpdate
+      let isQuestUpdate = false; 
+      
       // Quest Progression
       if (newQuest) {
         newQuestProgress += 5 + Math.floor(Math.random() * 5); 
@@ -426,6 +429,8 @@ export function useGame() {
                addLog(`【日常】顺手做些杂事：${filler.name}`, 'system');
              }
           }
+        } else {
+          isQuestUpdate = true;
         }
       } else {
          if (Math.random() < 0.2) {
