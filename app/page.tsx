@@ -4,29 +4,36 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank, SkillType } from '@/app/lib/constants';
 
-// 打字机组件
+// ⚠️ 核心修复：移除 CSS 动画，增加完成状态检查
 const TypewriterText = ({ text, className }: { text: string, className?: string }) => {
   const [displayedText, setDisplayedText] = useState('');
+  const hasCompletedRef = useRef(false); // 标记是否已完成打印
   
   useEffect(() => {
-    // 如果文本太短或已经完全显示，就不重置动画，防止闪烁
-    if (text === displayedText) return;
+    // 如果文本没有变化，且已经打印完成，直接跳过
+    // 这防止了组件重渲染时的闪烁
+    if (hasCompletedRef.current && displayedText === text) return;
 
+    // 重置状态
     let index = 0;
     setDisplayedText(''); 
+    hasCompletedRef.current = false;
+
     const timer = setInterval(() => {
       if (index < text.length) {
         setDisplayedText((prev) => prev + text.charAt(index));
         index++;
       } else {
         clearInterval(timer);
+        hasCompletedRef.current = true; // 标记完成
       }
-    }, 80); 
+    }, 80); // 80ms 慢速沉浸感
 
     return () => clearInterval(timer);
-  }, [text]); // 仅当 text 内容变化时才触发打字效果
+  }, [text]); // 仅当 text 内容实质变化时才重置
 
-  return <span className={`${className} animate-in fade-in duration-500`}>{displayedText}</span>;
+  // ⚠️ 移除了 animate-in fade-in，防止切换 Tab 时重播动画
+  return <span className={className}>{displayedText}</span>;
 };
 
 export default function Home() {
