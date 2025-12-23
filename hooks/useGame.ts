@@ -16,35 +16,22 @@ const getStoryStage = (level: number) => {
   return stage ? stage.name : "初出茅庐";
 };
 
-// ⚠️ 核心新增：标签计算器
 const calculateTags = (hero: HeroState): string[] => {
   const tags: string[] = [];
-  
-  // 1. 状态类
   if (hero.hp < hero.maxHp * 0.3) tags.push("重伤");
   if (hero.stamina < 20) tags.push("疲惫");
   if (hero.gold > 5000) tags.push("富甲一方");
   else if (hero.gold < 50) tags.push("穷困潦倒");
-
-  // 2. 装备类
   if (hero.equipment.weapon?.name.includes("剑")) tags.push("剑客");
   else if (hero.equipment.weapon?.name.includes("刀")) tags.push("刀客");
   else if (!hero.equipment.weapon) tags.push("拳师");
-
-  // 3. 物品类
   const hasAlcohol = hero.inventory.some(i => i.name.includes("酒") || i.name.includes("女儿红"));
   if (hasAlcohol) tags.push("嗜酒");
-  
   const hasBook = hero.inventory.some(i => i.type === 'book');
   if (hasBook || hero.attributes.intelligence > 20) tags.push("书卷气");
-
-  // 4. 行为类 (基于 actionCounts - 暂未深度实现，先给默认)
-  // tags.push("初入江湖");
-
   return tags;
 };
 
-// ... (Generate Quest / Visitors / Loot functions remain same as previous step)
 const generateQuestBoard = (level: number, stageName: string): Quest[] => {
   const quests: Quest[] = [];
   // @ts-ignore
@@ -156,8 +143,9 @@ export function useGame() {
       companion: null, companionExpiry: 0,
       reputation: { throne: 0, sect: 0, underworld: 0, cult: 0, neutral: 0 },
       narrativeHistory: "初入江湖，一切未卜。",
-      tags: ["初出茅庐"], // 初始标签
-      actionCounts: {}
+      tags: ["初出茅庐"], 
+      actionCounts: {},
+      description: "初入江湖，默默无闻。"
     };
 
     if (!supabase) { setHero(newHero); setLoading(false); setTimeout(() => triggerAI('start_game', undefined, undefined, newHero), 500); return; }
@@ -173,6 +161,7 @@ export function useGame() {
         if (mergedData.stamina === undefined) { mergedData.stamina = 120; mergedData.maxStamina = 120; }
         if (!mergedData.narrativeHistory) mergedData.narrativeHistory = "江湖路远，重新启程。";
         if (!mergedData.tags) mergedData.tags = ["回归江湖"];
+        if (!mergedData.description) mergedData.description = "重返江湖，风采依旧。";
         if (!mergedData.actionCounts) mergedData.actionCounts = {};
         
         setHero(mergedData);
@@ -254,13 +243,18 @@ export function useGame() {
         narrativeHistory: currentHero.narrativeHistory,
         recentLogs: recentLogsRef.current, 
         lastLogLen: recentLogsRef.current[0]?.length || 0,
-        // ⚠️ 传递标签给 AI
         tags: currentHero.tags || []
       };
       const res = await fetch('/api/ai', { method: 'POST', body: JSON.stringify({ context, eventType, userAction: action }) });
       if (!res.ok) return false;
       const data = await res.json();
       if (data.text) {
+        // ⚠️ 核心新增：处理侧写更新
+        if (eventType === 'generate_description') {
+            setHero(h => h ? { ...h, description: data.text } : null);
+            return true;
+        }
+
         if (eventType === 'generate_rumor') {
            let title = "江湖风声"; let content = data.text;
            if (data.text.includes("：")) { const parts = data.text.split("："); title = parts[0]; content = parts.slice(1).join("："); }
@@ -289,15 +283,15 @@ export function useGame() {
     }
   };
 
-  const autoManageInventory = (currentHero: HeroState): { hero: HeroState, logs: string[] } => {
+  const autoManageInventory = (currentHero: HeroState): { hero: HeroState, logs: string[], tagsChanged: boolean } => {
     let hero = { ...currentHero };
     const logs: string[] = [];
     let updated = false;
 
-    // 0. Recalculate Tags first (based on current state)
+    // 0. Recalculate Tags
     const newTags = calculateTags(hero);
-    // Simple check to see if tags changed
-    if (JSON.stringify(newTags) !== JSON.stringify(hero.tags)) {
+    const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(hero.tags);
+    if (tagsChanged) {
         hero.tags = newTags;
         updated = true;
     }
@@ -368,7 +362,7 @@ export function useGame() {
        }
     }
 
-    return { hero: updated ? hero : currentHero, logs };
+    return { hero: updated ? hero : currentHero, logs, tagsChanged };
   };
 
   useEffect(() => {
@@ -378,9 +372,14 @@ export function useGame() {
       const currentHero = heroRef.current;
       if (!currentHero) return;
 
-      const { hero: managedHero, logs: autoLogs } = autoManageInventory(currentHero);
+      const { hero: managedHero, logs: autoLogs, tagsChanged } = autoManageInventory(currentHero);
       if (autoLogs.length > 0) { setHero(managedHero); autoLogs.forEach(l => addLog(l, 'highlight')); }
       const activeHero = managedHero;
+
+      // ⚠️ 核心新增：当标签变化时，触发 AI 生成侧写
+      if (tagsChanged) {
+          await triggerAI('generate_description', '', undefined, activeHero);
+      }
 
       if (activeHero.companion && Date.now() > activeHero.companionExpiry) {
          addLog(`【离别】${activeHero.companion.name} 拱手道别：“青山不改，绿水长流！”`, "system");

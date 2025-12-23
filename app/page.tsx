@@ -136,7 +136,7 @@ export default function Home() {
             <span className={`text-[14px] leading-7 text-justify ${
               log.type === 'highlight' ? 'text-amber-900' : // 重点事件用深琥珀色
               log.type === 'system' ? 'text-stone-400 text-xs italic' : 
-              'text-black' // ⚠️ 剧情正文改为纯黑色，增强对比度
+              'text-black' // ⚠️ 剧情正文改为纯黑色
             }`}>
               {log.text}
             </span>
@@ -175,14 +175,16 @@ export default function Home() {
            <div className="text-center flex-1 border-r border-stone-100"><div className="text-xs text-stone-400">善恶</div><div className="font-bold text-stone-700">{hero.alignment}</div></div>
            <div className="text-center flex-1"><div className="text-xs text-stone-400">岁数</div><div className="font-bold text-stone-700">{hero.age}</div></div>
         </div>
-        <div className="mb-4">
-           <div className="text-xs text-stone-400 mb-1">江湖风评</div>
-           <div className="flex flex-wrap gap-2">
-             {hero.tags && hero.tags.length > 0 ? hero.tags.map((tag, i) => (
-                <span key={i} className="text-[10px] bg-stone-100 text-stone-600 px-2 py-1 rounded border border-stone-200">{tag}</span>
-             )) : <span className="text-[10px] text-stone-300 italic">暂无评价</span>}
+        
+        {/* ⚠️ 核心新增：江湖风评 (侧写展示) */}
+        <div className="mb-4 bg-stone-50 p-3 rounded border border-stone-100 relative">
+           <div className="absolute top-2 right-2 text-stone-300 opacity-20"><ScrollText size={48}/></div>
+           <div className="text-xs font-bold text-stone-700 mb-2 flex items-center gap-1"><Info size={12}/> 江湖风评</div>
+           <div className="text-[11px] text-stone-600 leading-relaxed font-serif italic">
+             “{hero.description || "初入江湖，默默无闻。"}”
            </div>
         </div>
+
         {hero.unlockedFeatures.includes('motto') && (
            <div className="mt-4 p-3 bg-stone-50 rounded border border-stone-100 relative"><Quote size={12} className="absolute top-2 left-2 text-stone-300"/><div className="text-center text-sm font-serif italic text-stone-600">“{hero.motto}”</div></div>
         )}

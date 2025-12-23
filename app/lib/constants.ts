@@ -90,9 +90,10 @@ export type HeroState = {
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
   reputation: Record<Faction, number>;
   
-  // ⚠️ 核心新增：标签系统
-  tags: string[]; // 当前生效的标签（如：[嗜酒], [重伤], [富甲一方]）
-  actionCounts: Record<string, number>; // 隐性计数器（如：{ used_poison: 10, killed_innocent: 1 }）
+  tags: string[]; 
+  actionCounts: Record<string, number>; 
+  // ⚠️ 核心新增：AI 生成的人物侧写
+  description: string; 
 
   currentQuest: Quest | null;
   queuedQuest: Quest | null;
@@ -222,7 +223,6 @@ export const QUEST_SOURCES = {
 };
 
 export const LOOT_TABLE: Partial<Item>[] = [
-  // (保持原有的丰富物品库，此处省略以节省篇幅，但请保留全部内容)
   { name: "半个冷馒头", type: 'consumable', desc: "干硬难咽，聊胜于无。", price: 1, minLevel: 1, quality: 'common', effect: 10 }, 
   { name: "女儿红", type: 'consumable', desc: "陈年好酒，回血并增加豪气。", price: 20, minLevel: 10, quality: 'common', effect: 50 },
   { name: "金疮药", type: 'consumable', desc: "江湖常备跌打药。", price: 50, minLevel: 15, quality: 'common', effect: 100 },

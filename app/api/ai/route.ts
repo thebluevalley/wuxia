@@ -14,7 +14,6 @@ export async function POST(req: Request) {
     const actionFlavor = FLAVOR_TEXTS.action[Math.floor(Math.random() * FLAVOR_TEXTS.action.length)];
 
     const stage = context.storyStage || "初出茅庐";
-    // ⚠️ 注入标签
     const tags = context.tags ? context.tags.join(", ") : "无";
     
     let tone = "witty and fast-paced";
@@ -25,17 +24,25 @@ export async function POST(req: Request) {
       You are a Dungeon Master for a Wuxia RPG. Write in CHINESE.
       Tone: ${tone}.
       Style: Show, Don't Tell. Use imagery.
-      Mandatory: Incorporate the flavor text "${envFlavor}" or "${actionFlavor}" naturally.
       
       Hero: ${context.name} (${stage}).
-      Hero Tags: [${tags}]. (⚠️ IMPORTANT: These tags define the hero's appearance and personality. Reflect them in the narrative.)
-      Quest: ${context.questScript?.title || "Wandering"} - ${context.questInfo}.
-      History: ${context.narrativeHistory.slice(-200)} (Keep continuity).
+      Hero Tags: [${tags}].
+      Quest: ${context.questScript?.title || "Wandering"}.
+      History: ${context.narrativeHistory?.slice(-200) || ""}.
     `;
 
     let prompt = "";
     
     switch (eventType) {
+      case 'generate_description':
+        // ⚠️ 侧写生成 Prompt
+        prompt = `
+          Based on the tags [${tags}], describe the hero's current appearance and aura in one flavorful sentence.
+          Example: "他背着一口锈剑，满身酒气，眼神中却透着一股不寻常的锐利。"
+          Do NOT list the tags directly. Weave them into the description.
+        `;
+        break;
+
       case 'start_game':
         prompt = `${baseInstruction} Write an opening scene. Describe the hero standing in ${context.location}. Reflect the hero's tags in their appearance or demeanor. 80 words.`;
         break;
