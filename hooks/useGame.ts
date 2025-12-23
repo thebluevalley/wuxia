@@ -6,7 +6,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
   : null;
 
-// --- 辅助函数 (保持在组件外) ---
+// --- 辅助函数 ---
 
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
@@ -32,16 +32,14 @@ const getLocationByQuest = (questType: QuestType, level: number): string => {
 const getInitialSkills = (): Skill[] => [{ name: "太祖长拳", type: 'attack', level: 1, exp: 0, maxExp: 100, desc: "江湖流传最广的入门拳法" }];
 const getInitialLifeSkills = (): Skill[] => [{ name: "包扎", type: 'medical', level: 1, exp: 0, maxExp: 100, desc: "简单的伤口处理" }];
 
-// ⚠️ 核心修改：优化的 NPC 生成逻辑 (带保底)
 const generateVisitors = (): Companion[] => {
   const visitors: Companion[] = [];
   const tiers: Quality[] = [];
 
-  // 1. 先生成 5 个稀有度池
+  // 1. 生成稀有度池
   for (let i = 0; i < 5; i++) {
     const rand = Math.random();
     let tier: Quality = 'common';
-    // 概率调整：传说 2%, 史诗 8%, 稀有 25%, 普通 65%
     if (rand < 0.02) tier = 'legendary';
     else if (rand < 0.10) tier = 'epic';
     else if (rand < 0.35) tier = 'rare';
@@ -49,18 +47,19 @@ const generateVisitors = (): Companion[] => {
     tiers.push(tier);
   }
 
-  // 2. 保底检查：如果全是普通，强制升级一个
-  const isAllCommon = tiers.every(t => t === 'common');
-  if (isAllCommon) {
-    const luckyIndex = Math.floor(Math.random() * 5); // 随机选一个倒霉蛋变成幸运儿
+  // 2. 保底检查 (⚠️ 修复点：使用 filter.length 替代 every，避免 TS 类型过度收窄报错)
+  const commonCount = tiers.filter(t => t === 'common').length;
+  
+  if (commonCount === 5) {
+    const luckyIndex = Math.floor(Math.random() * 5);
     const pityRoll = Math.random();
-    // 保底池：10% 传说, 30% 史诗, 60% 稀有 (绝不会是普通)
+    // 强制修改数组中的元素，此时 TS 不会报错，因为 tiers 类型仍被视为 Quality[]
     if (pityRoll < 0.1) tiers[luckyIndex] = 'legendary';
     else if (pityRoll < 0.4) tiers[luckyIndex] = 'epic';
     else tiers[luckyIndex] = 'rare';
   }
 
-  // 3. 根据稀有度生成具体数据
+  // 3. 生成具体数据
   tiers.forEach((tier, i) => {
     const templates = NPC_ARCHETYPES[tier];
     const template = templates[Math.floor(Math.random() * templates.length)];
@@ -68,9 +67,7 @@ const generateVisitors = (): Companion[] => {
     const lastName = NPC_NAMES_LAST[Math.floor(Math.random() * NPC_NAMES_LAST.length)];
     const trait = NPC_TRAITS[Math.floor(Math.random() * NPC_TRAITS.length)];
     
-    // 价格体系
     const priceMap = { common: 200, rare: 1000, epic: 5000, legendary: 20000 };
-    // 属性加成体系
     const buffVal = { common: 5, rare: 15, epic: 30, legendary: 80 };
 
     visitors.push({
@@ -92,10 +89,7 @@ const generateVisitors = (): Companion[] => {
 const rollLoot = (level: number, luck: number): Partial<Item> | null => {
     const validItems = LOOT_TABLE.filter(i => (i.minLevel || 1) <= level);
     if (validItems.length === 0) return null;
-    
-    // 幸运值影响掉落 (每点 luck 增加 0.5% 的高稀有度偏移)
     const rand = Math.random() * 100 - (luck * 0.5);
-    
     let targetQuality: Quality = 'common';
     if (rand < 2) targetQuality = 'legendary';
     else if (rand < 10) targetQuality = 'epic';
@@ -115,7 +109,6 @@ export function useGame() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // 引用最新状态
   const heroRef = useRef<HeroState | null>(null);
   const recentLogsRef = useRef<string[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -125,7 +118,6 @@ export function useGame() {
     heroRef.current = hero;
   }, [hero]);
 
-  // --- 登录 ---
   const login = async (name: string, password: string) => {
     setLoading(true); setError(null);
     const initialQuest = { name: "初出茅庐", type: "life" as QuestType, desc: "熟悉环境", progress: 0, total: 100 };
@@ -134,12 +126,10 @@ export function useGame() {
       name, level: 1, gender: Math.random() > 0.5 ? '男' : '女', age: 16, 
       personality: PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)], 
       title: "初出茅庐", motto: "莫欺少年穷", godPower: 100, unlockedFeatures: [], 
-      pet: null, 
-      storyStage: "初出茅庐",
+      pet: null, storyStage: "初出茅庐",
       attributes: { constitution: 10, strength: 10, dexterity: 10, intelligence: 10, luck: 10 },
-      hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 200, // 初始金币给够招募普通伙伴
-      alignment: 0,
-      location: "牛家村", state: 'idle', 
+      hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 200, 
+      alignment: 0, location: "牛家村", state: 'idle', 
       logs: [], messages: [], majorEvents: [`${new Date().toLocaleDateString()}：${name} 踏入江湖。`],
       inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
@@ -169,7 +159,6 @@ export function useGame() {
     setLoading(false);
   };
 
-  // --- 自动保存 ---
   useEffect(() => {
     if (!hero || !supabase) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -311,7 +300,6 @@ export function useGame() {
         
         const q = generateQuest();
         newQuest = q;
-        
         const targetLoc = getLocationByQuest(q.type, currentHero.level);
         newLocation = targetLoc;
 
