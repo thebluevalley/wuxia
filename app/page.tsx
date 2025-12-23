@@ -5,11 +5,9 @@ import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Foot
 import { ItemType, Quality } from '@/app/lib/constants';
 
 export default function Home() {
-  // ⚠️ 引入 refreshTavern 和 hireCompanion
   const { hero, login, godAction, loading, error, clearError, refreshTavern, hireCompanion } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
-  // ⚠️ 状态定义包含 'tavern'
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'equip' | 'messages' | 'tavern'>('logs');
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -17,12 +15,23 @@ export default function Home() {
     if (activeTab === 'logs') bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [hero?.logs, activeTab]);
 
+  // ⚠️ 核心修改 1：更新文本颜色辅助函数，使用鲜艳的 RPG 标准色
   const getQualityColor = (q: Quality) => {
     switch (q) {
-      case 'legendary': return 'text-orange-900 font-bold';
-      case 'epic': return 'text-stone-900 font-bold';
-      case 'rare': return 'text-stone-700 font-bold';
-      default: return 'text-stone-600';
+      case 'legendary': return 'text-orange-600 font-bold'; // 传说：橙色
+      case 'epic': return 'text-purple-600 font-bold';      // 史诗：紫色
+      case 'rare': return 'text-blue-600 font-bold';        // 稀有：蓝色
+      default: return 'text-stone-600 font-medium';         // 普通：深灰色
+    }
+  };
+
+  // ⚠️ 核心修改 2：新增徽章背景色辅助函数（用于酒馆）
+  const getQualityBadgeClass = (q: Quality) => {
+    switch (q) {
+      case 'legendary': return 'bg-orange-50 text-orange-600 border-orange-200';
+      case 'epic': return 'bg-purple-50 text-purple-600 border-purple-200';
+      case 'rare': return 'bg-blue-50 text-blue-600 border-blue-200';
+      default: return 'bg-stone-50 text-stone-500 border-stone-200';
     }
   };
 
@@ -131,7 +140,6 @@ export default function Home() {
         )}
       </div>
       
-      {/* 伙伴显示 */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100 relative overflow-hidden">
         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><UserPlus size={16}/> 随行伙伴</h3>
         {hero.companion ? (
@@ -140,7 +148,8 @@ export default function Home() {
                  {getJobIcon(hero.companion.archetype)}
               </div>
               <div className="flex-1 min-w-0">
-                 <div className="font-bold text-stone-800 truncate">{hero.companion.title} <span className="text-xs font-normal text-stone-500">| {hero.companion.name}</span></div>
+                 {/* ⚠️ 伙伴名字应用彩色 */}
+                 <div className={`truncate ${getQualityColor(hero.companion.quality)}`}>{hero.companion.title} <span className="text-xs font-normal text-stone-500">| {hero.companion.name}</span></div>
                  <div className="text-xs text-stone-500 mb-2 truncate">性格：{hero.companion.personality}</div>
                  <div className="text-[10px] text-stone-400 bg-stone-50 p-2 rounded leading-relaxed italic">"{hero.companion.desc}"</div>
                  <div className="mt-2 text-[10px] text-amber-700 flex items-center gap-1"><Info size={10}/> 羁绊剩余: {Math.max(0, Math.floor((hero.companionExpiry - Date.now()) / (1000 * 60 * 60)))} 小时</div>
@@ -177,11 +186,15 @@ export default function Home() {
 
   const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
 
-  const BagView = () => (<div className="p-4 h-full overflow-y-auto"><h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3><div className="space-y-2">{hero.inventory.map((item,i)=><div key={i} className="bg-white border border-stone-100 p-3 rounded flex justify-between"><span className={`font-bold text-sm ${getQualityColor(item.quality)}`}>{item.name}</span><div className="text-right"><span className="text-xs text-stone-400 block">x{item.count}</span><span className="text-[10px] bg-stone-100 px-1 rounded text-stone-500">价{item.price}</span></div></div>)}</div></div>);
-  const EquipView = () => { const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; return (<div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className={`font-bold text-sm ${getQualityColor(item.quality)}`}>{item.name}</div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>);};
+  // ⚠️ 行囊物品应用彩色
+  const BagView = () => (<div className="p-4 h-full overflow-y-auto"><h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3><div className="space-y-2">{hero.inventory.map((item,i)=><div key={i} className="bg-white border border-stone-100 p-3 rounded flex justify-between"><span className={`text-sm ${getQualityColor(item.quality)}`}>{item.name}</span><div className="text-right"><span className="text-xs text-stone-400 block">x{item.count}</span><span className="text-[10px] bg-stone-100 px-1 rounded text-stone-500">价{item.price}</span></div></div>)}</div></div>);
+  
+  // ⚠️ 装备应用彩色
+  const EquipView = () => { const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; return (<div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className={`text-sm ${getQualityColor(item.quality)}`}>{item.name}</div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>);};
+  
   const MessagesView = () => { const rumors = hero.messages.filter(m => m.type === 'rumor'); const systems = hero.messages.filter(m => m.type === 'system'); return (<div className="p-4 h-full overflow-y-auto space-y-6"><div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><MessageSquare size={16}/> 江湖风声</h3>{rumors.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无风声</div> : <div className="space-y-3">{rumors.map((msg)=><div key={msg.id} className="bg-amber-50 border border-amber-100 p-3 rounded-lg shadow-sm"><div className="flex justify-between items-start mb-1"><div className="font-bold text-amber-900 text-sm">{msg.title}</div><div className="text-[10px] text-amber-400">{msg.time}</div></div><div className="text-xs text-amber-800 leading-relaxed text-justify">{msg.content}</div></div>)}</div>}</div><div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><Info size={16}/> 系统记录</h3>{systems.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无记录</div> : <div className="bg-white border border-stone-100 rounded-lg overflow-hidden">{systems.map((msg,i)=><div key={msg.id} className={`p-3 border-b border-stone-50 last:border-0 ${i%2===0?'bg-white':'bg-stone-50/50'}`}><div className="flex justify-between mb-1"><span className="font-bold text-stone-700 text-xs">{msg.title}</span><span className="text-[10px] text-stone-400">{msg.time}</span></div><div className="text-xs text-stone-500">{msg.content}</div></div>)}</div>}</div></div>);};
 
-  // ⚠️ 修复：酒馆视图，使用黑白图标
+  // ⚠️ 核心修改 3：酒馆视图应用彩色徽章和名字
   const TavernView = () => (
     <div className="p-4 h-full overflow-y-auto">
        <div className="flex justify-between items-center mb-6 px-1">
@@ -199,17 +212,19 @@ export default function Home() {
 
        <div className="space-y-4">
           {hero.tavern.visitors.map((visitor) => (
-             <div key={visitor.id} className="bg-white border border-stone-200 p-4 rounded-xl shadow-sm relative overflow-hidden group hover:border-stone-400 transition-colors">
-                <div className={`absolute top-0 right-0 px-2 py-1 text-[9px] font-bold rounded-bl-lg bg-stone-100 text-stone-500`}>
+             <div key={visitor.id} className={`bg-white border p-4 rounded-xl shadow-sm relative overflow-hidden group transition-all hover:shadow-md ${getQualityBadgeClass(visitor.quality).replace('bg-', 'border-').replace('text-', 'hover:border-')}`}>
+                {/* 彩色稀有度徽章 */}
+                <div className={`absolute top-0 right-0 px-2 py-1 text-[9px] font-bold rounded-bl-lg border-b border-l ${getQualityBadgeClass(visitor.quality)}`}>
                    {visitor.quality.toUpperCase()}
                 </div>
                 
-                <div className="flex gap-4">
-                   <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center border border-stone-200 shrink-0">
+                <div className="flex gap-4 mt-2">
+                   <div className="w-12 h-12 rounded-full bg-stone-50 flex items-center justify-center border border-stone-100 shrink-0">
                       {getJobIcon(visitor.archetype)}
                    </div>
                    <div className="flex-1">
-                      <div className="font-bold text-stone-800 text-sm">{visitor.title}</div>
+                      {/* 彩色名字 */}
+                      <div className={`text-sm ${getQualityColor(visitor.quality)}`}>{visitor.title}</div>
                       <div className="text-xs text-stone-500 mb-1">{visitor.name} <span className="font-serif italic text-stone-400">| {visitor.personality}</span></div>
                       <div className="text-[10px] text-stone-400 mb-3 line-clamp-2">{visitor.desc}</div>
                       
@@ -220,7 +235,7 @@ export default function Home() {
                          <button 
                            onClick={() => hireCompanion(visitor.id)}
                            disabled={!!hero.companion}
-                           className="bg-stone-800 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-stone-600 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                           className={`px-4 py-1.5 rounded text-xs font-bold active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${hero.companion ? 'bg-stone-200 text-stone-500' : 'bg-stone-800 text-white hover:bg-stone-700'}`}
                          >
                             {hero.companion ? '已有伙伴' : `招募 (${visitor.price}文)`}
                          </button>
@@ -248,7 +263,6 @@ export default function Home() {
         {activeTab === 'tavern' && <TavernView />}
       </main>
       
-      {/* ⚠️ 底部导航：包含酒馆 */}
       <nav className="h-16 bg-white border-t border-stone-200 flex justify-around items-center px-1 flex-none z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
          <button onClick={() => setActiveTab('logs')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'logs' ? 'text-stone-800' : 'text-stone-400'}`}>
             <ScrollText size={18} strokeWidth={activeTab === 'logs' ? 2.5 : 2} />
