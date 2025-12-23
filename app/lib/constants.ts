@@ -1,3 +1,4 @@
+// --- 基础类型 ---
 export type ItemType = 'weapon' | 'head' | 'body' | 'legs' | 'feet' | 'accessory' | 'misc' | 'consumable' | 'book';
 export type Quality = 'common' | 'rare' | 'epic' | 'legendary';
 
@@ -52,8 +53,7 @@ export type Quest = {
     twist: string;
   };
 
-  // ⚠️ 核心修复：确保顶层包含 desc 字段
-  desc: string;
+  desc: string; 
 
   stage: QuestStage;
   progress: number; 
@@ -92,12 +92,16 @@ export type HeroState = {
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
   stamina: number; maxStamina: number;
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
+  
   reputation: Record<Faction, number>;
+
   currentQuest: Quest | null;
   queuedQuest: Quest | null;
   questBoard: Quest[];
   lastQuestRefresh: number;
+  
   narrativeHistory: string;
+
   location: string; 
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   logs: LogEntry[]; messages: Message[]; majorEvents: string[];
@@ -108,6 +112,8 @@ export type HeroState = {
 };
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
+
+// --- 静态数据 ---
 
 export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "避世"];
 export const NPC_NAMES_MALE = ["啸天", "无忌", "一刀", "寻欢", "留香", "不败", "求败", "铁手", "无情", "冷血", "小宝", "大侠", "三少", "风", "云", "雷", "电", "靖", "康", "峰", "平", "冲", "过", "伯光", "志平"];
@@ -160,6 +166,9 @@ export const PET_TEMPLATES = [
   { type: "玉蜂", desc: "古墓派驯养，酿造玉蜂浆。" },
   { type: "大黄", desc: "忠诚的中华田园犬，眼神坚毅。" }
 ];
+
+// ⚠️ 核心修复：补回 ARENA_OPPONENTS
+export const ARENA_OPPONENTS = ["少林铜人", "峨眉师太", "全真道士", "丐帮长老", "魔教护法", "隐世扫地僧", "金兵百夫长", "东瀛浪人", "波斯圣女", "西域番僧"];
 
 export const MAP_LOCATIONS = {
   common: ["荒野古道", "龙门客栈", "风陵渡口", "乱葬岗", "悦来客栈"],
