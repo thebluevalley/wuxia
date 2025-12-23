@@ -16,45 +16,57 @@ const getStoryStage = (level: number) => {
   return stage ? stage.name : "初出茅庐";
 };
 
+// ⚠️ 核心新增：标签计算器
+const calculateTags = (hero: HeroState): string[] => {
+  const tags: string[] = [];
+  
+  // 1. 状态类
+  if (hero.hp < hero.maxHp * 0.3) tags.push("重伤");
+  if (hero.stamina < 20) tags.push("疲惫");
+  if (hero.gold > 5000) tags.push("富甲一方");
+  else if (hero.gold < 50) tags.push("穷困潦倒");
+
+  // 2. 装备类
+  if (hero.equipment.weapon?.name.includes("剑")) tags.push("剑客");
+  else if (hero.equipment.weapon?.name.includes("刀")) tags.push("刀客");
+  else if (!hero.equipment.weapon) tags.push("拳师");
+
+  // 3. 物品类
+  const hasAlcohol = hero.inventory.some(i => i.name.includes("酒") || i.name.includes("女儿红"));
+  if (hasAlcohol) tags.push("嗜酒");
+  
+  const hasBook = hero.inventory.some(i => i.type === 'book');
+  if (hasBook || hero.attributes.intelligence > 20) tags.push("书卷气");
+
+  // 4. 行为类 (基于 actionCounts - 暂未深度实现，先给默认)
+  // tags.push("初入江湖");
+
+  return tags;
+};
+
+// ... (Generate Quest / Visitors / Loot functions remain same as previous step)
 const generateQuestBoard = (level: number, stageName: string): Quest[] => {
   const quests: Quest[] = [];
   // @ts-ignore
   const scripts = QUEST_SCRIPTS[stageName] || QUEST_SCRIPTS["default"];
-
   for (let i = 0; i < 3; i++) {
     const isCombat = Math.random() > 0.4;
     const template = scripts[Math.floor(Math.random() * scripts.length)];
-    
     const rand = Math.random();
     let rank: QuestRank = 1;
     if (rand < 0.1) rank = 5; else if (rand < 0.3) rank = 4; else if (rand < 0.6) rank = 3; else rank = 2;
-
     const baseGold = level * 20 + 50;
     const baseExp = level * 50 + 100;
     const multiplier = rank * 1.5;
     const staminaCost = rank * 10;
     const totalProgress = rank * 300; 
-
     quests.push({
       id: Date.now() + i + Math.random().toString(),
       name: `[${rank}星] ${template.title}`,
       category: isCombat ? 'combat' : 'life',
-      rank,
-      faction: template.faction as Faction,
-      script: {
-        title: template.title,
-        description: template.desc,
-        objective: template.obj,
-        antagonist: template.antagonist,
-        twist: template.twist
-      },
-      desc: template.desc,
-      progress: 0, 
-      total: totalProgress,
-      stage: 'start', 
-      reqLevel: Math.max(1, level - 2 + Math.floor(Math.random() * 5)),
-      isAuto: false,
-      staminaCost,
+      rank, faction: template.faction as Faction,
+      script: { title: template.title, description: template.desc, objective: template.obj, antagonist: template.antagonist, twist: template.twist },
+      desc: template.desc, progress: 0, total: totalProgress, stage: 'start', reqLevel: Math.max(1, level - 2 + Math.floor(Math.random() * 5)), isAuto: false, staminaCost,
       rewards: { gold: Math.floor(baseGold * multiplier), exp: Math.floor(baseExp * multiplier) }
     });
   }
@@ -62,17 +74,7 @@ const generateQuestBoard = (level: number, stageName: string): Quest[] => {
 };
 
 const generateFillerQuest = (level: number, stageName: string): Quest => {
-  return {
-    id: 'auto_' + Date.now(),
-    name: "闲逛",
-    category: 'life',
-    rank: 1,
-    faction: 'neutral',
-    script: { title: "闲逛", description: "无事发生", objective: "消磨时间", antagonist: "无", twist: "无" },
-    desc: "日常琐事...",
-    progress: 0, total: 200, reqLevel: 1, stage: 'start', isAuto: true, staminaCost: 5, 
-    rewards: { gold: level * 5 + 10, exp: level * 10 + 20 }
-  };
+  return { id: 'auto_' + Date.now(), name: "闲逛", category: 'life', rank: 1, faction: 'neutral', script: { title: "闲逛", description: "无事发生", objective: "消磨时间", antagonist: "无", twist: "无" }, desc: "日常琐事...", progress: 0, total: 200, reqLevel: 1, stage: 'start', isAuto: true, staminaCost: 5, rewards: { gold: level * 5 + 10, exp: level * 10 + 20 } };
 };
 
 const getLocationByQuest = (questType: QuestType, level: number): string => {
@@ -87,21 +89,11 @@ const getInitialLifeSkills = (): Skill[] => [{ name: "包扎", type: 'medical', 
 const generateVisitors = (): Companion[] => {
   const visitors: Companion[] = [];
   const tiers: Quality[] = [];
-  for (let i = 0; i < 5; i++) {
-    const rand = Math.random();
-    let tier: Quality = 'common';
-    if (rand < 0.02) tier = 'legendary'; else if (rand < 0.10) tier = 'epic'; else if (rand < 0.35) tier = 'rare'; else tier = 'common';
-    tiers.push(tier);
-  }
+  for (let i = 0; i < 5; i++) { const rand = Math.random(); let tier: Quality = 'common'; if (rand < 0.02) tier = 'legendary'; else if (rand < 0.10) tier = 'epic'; else if (rand < 0.35) tier = 'rare'; else tier = 'common'; tiers.push(tier); }
   const commonCount = tiers.filter(t => t === 'common').length;
-  if (commonCount === 5) {
-    const luckyIndex = Math.floor(Math.random() * 5);
-    const pityRoll = Math.random();
-    if (pityRoll < 0.1) tiers[luckyIndex] = 'legendary'; else if (pityRoll < 0.4) tiers[luckyIndex] = 'epic'; else tiers[luckyIndex] = 'rare';
-  }
+  if (commonCount === 5) { const luckyIndex = Math.floor(Math.random() * 5); const pityRoll = Math.random(); if (pityRoll < 0.1) tiers[luckyIndex] = 'legendary'; else if (pityRoll < 0.4) tiers[luckyIndex] = 'epic'; else tiers[luckyIndex] = 'rare'; }
   tiers.forEach((tier, i) => {
-    const templates = NPC_ARCHETYPES[tier];
-    const template = templates[Math.floor(Math.random() * templates.length)];
+    const templates = NPC_ARCHETYPES[tier]; const template = templates[Math.floor(Math.random() * templates.length)];
     let gender: '男' | '女' = Math.random() > 0.5 ? '男' : '女';
     if (template.job.includes('女') || template.job.includes('花')) gender = '女';
     if (template.job.includes('僧') || template.job.includes('少')) gender = '男';
@@ -163,7 +155,9 @@ export function useGame() {
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0,
       reputation: { throne: 0, sect: 0, underworld: 0, cult: 0, neutral: 0 },
-      narrativeHistory: "初入江湖，一切未卜。"
+      narrativeHistory: "初入江湖，一切未卜。",
+      tags: ["初出茅庐"], // 初始标签
+      actionCounts: {}
     };
 
     if (!supabase) { setHero(newHero); setLoading(false); setTimeout(() => triggerAI('start_game', undefined, undefined, newHero), 500); return; }
@@ -178,6 +172,9 @@ export function useGame() {
         if (!mergedData.lastQuestRefresh) mergedData.lastQuestRefresh = Date.now();
         if (mergedData.stamina === undefined) { mergedData.stamina = 120; mergedData.maxStamina = 120; }
         if (!mergedData.narrativeHistory) mergedData.narrativeHistory = "江湖路远，重新启程。";
+        if (!mergedData.tags) mergedData.tags = ["回归江湖"];
+        if (!mergedData.actionCounts) mergedData.actionCounts = {};
+        
         setHero(mergedData);
         setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
       } else {
@@ -237,11 +234,6 @@ export function useGame() {
     triggerAI("recruit_companion", "", "recruit", { ...hero, companion: visitor });
   };
 
-  const refreshTavernInternal = (force: boolean = false) => {
-    setHero(prev => { if (!prev) return null; return { ...prev, tavern: { visitors: generateVisitors(), lastRefresh: Date.now() } }; });
-    addLog("酒馆里来了一批新客。", "system");
-  };
-
   const triggerAI = async (eventType: string, suffix: string = "", action?: string, explicitHero?: HeroState) => {
     const currentHero = explicitHero || hero;
     if (!currentHero) return false;
@@ -261,7 +253,9 @@ export function useGame() {
         skillInfo: `擅长${bestSkill?.name || '乱拳'}(Lv.${bestSkill?.level || 1})`, 
         narrativeHistory: currentHero.narrativeHistory,
         recentLogs: recentLogsRef.current, 
-        lastLogLen: recentLogsRef.current[0]?.length || 0 
+        lastLogLen: recentLogsRef.current[0]?.length || 0,
+        // ⚠️ 传递标签给 AI
+        tags: currentHero.tags || []
       };
       const res = await fetch('/api/ai', { method: 'POST', body: JSON.stringify({ context, eventType, userAction: action }) });
       if (!res.ok) return false;
@@ -299,6 +293,14 @@ export function useGame() {
     let hero = { ...currentHero };
     const logs: string[] = [];
     let updated = false;
+
+    // 0. Recalculate Tags first (based on current state)
+    const newTags = calculateTags(hero);
+    // Simple check to see if tags changed
+    if (JSON.stringify(newTags) !== JSON.stringify(hero.tags)) {
+        hero.tags = newTags;
+        updated = true;
+    }
 
     hero.inventory.forEach(item => {
       const equipPower = item.power || 0;
@@ -384,7 +386,10 @@ export function useGame() {
          addLog(`【离别】${activeHero.companion.name} 拱手道别：“青山不改，绿水长流！”`, "system");
          setHero(h => h ? { ...h, companion: null } : null);
       }
-      if (Date.now() - activeHero.tavern.lastRefresh > REFRESH_INTERVAL) { refreshTavernInternal(); }
+      if (Date.now() - activeHero.tavern.lastRefresh > REFRESH_INTERVAL) { 
+         setHero(prev => { if (!prev) return null; return { ...prev, tavern: { visitors: generateVisitors(), lastRefresh: Date.now() } }; });
+         addLog("酒馆里来了一批新客。", "system");
+      }
       if (Date.now() - (activeHero.lastQuestRefresh || 0) > QUEST_REFRESH_INTERVAL) {
          const newBoard = generateQuestBoard(activeHero.level, activeHero.storyStage);
          setHero(h => h ? { ...h, questBoard: newBoard, lastQuestRefresh: Date.now() } : null);
@@ -517,6 +522,5 @@ export function useGame() {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [hero?.name]);
 
-  // ⚠️ 核心修复：移除 useItem
   return { hero, login, godAction, loading, error, clearError: () => setError(null), hireCompanion, acceptQuest };
 }

@@ -1,11 +1,10 @@
 'use client';
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
-import { ItemType, Quality, QuestRank } from '@/app/lib/constants';
+import { ScrollText, Zap, MapPin, User, Package, Shield, Sword, Heart, Clover, Wind, Brain, BicepsFlexed, Star, Clock, Battery, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, BookOpen, Quote, HardHat, Shirt, Footprints, Gem } from 'lucide-react';
+import { ItemType, Quality } from '@/app/lib/constants';
 
 export default function Home() {
-  // ⚠️ 核心修复：移除 useItem
   const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
@@ -170,6 +169,17 @@ export default function Home() {
            <div className="text-center flex-1 border-r border-stone-100"><div className="text-xs text-stone-400">善恶</div><div className="font-bold text-stone-700">{hero.alignment}</div></div>
            <div className="text-center flex-1"><div className="text-xs text-stone-400">岁数</div><div className="font-bold text-stone-700">{hero.age}</div></div>
         </div>
+        
+        {/* ⚠️ 新增：江湖风评 (标签展示) */}
+        <div className="mb-4">
+           <div className="text-xs text-stone-400 mb-1">江湖风评</div>
+           <div className="flex flex-wrap gap-2">
+             {hero.tags && hero.tags.length > 0 ? hero.tags.map((tag, i) => (
+                <span key={i} className="text-[10px] bg-stone-100 text-stone-600 px-2 py-1 rounded border border-stone-200">{tag}</span>
+             )) : <span className="text-[10px] text-stone-300 italic">暂无评价</span>}
+           </div>
+        </div>
+
         {hero.unlockedFeatures.includes('motto') && (
            <div className="mt-4 p-3 bg-stone-50 rounded border border-stone-100 relative"><Quote size={12} className="absolute top-2 left-2 text-stone-300"/><div className="text-center text-sm font-serif italic text-stone-600">“{hero.motto}”</div></div>
         )}
@@ -218,7 +228,6 @@ export default function Home() {
 
   const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
 
-  // ⚠️ 移除手动使用按钮
   const BagView = () => (
     <div className="p-4 h-full overflow-y-auto">
       <div className="flex justify-between items-center mb-4 px-2">
@@ -270,7 +279,6 @@ export default function Home() {
                        </div>
                        <div className="flex gap-0.5 text-stone-300">{[...Array(quest.rank)].map((_, i) => <Star key={i} size={8} fill="currentColor"/>)}</div>
                     </div>
-                    {/* ⚠️ 使用 quest.desc (现在定义已修复) */}
                     <div className="text-[10px] text-stone-400 mb-2">{quest.desc}</div>
                     <div className="flex justify-between items-center border-t border-stone-50 pt-2">
                        <div className="text-[10px] text-stone-500 font-mono flex items-center gap-2">

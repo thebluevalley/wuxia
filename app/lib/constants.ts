@@ -1,4 +1,3 @@
-// --- 基础类型 ---
 export type ItemType = 'weapon' | 'head' | 'body' | 'legs' | 'feet' | 'accessory' | 'misc' | 'consumable' | 'book';
 export type Quality = 'common' | 'rare' | 'epic' | 'legendary';
 
@@ -44,7 +43,6 @@ export type Quest = {
   category: QuestCategory; 
   rank: QuestRank;
   faction: Faction;
-  
   script: {
     title: string;
     description: string;
@@ -52,9 +50,7 @@ export type Quest = {
     antagonist: string;
     twist: string;
   };
-
   desc: string; 
-
   stage: QuestStage;
   progress: number; 
   total: number;
@@ -92,16 +88,17 @@ export type HeroState = {
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
   stamina: number; maxStamina: number;
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
-  
   reputation: Record<Faction, number>;
+  
+  // ⚠️ 核心新增：标签系统
+  tags: string[]; // 当前生效的标签（如：[嗜酒], [重伤], [富甲一方]）
+  actionCounts: Record<string, number>; // 隐性计数器（如：{ used_poison: 10, killed_innocent: 1 }）
 
   currentQuest: Quest | null;
   queuedQuest: Quest | null;
   questBoard: Quest[];
   lastQuestRefresh: number;
-  
   narrativeHistory: string;
-
   location: string; 
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   logs: LogEntry[]; messages: Message[]; majorEvents: string[];
@@ -114,7 +111,6 @@ export type HeroState = {
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
 // --- 静态数据 ---
-
 export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "避世"];
 export const NPC_NAMES_MALE = ["啸天", "无忌", "一刀", "寻欢", "留香", "不败", "求败", "铁手", "无情", "冷血", "小宝", "大侠", "三少", "风", "云", "雷", "电", "靖", "康", "峰", "平", "冲", "过", "伯光", "志平"];
 export const NPC_NAMES_FEMALE = ["语嫣", "灵珊", "盈盈", "莫愁", "芷若", "敏", "蓉", "念慈", "双", "素素", "药师", "凤凰", "不悔", "襄", "芙", "龙女", "铁心", "无双", "红药", "师师"];
@@ -167,7 +163,6 @@ export const PET_TEMPLATES = [
   { type: "大黄", desc: "忠诚的中华田园犬，眼神坚毅。" }
 ];
 
-// ⚠️ 核心修复：补回 ARENA_OPPONENTS
 export const ARENA_OPPONENTS = ["少林铜人", "峨眉师太", "全真道士", "丐帮长老", "魔教护法", "隐世扫地僧", "金兵百夫长", "东瀛浪人", "波斯圣女", "西域番僧"];
 
 export const MAP_LOCATIONS = {
@@ -227,6 +222,7 @@ export const QUEST_SOURCES = {
 };
 
 export const LOOT_TABLE: Partial<Item>[] = [
+  // (保持原有的丰富物品库，此处省略以节省篇幅，但请保留全部内容)
   { name: "半个冷馒头", type: 'consumable', desc: "干硬难咽，聊胜于无。", price: 1, minLevel: 1, quality: 'common', effect: 10 }, 
   { name: "女儿红", type: 'consumable', desc: "陈年好酒，回血并增加豪气。", price: 20, minLevel: 10, quality: 'common', effect: 50 },
   { name: "金疮药", type: 'consumable', desc: "江湖常备跌打药。", price: 50, minLevel: 15, quality: 'common', effect: 100 },
