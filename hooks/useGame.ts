@@ -9,8 +9,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 3 * 60 * 60 * 1000; 
 const QUEST_REFRESH_INTERVAL = 6 * 60 * 60 * 1000; 
 
-// --- 辅助函数 ---
-// (保留所有辅助函数逻辑不变)
+// --- 辅助函数 (保持不变) ---
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "私生子";
@@ -134,7 +133,6 @@ export function useGame() {
 
   useEffect(() => { heroRef.current = hero; }, [hero]);
 
-  // Login ... (Same as before)
   const login = async (name: string, password: string) => {
     setLoading(true); setError(null);
     const initialStage = "私生子";
@@ -149,7 +147,8 @@ export function useGame() {
       stamina: 120, maxStamina: 120,
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 200, 
       alignment: 0, location: "临冬城", state: 'idle', 
-      logs: [{ id: "init", text: "北境的寒风凛冽，你裹紧了破旧的斗篷，望着灰暗的天空，心中知道——凛冬将至。", type: "highlight", time: "00:00" }], 
+      // ⚠️ 核心调整：更有文学性的初始文本，作为引子
+      logs: [{ id: "init", text: "寒风如剃刀般刮过面颊，这片被旧神遗忘的土地上，每个人都只是凛冬将至前的一粒尘埃。", type: "highlight", time: "00:00" }], 
       messages: [], majorEvents: [`${new Date().toLocaleDateString()}：${name} 踏入维斯特洛。`],
       inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
@@ -173,8 +172,9 @@ export function useGame() {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
         if (!mergedData.equipmentDescription) mergedData.equipmentDescription = "衣着朴素。";
+        // 确保老存档也有引子
         if (!mergedData.logs || mergedData.logs.length === 0) {
-            mergedData.logs = [{ id: "init_resume", text: "你从沉睡中醒来，周围的一切既熟悉又陌生。战乱的硝烟似乎从未散去。", type: "highlight", time: "08:00" }];
+            mergedData.logs = [{ id: "init_resume", text: "你从沉睡中惊醒，梦中那些关于龙与冰雪的呓语仍在耳边回荡。", type: "highlight", time: "08:00" }];
         }
         
         setHero(mergedData);
@@ -284,7 +284,10 @@ export function useGame() {
         }
         return true;
       }
-    } catch (e) { console.error(e); addLog("风雪太大了，你看不清前方的路，只能暂时在原地休整。", "highlight"); }
+    } catch (e) { 
+        console.error(e); 
+        addLog("风雪太大了，你看不清前方的路，只能暂时在原地休整。", "highlight");
+    }
     return false;
   };
 
@@ -463,7 +466,7 @@ export function useGame() {
          }
       }
 
-      // ⚠️ 核心修改：大幅提高事件触发概率 (95%)
+      // ⚠️ 核心：频率和触发逻辑
       if (aiEvent) {
          setHero(managedHero);
          await triggerAI(aiEvent);
@@ -479,7 +482,6 @@ export function useGame() {
          setHero(managedHero);
       }
       
-      // ⚠️ 心跳时间：15s - 25s (给足阅读时间)
       const nextTick = Math.floor(Math.random() * (25000 - 15000) + 15000); 
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
