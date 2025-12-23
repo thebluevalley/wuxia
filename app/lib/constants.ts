@@ -24,7 +24,7 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-// ⚠️ 核心新增：势力体系
+// ⚠️ 势力体系
 export type Faction = 'throne' | 'sect' | 'underworld' | 'cult' | 'neutral';
 export const FACTIONS: Record<Faction, string> = {
   throne: "朝廷六扇门",
@@ -34,28 +34,30 @@ export const FACTIONS: Record<Faction, string> = {
   neutral: "市井江湖"
 };
 
-// ⚠️ 核心新增：剧本结构
+// ⚠️ 任务相关定义
 export type QuestCategory = 'combat' | 'life';
 export type QuestRank = 1 | 2 | 3 | 4 | 5;
-export type QuestStage = 'start' | 'road' | 'climax' | 'end'; // 任务的四个叙事阶段
+export type QuestStage = 'start' | 'road' | 'climax' | 'end'; 
+
+// ⚠️ 补回丢失的 QuestType，用于地图定位逻辑
+export type QuestType = 'search' | 'hunt' | 'challenge' | 'train' | 'life';
 
 export type Quest = { 
   id: string;
   name: string; 
   category: QuestCategory; 
   rank: QuestRank;
-  faction: Faction; // 委托势力
+  faction: Faction;
   
-  // 剧本上下文 (AI 依据此生成)
   script: {
-    title: string;       // 剧本名，如《风雪山神庙》
-    description: string; // 悬赏榜显示的文案
-    objective: string;   // 核心目标
-    antagonist: string;  // 对立面 (人或环境)
-    twist: string;       // 转折点/高潮事件
+    title: string;
+    description: string;
+    objective: string;
+    antagonist: string;
+    twist: string;
   };
 
-  stage: QuestStage; // 当前所处阶段
+  stage: QuestStage;
   progress: number; 
   total: number;
   reqLevel: number;
@@ -93,7 +95,6 @@ export type HeroState = {
   stamina: number; maxStamina: number;
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
   
-  // 势力声望
   reputation: Record<Faction, number>;
 
   currentQuest: Quest | null;
@@ -101,7 +102,6 @@ export type HeroState = {
   questBoard: Quest[];
   lastQuestRefresh: number;
   
-  // ⚠️ 记忆链：记录上一段剧情摘要，用于保持连贯性
   narrativeHistory: string;
 
   location: string; 
@@ -195,14 +195,13 @@ export const STORY_STAGES = [
   { level: 100, name: "破碎虚空", desc: "羽化登仙，留下传说" }
 ];
 
-// ⚠️ 核心新增：风味文本库 (AI 强制使用，增加文学性)
 export const FLAVOR_TEXTS = {
   environment: ["残阳如血", "枯藤老树", "大雪纷飞", "夜凉如水", "黄沙漫天", "竹林听雨", "断壁残垣"],
   action: ["拔剑出鞘", "屏息凝神", "快马加鞭", "拂袖而去", "仰天长啸", "温酒斩将"],
   object: ["锈迹斑斑的铁剑", "半块玉佩", "染血的书信", "酒旗", "孤灯", "寒鸦"]
 };
 
-// ⚠️ 核心新增：剧本模板 (不再是简单的字符串，而是结构化对象)
+// 剧本库
 export const QUEST_SCRIPTS = {
   "初出茅庐": [
     { title: "偷鸡贼的末路", desc: "王大妈的鸡丢了，据说后山有野狗出没。", obj: "找回丢失的老母鸡", antagonist: "成精的野狗", twist: "野狗嘴里叼着的竟是一块官银", faction: 'neutral' },
@@ -212,14 +211,24 @@ export const QUEST_SCRIPTS = {
     { title: "黑风寨的秘密", desc: "官府悬赏黑风寨大当家的首级。", obj: "刺杀大当家", antagonist: "黑风寨主", twist: "大当家其实是朝廷的卧底", faction: 'throne' },
     { title: "古墓惊魂", desc: "据说古墓中有前朝遗宝。", obj: "探索古墓", antagonist: "守墓机关", twist: "宝箱里只有一封情书", faction: 'sect' }
   ],
-  // ... 其他境界的剧本可继续扩展
   "default": [
     { title: "江湖琐事", desc: "有人需要帮忙。", obj: "解决麻烦", antagonist: "未知的阻碍", twist: "事情并没有那么简单", faction: 'neutral' }
   ]
 };
 
+// ⚠️ 确保这个被导出
+export const WORLD_LORE = `
+背景：王朝末年，乱世江湖。
+势力：听雨楼(情报)、铸剑山庄(神兵)、隐元会(杀手)、丐帮(天下第一帮)。
+体系：内练一口气，外练筋骨皮。武学分外功、内功、轻功。
+`;
+
+// 兼容旧代码
+export const QUEST_SOURCES = {
+  search: ["寻找失传的《易筋经》残卷"], hunt: ["讨伐黑风寨"], challenge: ["挑战华山"], train: ["修炼"], life: ["打杂"]
+};
+
 export const LOOT_TABLE: Partial<Item>[] = [
-  // ... (保持之前的物品列表不变，太长略去，请保留原有的物品定义) ...
   { name: "半个冷馒头", type: 'consumable', desc: "干硬难咽，聊胜于无。", price: 1, minLevel: 1, quality: 'common', effect: 10 }, 
   { name: "女儿红", type: 'consumable', desc: "陈年好酒，回血并增加豪气。", price: 20, minLevel: 10, quality: 'common', effect: 50 },
   { name: "金疮药", type: 'consumable', desc: "江湖常备跌打药。", price: 50, minLevel: 15, quality: 'common', effect: 100 },

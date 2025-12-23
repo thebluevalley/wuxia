@@ -16,7 +16,6 @@ const getStoryStage = (level: number) => {
   return stage ? stage.name : "初出茅庐";
 };
 
-// ⚠️ 核心修改：基于剧本生成任务
 const generateQuestBoard = (level: number, stageName: string): Quest[] => {
   const quests: Quest[] = [];
   // @ts-ignore
@@ -42,7 +41,6 @@ const generateQuestBoard = (level: number, stageName: string): Quest[] => {
       category: isCombat ? 'combat' : 'life',
       rank,
       faction: template.faction as Faction,
-      // ⚠️ 注入剧本
       script: {
         title: template.title,
         description: template.desc,
@@ -50,10 +48,10 @@ const generateQuestBoard = (level: number, stageName: string): Quest[] => {
         antagonist: template.antagonist,
         twist: template.twist
       },
-      desc: template.desc, // 显示用
+      desc: template.desc,
       progress: 0, 
       total: totalProgress,
-      stage: 'start', // 初始阶段
+      stage: 'start', 
       reqLevel: Math.max(1, level - 2 + Math.floor(Math.random() * 5)),
       isAuto: false,
       staminaCost,
@@ -64,7 +62,6 @@ const generateQuestBoard = (level: number, stageName: string): Quest[] => {
 };
 
 const generateFillerQuest = (level: number, stageName: string): Quest => {
-  // 简单的挂机任务
   return {
     id: 'auto_' + Date.now(),
     name: "闲逛",
@@ -166,7 +163,7 @@ export function useGame() {
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0,
       reputation: { throne: 0, sect: 0, underworld: 0, cult: 0, neutral: 0 },
-      narrativeHistory: "初入江湖，一切未卜。" // 初始化记忆
+      narrativeHistory: "初入江湖，一切未卜。"
     };
 
     if (!supabase) { setHero(newHero); setLoading(false); setTimeout(() => triggerAI('start_game', undefined, undefined, newHero), 500); return; }
@@ -200,10 +197,9 @@ export function useGame() {
   }, [hero]);
 
   const addLog = (text: string, type: LogEntry['type'] = 'normal') => {
-    recentLogsRef.current = [text, ...recentLogsRef.current].slice(0, 3); // 减少日志显示数量
+    recentLogsRef.current = [text, ...recentLogsRef.current].slice(0, 3);
     setHero(prev => {
       if (!prev) return null;
-      // 记忆链更新：将最新日志追加到历史，保持一定长度
       const newHistory = (prev.narrativeHistory + " " + text).slice(-500);
       const newLog = { id: Date.now().toString(), text, type, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}) };
       return { ...prev, logs: [...prev.logs, newLog].slice(-50), narrativeHistory: newHistory };
@@ -257,14 +253,12 @@ export function useGame() {
         ...currentHero, 
         storyStage: getStoryStage(currentHero.level), 
         worldLore: WORLD_LORE, 
-        // ⚠️ 传递剧本信息
         questScript: currentHero.currentQuest?.script,
         questStage: currentHero.currentQuest?.stage,
         questInfo: currentHero.currentQuest ? `[${currentHero.currentQuest.category}] ${currentHero.currentQuest.name}` : "无任务，游历中", 
         petInfo: currentHero.pet ? `灵宠:${currentHero.pet.type}` : "无", 
         companionInfo: companionInfo, 
         skillInfo: `擅长${bestSkill?.name || '乱拳'}(Lv.${bestSkill?.level || 1})`, 
-        // ⚠️ 传递记忆链
         narrativeHistory: currentHero.narrativeHistory,
         recentLogs: recentLogsRef.current, 
         lastLogLen: recentLogsRef.current[0]?.length || 0 
@@ -406,13 +400,11 @@ export function useGame() {
       let expChange = 0;
       let lootItem: Item | null = null;
       let logSuffix = "";
-      let aiEvent: string | null = null; // ⚠️ 记录触发的 AI 事件
+      let aiEvent: string | null = null; 
 
-      // Quest Logic
       if (newQuest) {
-        // 1. Start Phase
         if (newQuest.progress === 0 && newQuest.stage === 'start') {
-           newQuest.stage = 'road'; // 切换到赶路/中期
+           newQuest.stage = 'road';
            aiEvent = 'quest_start';
         }
 
@@ -420,18 +412,15 @@ export function useGame() {
         if (newQuest.category === 'combat') newQuestProgress += Math.floor(activeHero.attributes.strength / 5);
         else newQuestProgress += Math.floor(activeHero.attributes.luck / 5);
 
-        // 2. Middle/Climax Phase (at 50%)
         if (newQuestProgress >= newQuest.total * 0.5 && newQuest.stage === 'road') {
-           newQuest.stage = 'climax'; // 切换到高潮
+           newQuest.stage = 'climax'; 
            aiEvent = 'quest_climax';
         }
 
-        // 3. End Phase (at 100%)
         if (newQuestProgress >= newQuest.total) {
           goldChange += newQuest.rewards.gold;
           expChange += newQuest.rewards.exp;
-          
-          aiEvent = 'quest_end'; // 触发结算 AI
+          aiEvent = 'quest_end'; 
           
           if (queued) {
              const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', activeHero.level);
@@ -439,7 +428,6 @@ export function useGame() {
              queued = null;
              newLocation = targetLoc; 
              newState = newQuest.category === 'combat' ? 'fight' : 'idle';
-             // ⚠️ 不再用 addLog 描述剧情，交给 AI
           } else {
              if (Math.random() < 0.7) {
                newQuest = null; 
@@ -458,7 +446,6 @@ export function useGame() {
          }
       }
 
-      // Random Loot & Combat
       if (activeHero.state !== 'town' && Math.random() < 0.15) {
          const luck = activeHero.attributes.luck + (activeHero.companion?.buff.type === 'luck' ? activeHero.companion.buff.val : 0);
          const loot = rollLoot(activeHero.level, luck);
@@ -514,16 +501,11 @@ export function useGame() {
         return finalH;
       });
 
-      // 4. Trigger AI (Only for meaningful events, NOT random noise)
       if (aiEvent) {
-         // ⚠️ 优先触发剧本节点
          await triggerAI(aiEvent, logSuffix);
       } else if (Math.random() < 0.05) {
-         // 极低概率触发传闻
          await triggerAI('generate_rumor');
       } 
-      // ⚠️ 彻底移除 'auto' 类型的随机生成，防止废话
-      // 如果没有剧本事件，且有掉落物，才显示系统日志
       else if (logSuffix) {
          addLog(logSuffix, 'system');
       }
