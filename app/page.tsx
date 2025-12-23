@@ -2,13 +2,14 @@
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
-import { ItemType, Quality, QuestRank } from '@/app/lib/constants';
+// ⚠️ 核心修复：添加 Item 到导入列表
+import { Item, ItemType, Quality, QuestRank } from '@/app/lib/constants';
 
 export default function Home() {
   const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
-  // ⚠️ 移除 'equip' tab
+  // 移除 'equip' tab
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'messages' | 'tavern'>('logs');
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -159,6 +160,15 @@ export default function Home() {
     </div>
   );
 
+  // ⚠️ 辅助组件：装备槽 (修复了类型问题)
+  const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
+    <div className="flex flex-col items-center bg-white p-2 rounded border border-stone-100">
+       <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${item ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-300'}`}>{icon}</div>
+       <div className="text-[9px] text-stone-400 mb-0.5">{label}</div>
+       <div className={`text-[9px] font-bold truncate max-w-full ${item ? 'text-stone-700' : 'text-stone-300'}`}>{item ? item.name : "空"}</div>
+    </div>
+  );
+
   const HeroView = () => (
     <div className="p-6 overflow-y-auto h-full space-y-6">
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
@@ -185,7 +195,7 @@ export default function Home() {
            </div>
         </div>
 
-        {/* ⚠️ 新增：装备外观描述 + 装备槽位展示 */}
+        {/* 装备外观描述 + 装备槽位展示 */}
         <div className="mb-4 bg-stone-50 p-3 rounded border border-stone-100 relative">
            <div className="absolute top-2 right-2 text-stone-300 opacity-20"><Shield size={48}/></div>
            <div className="text-xs font-bold text-stone-700 mb-2 flex items-center gap-1"><Shirt size={12}/> 穿戴</div>
@@ -249,15 +259,6 @@ export default function Home() {
     </div>
   );
 
-  // ⚠️ 辅助组件：装备槽
-  const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
-    <div className="flex flex-col items-center bg-white p-2 rounded border border-stone-100">
-       <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${item ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-300'}`}>{icon}</div>
-       <div className="text-[9px] text-stone-400 mb-0.5">{label}</div>
-       <div className={`text-[9px] font-bold truncate max-w-full ${item ? 'text-stone-700' : 'text-stone-300'}`}>{item ? item.name : "空"}</div>
-    </div>
-  );
-
   const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
 
   const BagView = () => (
@@ -281,8 +282,6 @@ export default function Home() {
       </div>
     </div>
   );
-
-  // EquipView 已整合到 HeroView 中，此处删除
 
   const MessagesView = () => { 
     const rumors = hero.messages.filter(m => m.type === 'rumor'); 
