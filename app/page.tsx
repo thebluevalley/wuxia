@@ -1,64 +1,55 @@
 'use client';
 import { useGame } from '@/hooks/useGame';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
-import { Item, ItemType, Quality, QuestRank, SkillType } from '@/app/lib/constants';
+import { Item, ItemType, Quality, QuestRank, SkillType, HeroState } from '@/app/lib/constants';
 
-// ⚠️ 核心修复：移除 CSS 动画，增加完成状态检查
+// --- 组件提取区 (防止父组件重渲染导致子组件销毁) ---
+
+// 1. 打字机组件
 const TypewriterText = ({ text, className }: { text: string, className?: string }) => {
   const [displayedText, setDisplayedText] = useState('');
-  const hasCompletedRef = useRef(false); // 标记是否已完成打印
-  
+  // 使用 ref 记录是否已经播放过，防止重播
+  const hasPlayedRef = useRef(false);
+  // 记录上一次的文本，用于检测文本是否真的变更
+  const lastTextRef = useRef(text);
+
   useEffect(() => {
-    // 如果文本没有变化，且已经打印完成，直接跳过
-    // 这防止了组件重渲染时的闪烁
-    if (hasCompletedRef.current && displayedText === text) return;
+    // 如果文本没变且已经播放过，直接显示全文，跳过动画
+    if (text === lastTextRef.current && hasPlayedRef.current) {
+        setDisplayedText(text);
+        return;
+    }
 
-    // 重置状态
+    // 如果文本变了，重置状态
+    if (text !== lastTextRef.current) {
+        hasPlayedRef.current = false;
+        lastTextRef.current = text;
+        setDisplayedText('');
+    }
+
     let index = 0;
-    setDisplayedText(''); 
-    hasCompletedRef.current = false;
-
     const timer = setInterval(() => {
       if (index < text.length) {
         setDisplayedText((prev) => prev + text.charAt(index));
         index++;
       } else {
         clearInterval(timer);
-        hasCompletedRef.current = true; // 标记完成
+        hasPlayedRef.current = true; // 标记完成
       }
-    }, 80); // 80ms 慢速沉浸感
+    }, 80); 
 
     return () => clearInterval(timer);
-  }, [text]); // 仅当 text 内容实质变化时才重置
+  }, [text]);
 
-  // ⚠️ 移除了 animate-in fade-in，防止切换 Tab 时重播动画
   return <span className={className}>{displayedText}</span>;
 };
 
-export default function Home() {
-  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
-  const [inputName, setInputName] = useState('');
-  const [inputPassword, setInputPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'messages' | 'tavern'>('logs');
-  
-  const getQualityColor = (q: Quality) => {
-    switch (q) {
-      case 'legendary': return 'text-orange-900 font-bold';
-      case 'epic': return 'text-purple-800 font-bold';
-      case 'rare': return 'text-blue-700 font-bold';
-      default: return 'text-stone-600';
-    }
-  };
-
-  const getQualityBadgeClass = (q: Quality) => {
-    switch (q) {
-      case 'legendary': return 'bg-orange-50 text-orange-800 border-orange-200';
-      case 'epic': return 'bg-purple-50 text-purple-800 border-purple-200';
-      case 'rare': return 'bg-blue-50 text-blue-800 border-blue-200';
-      default: return 'bg-stone-50 text-stone-500 border-stone-200';
-    }
-  };
+// 2. 头部组件
+const Header = memo(({ hero }: { hero: HeroState }) => {
+  const questPercent = hero.currentQuest 
+    ? Math.min(100, Math.floor((hero.currentQuest.progress / hero.currentQuest.total) * 100)) 
+    : 0;
 
   const getStageColor = (stage: string) => {
     switch (stage) {
@@ -71,47 +62,7 @@ export default function Home() {
     }
   };
 
-  const getJobIcon = (job: string) => {
-    if (!job) return <User size={24} className="text-stone-800"/>;
-    if (job.includes('剑') || job.includes('骑士') || job.includes('刺客') || job.includes('卫兵')) return <Sword size={24} className="text-stone-800"/>;
-    if (job.includes('守夜人') || job.includes('铁卫')) return <Shield size={24} className="text-stone-800"/>;
-    if (job.includes('学士') || job.includes('祭司')) return <BookOpen size={24} className="text-stone-800"/>;
-    return <ScrollText size={24} className="text-stone-800"/>;
-  };
-
-  const getSkillLabel = (type: SkillType) => {
-    switch (type) {
-        case 'combat': return '战技';
-        case 'intrigue': return '权谋';
-        case 'survival': return '求生';
-        case 'knowledge': return '学识';
-        case 'command': return '统帅';
-        default: return '技能';
-    }
-  };
-
-  if (!hero) {
-    return (
-       <div className="flex h-[100dvh] flex-col items-center justify-center bg-[#fcf9f2] text-stone-800 p-6 relative overflow-hidden">
-        <div className="z-10 flex flex-col items-center w-full max-w-xs">
-          <div className="w-20 h-20 border-4 border-stone-800 rounded-full flex items-center justify-center mb-6 shadow-lg bg-white"><span className="font-serif text-4xl font-bold">权</span></div>
-          <h1 className="text-2xl font-serif font-bold mb-8 tracking-[0.2em] text-stone-900 text-center">凡人皆有一死<br/><span className="text-xs font-normal text-stone-500 tracking-normal">Valar Morghulis</span></h1>
-          <div className="flex flex-col gap-4 w-full">
-            <input type="text" placeholder="家族姓氏 / 名字" className="w-full bg-white/50 border-b-2 border-stone-300 p-3 text-center text-lg outline-none focus:border-stone-800 transition-colors font-serif placeholder:text-stone-400 rounded-t" value={inputName} onChange={e => {setInputName(e.target.value); clearError();}} />
-            <input type="password" placeholder="密语" className="w-full bg-white/50 border-b-2 border-stone-300 p-3 text-center text-lg outline-none focus:border-stone-800 transition-colors font-serif placeholder:text-stone-400 rounded-b" value={inputPassword} onChange={e => {setInputPassword(e.target.value); clearError();}} />
-          </div>
-          {error && <div className="text-red-600 text-xs mt-3 bg-red-50 px-2 py-1 rounded border border-red-200">{error}</div>}
-          <button onClick={() => inputName && inputPassword && login(inputName, inputPassword)} disabled={loading || !inputName || !inputPassword} className="mt-8 px-10 py-3 bg-stone-800 text-[#fcf9f2] font-serif text-lg rounded shadow-lg hover:bg-stone-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full">{loading ? '正在读取渡鸦传信...' : '加入权力的游戏'}</button>
-        </div>
-      </div>
-    );
-  }
-
-  const questPercent = hero.currentQuest 
-    ? Math.min(100, Math.floor((hero.currentQuest.progress / hero.currentQuest.total) * 100)) 
-    : 0;
-
-  const Header = () => (
+  return (
     <header className="p-4 pb-2 flex-none z-10 bg-[#fcf9f2]/90 backdrop-blur-sm border-b border-stone-200">
       <div className="flex justify-between items-start mb-3">
         <div>
@@ -163,11 +114,16 @@ export default function Home() {
       </div>
     </header>
   );
+});
+Header.displayName = 'Header';
 
-  const LogsView = () => (
+// 3. 故事日志组件
+const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type: 'bless'|'punish') => void }) => {
+  return (
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
         {hero.logs.map((log, index) => {
+          // 仅最新的高光日志使用打字机
           const isLatest = index === 0; 
           const isNarrative = log.type === 'highlight';
 
@@ -204,16 +160,63 @@ export default function Home() {
       </div>
     </div>
   );
+});
+LogsView.displayName = 'LogsView';
 
-  const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
+// 4. 辅助：装备槽
+const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
     <div className="flex flex-col items-center bg-white p-2 rounded border border-stone-100">
        <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${item ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-300'}`}>{icon}</div>
        <div className="text-[9px] text-stone-400 mb-0.5">{label}</div>
        <div className={`text-[9px] font-bold truncate max-w-full ${item ? 'text-stone-700' : 'text-stone-300'}`}>{item ? item.name : "空"}</div>
     </div>
-  );
+);
 
-  const HeroView = () => (
+// 5. 辅助：属性行
+const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
+
+// 6. 人物视图
+const HeroView = memo(({ hero }: { hero: HeroState }) => {
+  const getStageColor = (stage: string) => {
+    switch (stage) {
+      case '私生子': return 'text-stone-500 bg-stone-100 border-stone-200';
+      case '侍从': return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+      case '骑士': return 'text-blue-700 bg-blue-50 border-blue-200';
+      case '领主': return 'text-purple-800 bg-purple-50 border-purple-200';
+      case '王者': return 'text-orange-800 bg-orange-50 border-orange-200';
+      default: return 'text-stone-500 bg-stone-100 border-stone-200';
+    }
+  };
+
+  const getQualityColor = (q: Quality) => {
+    switch (q) {
+      case 'legendary': return 'text-orange-900 font-bold';
+      case 'epic': return 'text-purple-800 font-bold';
+      case 'rare': return 'text-blue-700 font-bold';
+      default: return 'text-stone-600';
+    }
+  };
+
+  const getJobIcon = (job: string) => {
+    if (!job) return <User size={24} className="text-stone-800"/>;
+    if (job.includes('剑') || job.includes('骑士') || job.includes('刺客') || job.includes('卫兵')) return <Sword size={24} className="text-stone-800"/>;
+    if (job.includes('守夜人') || job.includes('铁卫')) return <Shield size={24} className="text-stone-800"/>;
+    if (job.includes('学士') || job.includes('祭司')) return <BookOpen size={24} className="text-stone-800"/>;
+    return <ScrollText size={24} className="text-stone-800"/>;
+  };
+
+  const getSkillLabel = (type: SkillType) => {
+    switch (type) {
+        case 'combat': return '战技';
+        case 'intrigue': return '权谋';
+        case 'survival': return '求生';
+        case 'knowledge': return '学识';
+        case 'command': return '统帅';
+        default: return '技能';
+    }
+  };
+
+  return (
     <div className="p-6 overflow-y-auto h-full space-y-6">
       <div className="bg-white p-4 rounded-lg shadow-sm border border-stone-100">
         <h3 className="font-bold text-stone-800 mb-4 flex items-center gap-2"><User size={16}/> 档案</h3>
@@ -299,10 +302,21 @@ export default function Home() {
       </div>
     </div>
   );
+});
+HeroView.displayName = 'HeroView';
 
-  const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
+// 7. 行囊视图
+const BagView = memo(({ hero }: { hero: HeroState }) => {
+  const getQualityColor = (q: Quality) => {
+    switch (q) {
+      case 'legendary': return 'text-orange-900 font-bold';
+      case 'epic': return 'text-purple-800 font-bold';
+      case 'rare': return 'text-blue-700 font-bold';
+      default: return 'text-stone-600';
+    }
+  };
 
-  const BagView = () => (
+  return (
     <div className="p-4 h-full overflow-y-auto">
       <div className="flex justify-between items-center mb-4 px-2">
         <h3 className="font-bold text-stone-800">行囊 ({hero.inventory.length}/20)</h3>
@@ -323,17 +337,48 @@ export default function Home() {
       </div>
     </div>
   );
+});
+BagView.displayName = 'BagView';
 
-  const MessagesView = () => { 
+// 8. 消息视图
+const MessagesView = memo(({ hero }: { hero: HeroState }) => { 
     const rumors = hero.messages.filter(m => m.type === 'rumor'); 
     const systems = hero.messages.filter(m => m.type === 'system'); 
     return (<div className="p-4 h-full overflow-y-auto space-y-6"><div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><MessageSquare size={16}/> 渡鸦传信</h3>{rumors.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无消息</div> : <div className="space-y-3">{rumors.map((msg)=><div key={msg.id} className="bg-amber-50 border border-amber-100 p-3 rounded-lg shadow-sm"><div className="flex justify-between items-start mb-1"><div className="font-bold text-amber-900 text-sm">{msg.title}</div><div className="text-[10px] text-amber-400">{msg.time}</div></div><div className="text-xs text-amber-800 leading-relaxed text-justify">{msg.content}</div></div>)}</div>}</div><div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><Info size={16}/> 学城记录</h3>{systems.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无记录</div> : <div className="bg-white border border-stone-100 rounded-lg overflow-hidden">{systems.map((msg,i)=><div key={msg.id} className={`p-3 border-b border-stone-50 last:border-0 ${i%2===0?'bg-white':'bg-stone-50/50'}`}><div className="flex justify-between mb-1"><span className="font-bold text-stone-700 text-xs">{msg.title}</span><span className="text-[10px] text-stone-400">{msg.time}</span></div><div className="text-xs text-stone-500">{msg.content}</div></div>)}</div>}</div></div>);
-  };
+});
+MessagesView.displayName = 'MessagesView';
 
-  const TavernView = () => {
+// 9. 酒馆视图
+const TavernView = memo(({ hero, hireCompanion, acceptQuest }: { hero: HeroState, hireCompanion: (id: string) => void, acceptQuest: (id: string) => void }) => {
     const refreshTimeLeft = Math.max(0, 6 * 60 * 60 * 1000 - (Date.now() - (hero.lastQuestRefresh || 0)));
     const hours = Math.floor(refreshTimeLeft / (1000 * 60 * 60));
     const mins = Math.floor((refreshTimeLeft % (1000 * 60 * 60)) / (1000 * 60));
+
+    const getQualityColor = (q: Quality) => {
+        switch (q) {
+          case 'legendary': return 'text-orange-900 font-bold';
+          case 'epic': return 'text-purple-800 font-bold';
+          case 'rare': return 'text-blue-700 font-bold';
+          default: return 'text-stone-600';
+        }
+    };
+
+    const getQualityBadgeClass = (q: Quality) => {
+        switch (q) {
+          case 'legendary': return 'bg-orange-50 text-orange-800 border-orange-200';
+          case 'epic': return 'bg-purple-50 text-purple-800 border-purple-200';
+          case 'rare': return 'bg-blue-50 text-blue-800 border-blue-200';
+          default: return 'bg-stone-50 text-stone-500 border-stone-200';
+        }
+    };
+
+    const getJobIcon = (job: string) => {
+        if (!job) return <User size={24} className="text-stone-800"/>;
+        if (job.includes('剑') || job.includes('骑士') || job.includes('刺客') || job.includes('卫兵')) return <Sword size={24} className="text-stone-800"/>;
+        if (job.includes('守夜人') || job.includes('铁卫')) return <Shield size={24} className="text-stone-800"/>;
+        if (job.includes('学士') || job.includes('祭司')) return <BookOpen size={24} className="text-stone-800"/>;
+        return <ScrollText size={24} className="text-stone-800"/>;
+    };
 
     return (
     <div className="p-4 h-full overflow-y-auto">
@@ -387,18 +432,44 @@ export default function Home() {
        </div>
        <div className="text-center text-[10px] text-stone-300 mt-8 mb-4">每3小时有新客到访。</div>
     </div>
-  );};
+  );
+});
+TavernView.displayName = 'TavernView';
+
+// --- 主组件 ---
+
+export default function Home() {
+  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
+  const [inputName, setInputName] = useState('');
+  const [inputPassword, setInputPassword] = useState('');
+  const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'messages' | 'tavern'>('logs');
+
+  if (!hero) {
+    return (
+       <div className="flex h-[100dvh] flex-col items-center justify-center bg-[#fcf9f2] text-stone-800 p-6 relative overflow-hidden">
+        <div className="z-10 flex flex-col items-center w-full max-w-xs">
+          <div className="w-20 h-20 border-4 border-stone-800 rounded-full flex items-center justify-center mb-6 shadow-lg bg-white"><span className="font-serif text-4xl font-bold">权</span></div>
+          <h1 className="text-2xl font-serif font-bold mb-8 tracking-[0.2em] text-stone-900 text-center">凡人皆有一死<br/><span className="text-xs font-normal text-stone-500 tracking-normal">Valar Morghulis</span></h1>
+          <div className="flex flex-col gap-4 w-full">
+            <input type="text" placeholder="家族姓氏 / 名字" className="w-full bg-white/50 border-b-2 border-stone-300 p-3 text-center text-lg outline-none focus:border-stone-800 transition-colors font-serif placeholder:text-stone-400 rounded-t" value={inputName} onChange={e => {setInputName(e.target.value); clearError();}} />
+            <input type="password" placeholder="密语" className="w-full bg-white/50 border-b-2 border-stone-300 p-3 text-center text-lg outline-none focus:border-stone-800 transition-colors font-serif placeholder:text-stone-400 rounded-b" value={inputPassword} onChange={e => {setInputPassword(e.target.value); clearError();}} />
+          </div>
+          {error && <div className="text-red-600 text-xs mt-3 bg-red-50 px-2 py-1 rounded border border-red-200">{error}</div>}
+          <button onClick={() => inputName && inputPassword && login(inputName, inputPassword)} disabled={loading || !inputName || !inputPassword} className="mt-8 px-10 py-3 bg-stone-800 text-[#fcf9f2] font-serif text-lg rounded shadow-lg hover:bg-stone-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full">{loading ? '正在读取渡鸦传信...' : '加入权力的游戏'}</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[100dvh] bg-[#fcf9f2] text-stone-800 font-serif max-w-md mx-auto shadow-2xl relative">
-      <Header />
+      <Header hero={hero} />
       <main className="flex-1 overflow-hidden bg-[#fcf9f2]">
-        {/* ⚠️ 核心修复：使用 CSS hidden 而不是条件渲染，保持组件状态 */}
-        <div className={activeTab === 'logs' ? 'block h-full' : 'hidden'}><LogsView /></div>
-        <div className={activeTab === 'hero' ? 'block h-full' : 'hidden'}><HeroView /></div>
-        <div className={activeTab === 'bag' ? 'block h-full' : 'hidden'}><BagView /></div>
-        <div className={activeTab === 'messages' ? 'block h-full' : 'hidden'}><MessagesView /></div>
-        <div className={activeTab === 'tavern' ? 'block h-full' : 'hidden'}><TavernView /></div>
+        <div className={activeTab === 'logs' ? 'block h-full' : 'hidden'}><LogsView hero={hero} godAction={godAction} /></div>
+        <div className={activeTab === 'hero' ? 'block h-full' : 'hidden'}><HeroView hero={hero} /></div>
+        <div className={activeTab === 'bag' ? 'block h-full' : 'hidden'}><BagView hero={hero} /></div>
+        <div className={activeTab === 'messages' ? 'block h-full' : 'hidden'}><MessagesView hero={hero} /></div>
+        <div className={activeTab === 'tavern' ? 'block h-full' : 'hidden'}><TavernView hero={hero} hireCompanion={hireCompanion} acceptQuest={acceptQuest} /></div>
       </main>
       <nav className="h-16 bg-white border-t border-stone-200 flex justify-around items-center px-1 flex-none z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
          <button onClick={() => setActiveTab('logs')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'logs' ? 'text-stone-800' : 'text-stone-400'}`}><ScrollText size={18} strokeWidth={activeTab === 'logs' ? 2.5 : 2} /><span className="text-[9px] font-bold">故事</span></button>
