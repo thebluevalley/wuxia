@@ -9,8 +9,8 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 3 * 60 * 60 * 1000; 
 const QUEST_REFRESH_INTERVAL = 6 * 60 * 60 * 1000; 
 
-// --- 辅助函数 ---
-
+// ... (getStoryStage, calculateTags, generateQuestBoard, generateFillerQuest, getLocationByQuest, getInitialSkills, getInitialLifeSkills, generateVisitors, rollLoot 函数保持不变，为了节省篇幅省略，请确保文件中保留这些辅助函数) ...
+// ⚠️ 请保留上述辅助函数的完整代码 ⚠️
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "私生子";
@@ -84,6 +84,7 @@ const getLocationByQuest = (questType: QuestType, level: number): string => {
   return pool[Math.floor(Math.random() * pool.length)].name;
 };
 
+// ⚠️ 核心修复：SkillType 适配 (attack -> combat, medical -> survival)
 const getInitialSkills = (): Skill[] => [{ name: "基础剑术", type: 'combat', level: 1, exp: 0, maxExp: 100, desc: "维斯特洛通用的防身剑术" }];
 const getInitialLifeSkills = (): Skill[] => [{ name: "伤口处理", type: 'survival', level: 1, exp: 0, maxExp: 100, desc: "在乱世中活下去的必备技能" }];
 
@@ -148,7 +149,9 @@ export function useGame() {
       stamina: 120, maxStamina: 120,
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 200, 
       alignment: 0, location: "临冬城", state: 'idle', 
-      logs: [], messages: [], majorEvents: [`${new Date().toLocaleDateString()}：${name} 踏入维斯特洛。`],
+      // ⚠️ 初始日志：保证一进游戏就有字看
+      logs: [{ id: "init", text: "北境的寒风凛冽，你裹紧了破旧的斗篷，望着灰暗的天空，心中知道——凛冬将至。", type: "highlight", time: "00:00" }], 
+      messages: [], majorEvents: [`${new Date().toLocaleDateString()}：${name} 踏入维斯特洛。`],
       inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
       stats: { kills: 0, days: 1, arenaWins: 0 },
@@ -171,6 +174,10 @@ export function useGame() {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
         if (!mergedData.equipmentDescription) mergedData.equipmentDescription = "衣着朴素。";
+        // ⚠️ 确保老用户也有日志显示（如果为空）
+        if (!mergedData.logs || mergedData.logs.length === 0) {
+            mergedData.logs = [{ id: "init_resume", text: "你从沉睡中醒来，周围的一切既熟悉又陌生。战乱的硝烟似乎从未散去。", type: "highlight", time: "08:00" }];
+        }
         
         setHero(mergedData);
         setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
@@ -190,19 +197,20 @@ export function useGame() {
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
   }, [hero]);
 
-  // ⚠️ 核心调整：日志只存剧情。系统消息全部走 addMessage
-  const addLog = (text: string, type: LogEntry['type'] = 'normal') => {
-    recentLogsRef.current = [text, ...recentLogsRef.current].slice(0, 3);
+  // ⚠️ 日志系统 (Story Only)
+  const addLog = (text: string, type: LogEntry['type'] = 'highlight') => {
+    // 强制设为 highlight，确保前端打字机能渲染
+    const finalType = 'highlight'; 
     setHero(prev => {
       if (!prev) return null;
       const newHistory = (prev.narrativeHistory + " " + text).slice(-500);
-      const newLog = { id: Date.now().toString(), text, type, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}) };
-      // ⚠️ 倒序：新日志在前
+      const newLog = { id: Date.now().toString(), text, type: finalType, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}) };
+      // ⚠️ 倒序插入
       return { ...prev, logs: [newLog, ...prev.logs].slice(0, 50), narrativeHistory: newHistory };
     });
   };
 
-  // ⚠️ 渡鸦传信（系统消息中心）
+  // ⚠️ 消息系统 (System Mechanics)
   const addMessage = (type: 'rumor' | 'system', title: string, content: string) => {
     setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; });
   };
@@ -219,9 +227,9 @@ export function useGame() {
     const newBoard = hero.questBoard.filter(q => q.id !== questId); 
     setHero(prev => prev ? { ...prev, stamina: prev.stamina - quest.staminaCost, queuedQuest: quest, questBoard: newBoard } : null);
     
-    // ⚠️ 核心修复：任务接受后，系统消息进渡鸦，同时立刻触发 AI 剧情
+    // ⚠️ 关键：接任务后，立刻触发剧情，不依赖轮询
     addMessage('system', '誓言', `已接受委托：${quest.name}`);
-    triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest }); // 传入最新状态
+    triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest }); 
   };
 
   const hireCompanion = (visitorId: string) => {
@@ -233,7 +241,6 @@ export function useGame() {
       if (!prev) return null;
       return { ...prev, gold: prev.gold - visitor.price, companion: visitor, companionExpiry: Date.now() + 24 * 60 * 60 * 1000, tavern: { ...prev.tavern, visitors: prev.tavern.visitors.filter(v => v.id !== visitorId) } };
     });
-    // ⚠️ 招募成功：系统消息进渡鸦，剧情进主界面
     addMessage('system', '结盟', `支付 ${visitor.price} 金龙，招募了【${visitor.name}】。`);
     triggerAI("recruit_companion", "", "recruit", { ...hero, companion: visitor });
   };
@@ -249,7 +256,7 @@ export function useGame() {
         ...currentHero, 
         storyStage: getStoryStage(currentHero.level), 
         worldLore: WORLD_LORE, 
-        questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, // Use queued quest if current is null
+        questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
         questStage: currentHero.currentQuest?.stage,
         questInfo: currentHero.currentQuest ? `[${currentHero.currentQuest.category}] ${currentHero.currentQuest.name}` : "无任务，游历中", 
         petInfo: currentHero.pet ? `灵宠:${currentHero.pet.type}` : "无", 
@@ -279,17 +286,21 @@ export function useGame() {
            if (data.text.includes("：")) { const parts = data.text.split("："); title = parts[0]; content = parts.slice(1).join("："); }
            addMessage('rumor', title, content);
         } else {
-           // ⚠️ 剧情文字：只在此处产生。
            const fullText = suffix ? `${data.text} ${suffix}` : data.text;
-           // 所有的 AI 叙事都标记为 highlight，触发前端打字机
            addLog(fullText, 'highlight');
         }
         return true;
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error(e); 
+        // ⚠️ 兜底：如果 AI 挂了，写一句默认的，防止空白
+        addLog("风雪太大了，你看不清前方的路，只能暂时在原地休整。", "highlight");
+    }
     return false;
   };
 
+  // ... (godAction, autoManageInventory 保持不变，但日志改为 addMessage) ...
+  // 为节省空间，只展示修改部分：
   const godAction = async (type: 'bless' | 'punish') => {
     if (!hero) return;
     if (hero.godPower < 25) { addMessage('system', '命运', "命运值不足。"); return; }
@@ -306,20 +317,20 @@ export function useGame() {
 
   const autoManageInventory = (currentHero: HeroState): { hero: HeroState, logs: string[], tagsChanged: boolean } => {
     let hero = { ...currentHero };
-    const logs: string[] = []; // 这里的 logs 最终会转为 messages
+    const logs: string[] = []; // logs will be sent to addMessage
     let updated = false;
     let equipChanged = false;
 
+    // ... (tags calc, item usage logic same as before) ...
+    // 但 logs.push() 的内容现在会发给系统消息
     const newTags = calculateTags(hero);
     const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(hero.tags);
-    if (tagsChanged) {
-        hero.tags = newTags;
-        updated = true;
-    }
+    if (tagsChanged) { hero.tags = newTags; updated = true; }
 
     hero.inventory.forEach(item => {
       const equipPower = item.power || 0;
       if (equipPower > 0) {
+        // ... equip logic ...
         let slotKey: keyof Equipment | null = null;
         if (item.type === 'weapon') slotKey = 'weapon';
         else if (item.type === 'head') slotKey = 'head';
@@ -336,24 +347,25 @@ export function useGame() {
             hero.equipment[slotKey] = item;
             const idx = hero.inventory.findIndex(i => i.id === item.id);
             if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
-            logs.push(`换上了 ${item.name} (强度 ${equipPower})`);
+            logs.push(`装备了 ${item.name}`); // 简化文本
             updated = true;
             equipChanged = true;
           }
         }
       }
     });
-
+    
+    // ... (book reading, potion drinking logic - logs.push to system msg) ...
     const books = hero.inventory.filter(i => i.type === 'book');
     books.forEach(book => {
        const skillName = String(book.effect);
        const existingSkill = hero.martialArts.find(s => s.name === skillName);
        if (existingSkill) {
           existingSkill.exp += 100;
-          logs.push(`研读 ${book.name}，${skillName}熟练度提升！`);
+          logs.push(`研读 ${book.name}`);
        } else {
           hero.martialArts.push({ name: skillName, type: 'combat', level: 1, exp: 0, maxExp: 100, desc: "通过书籍习得" });
-          logs.push(`阅读 ${book.name}，习得【${skillName}】！`);
+          logs.push(`习得 ${skillName}`);
        }
        const idx = hero.inventory.findIndex(i => i.id === book.id);
        if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
@@ -365,7 +377,7 @@ export function useGame() {
        if (potion) {
           const heal = Number(potion.effect) || 0;
           hero.hp = Math.min(hero.maxHp, hero.hp + heal);
-          logs.push(`使用了 ${potion.name}，恢复 ${heal} 生命。`);
+          logs.push(`使用了 ${potion.name}`);
           const idx = hero.inventory.findIndex(i => i.id === potion.id);
           if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
           updated = true;
@@ -377,7 +389,7 @@ export function useGame() {
        if (food) {
           const regen = Number(food.effect) || 0;
           hero.stamina = Math.min(hero.maxStamina, hero.stamina + regen);
-          logs.push(`使用了 ${food.name}，恢复 ${regen} 体力。`);
+          logs.push(`使用了 ${food.name}`);
           const idx = hero.inventory.findIndex(i => i.id === food.id);
           if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
           hero.actionCounts.drinking++; 
@@ -385,9 +397,7 @@ export function useGame() {
        }
     }
 
-    if (equipChanged) {
-        setTimeout(() => triggerAI('generate_equip_desc', '', undefined, hero), 100);
-    }
+    if (equipChanged) { setTimeout(() => triggerAI('generate_equip_desc', '', undefined, hero), 100); }
 
     return { hero: updated ? hero : currentHero, logs, tagsChanged };
   };
@@ -401,13 +411,12 @@ export function useGame() {
 
       const { hero: managedHero, logs: autoLogs, tagsChanged } = autoManageInventory(currentHero);
       
-      // ⚠️ 核心调整：所有系统自动日志（喝药、换装）全部进“渡鸦”
+      // ⚠️ 系统日志 -> 渡鸦
       if (autoLogs.length > 0) {
           setHero(managedHero); 
           autoLogs.forEach(l => addMessage('system', '记录', l)); 
       } 
       
-      // 预判 AI 事件
       let aiEvent: string | null = null;
       let newQuest = managedHero.currentQuest;
       let queued = managedHero.queuedQuest;
@@ -429,8 +438,8 @@ export function useGame() {
            aiEvent = 'quest_end'; 
            managedHero.gold += newQuest.rewards.gold;
            managedHero.exp += newQuest.rewards.exp;
-           // 任务完成：发系统消息到渡鸦
-           addMessage('system', '报偿', `委托【${newQuest.name}】已完成。获得 ${newQuest.rewards.gold} 金龙。`);
+           // 任务完成 -> 渡鸦
+           addMessage('system', '报偿', `委托【${newQuest.name}】已完成。`);
 
            if (queued) {
              const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', managedHero.level);
@@ -438,7 +447,7 @@ export function useGame() {
              queued = null;
              managedHero.location = targetLoc; 
              managedHero.state = newQuest.category === 'combat' ? 'fight' : 'idle';
-             // 自动开始下一个：触发 AI
+             // 自动开始下一个 -> 触发剧情
              setTimeout(() => triggerAI('quest_start', '', undefined, managedHero), 500);
           } else {
              if (Math.random() < 0.7) { newQuest = null; managedHero.state = 'idle'; } 
@@ -470,13 +479,10 @@ export function useGame() {
             const lootItem = { ...loot, id: Date.now().toString(), count: 1 } as Item;
             const idx = managedHero.inventory.findIndex(i => i.name === lootItem.name);
             if (idx >= 0) managedHero.inventory[idx].count++; else managedHero.inventory.push(lootItem);
-            // 战利品：发系统消息到渡鸦
             addMessage('system', '战利品', `获得了 ${lootItem.name}。`);
          }
       }
 
-      // 决定是否触发 AI
-      // 如果有 AI 事件，直接触发。如果没有，只有在状态更新（但没有自动日志）的情况下才更新 setHero，避免频繁重渲染
       if (aiEvent) {
          setHero(managedHero);
          await triggerAI(aiEvent);
@@ -487,9 +493,8 @@ export function useGame() {
          setHero(managedHero);
          await triggerAI('idle_event');
       } else if (Math.random() < 0.1) {
-         await triggerAI('generate_rumor'); // 谣言不影响 hero 状态，单独触发
+         await triggerAI('generate_rumor');
       } else {
-         // 即使没有 AI 事件，也需要更新进度条等数值
          setHero(managedHero);
       }
       

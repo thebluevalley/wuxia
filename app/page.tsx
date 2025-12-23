@@ -4,26 +4,32 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank, SkillType } from '@/app/lib/constants';
 
-// ⚠️ 核心优化：慢速打字机 + 淡入效果
-const TypewriterText = ({ text, className }: { text: string, className?: string }) => {
+// 打字机组件：增加防抖和状态清理，防止乱码
+const TypewriterText = ({ text, className, onComplete }: { text: string, className?: string, onComplete?: () => void }) => {
   const [displayedText, setDisplayedText] = useState('');
-  
+  const indexRef = useRef(0);
+
   useEffect(() => {
-    let index = 0;
+    indexRef.current = 0;
     setDisplayedText(''); 
+    
+    if (!text) return;
+
     const timer = setInterval(() => {
-      if (index < text.length) {
-        setDisplayedText((prev) => prev + text.charAt(index));
-        index++;
+      if (indexRef.current < text.length) {
+        const char = text.charAt(indexRef.current);
+        setDisplayedText((prev) => prev + char);
+        indexRef.current++;
       } else {
         clearInterval(timer);
+        if (onComplete) onComplete();
       }
-    }, 80); // ⚠️ 速度：80ms/字，非常慢，适合阅读
+    }, 50); // 50ms 适中速度
 
     return () => clearInterval(timer);
   }, [text]);
 
-  return <span className={`${className} animate-in fade-in duration-500`}>{displayedText}</span>;
+  return <span className={className}>{displayedText}</span>;
 };
 
 export default function Home() {
@@ -157,24 +163,30 @@ export default function Home() {
   const LogsView = () => (
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
+        {/* ⚠️ 核心修复：移除 isNarrative 过滤，确保所有日志都显示 */}
+        {/* 增加空状态提示 */}
+        {hero.logs.length === 0 && (
+           <div className="text-center text-stone-400 text-sm mt-10 animate-pulse">正在书写历史...</div>
+        )}
+        
         {hero.logs.map((log, index) => {
-          // ⚠️ 核心调整：仅最新的 (index === 0) 且为 highlight 的日志使用打字机
-          // 且只有 highlight 类型的日志才会显示在主界面
+          // 仅最新的一条，且必须是 highlight 才打字
+          // ⚠️ 修复：即使不是 highlight，只要是最新一条，也给个淡入动画，避免太生硬
           const isLatest = index === 0; 
-          const isNarrative = log.type === 'highlight';
-
-          if (!isNarrative) return null; // 过滤非剧情日志
+          const useTypewriter = isLatest && log.type === 'highlight';
 
           return (
-            <div key={log.id} className="flex gap-2 items-baseline mb-4">
-              <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
-              {isLatest ? (
+            <div key={log.id} className="flex gap-3 items-baseline mb-6 px-1">
+              <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-40 pt-1">{log.time}</span>
+              {useTypewriter ? (
                  <TypewriterText 
                    text={log.text} 
-                   className="text-[15px] leading-8 text-justify font-medium text-black" 
+                   className="text-[15px] leading-7 text-justify font-medium text-black font-serif" 
                  />
               ) : (
-                 <span className="text-[15px] leading-8 text-justify font-medium text-black opacity-80">
+                 <span className={`text-[15px] leading-7 text-justify font-medium font-serif animate-in fade-in duration-500 ${
+                     log.type === 'highlight' ? 'text-black' : 'text-stone-600' // 普通文本稍微淡一点
+                   }`}>
                    {log.text}
                  </span>
               )}
