@@ -13,153 +13,86 @@ export async function POST(req: Request) {
     const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
     const loreSnippet = WORLD_ARCHIVE[Math.floor(Math.random() * WORLD_ARCHIVE.length)];
 
-    const stage = context.storyStage || "私生子";
-    const tags = context.tags ? context.tags.join("、") : "无";
-    
-    // 1. 确定叙事节奏 (Pacing)
-    // 默认随机，但关键事件强制长文
-    let pacing = Math.random() > 0.4 ? 'scene' : 'snapshot'; // 60% 场景(长)，40% 快照(短)
-    
-    if (['start_game', 'quest_start', 'quest_end', 'quest_climax', 'recruit_companion'].includes(eventType)) {
-        pacing = 'scene'; // 关键节点必须详写
-    }
+    // 识别任务类型：主线还是支线
+    const isMainQuest = context.questScript?.title && context.questScript.title.includes("【主线】");
+    const npcName = context.questScript?.npc || "Mysterious Stranger";
 
-    // 2. 动态指令构建
-    let lengthInstruction = "";
-    let styleInstruction = "";
-
-    if (pacing === 'scene') {
-        lengthInstruction = "LENGTH: Write a DETAILED PARAGRAPH (100-160 Chinese characters).";
-        styleInstruction = "FOCUS: Atmosphere, sensory details (smell, temperature, texture), inner monologue, and world-building.";
-    } else {
-        lengthInstruction = "LENGTH: Write 1-2 SHORT, PUNCHY sentences (30-50 Chinese characters).";
-        styleInstruction = "FOCUS: A fleeting action, a sudden sound, a brief dialogue fragment, or a sharp observation.";
-    }
-
-    // 3. 基础 Prompt
     const baseInstruction = `
-      You are George R.R. Martin writing a Grimdark Fantasy novel (Game of Thrones style).
+      You are George R.R. Martin writing "A Song of Ice and Fire".
       Language: SIMPLIFIED CHINESE ONLY.
+      Style: Grimdark, Detailed, Sensory (Smell, Touch, Taste), Political.
       
-      ${lengthInstruction}
-      ${styleInstruction}
-      
-      Context:
-      - Hero: ${context.name} (${stage}). Tags: [${tags}].
+      Context: 
+      - Hero: ${context.name}.
       - Location: ${context.location}.
-      - Lore: ${loreSnippet} (Weave this in subtly if fitting).
-      - Flavor: ${envFlavor}.
+      - Current Saga Chapter: ${context.mainSaga}.
       
-      CRITICAL RULES:
-      1. NO FILLER: Every word must carry weight.
-      2. REALISM: Mud, blood, rust, cold, hunger. No high fantasy magic sparkles.
-      3. COMPLETE: Do not leave sentences unfinished.
+      RULES:
+      1. REALISM: No high magic sparkles. Use mud, rust, blood, cold, and wine.
+      2. LENGTH: ${isMainQuest ? 'VERY LONG (180-250 chars). Detailed scene.' : 'Medium (100-150 chars). Atmospheric.'}
+      3. NPC: If a Main Quest, mention the key NPC (${npcName}) explicitly and their demeanor.
     `;
 
     let prompt = "";
     
     switch (eventType) {
-      case 'generate_description':
-        prompt = `
-          Task: Write a character portrait based on tags: [${tags}].
-          Rule: Chinese only. Max 80 chars. 
-          Style: Grimdark.
-          Example: "他裹着满是污泥的守夜人黑衣，眼神像临冬城的雪一样冷，手中紧握着那枚无面者的硬币。"
-          Your Description:
-        `;
-        break;
-
-      case 'generate_equip_desc':
-        const weapon = context.equipment?.weapon?.name || "空手";
-        const body = context.equipment?.body?.name || "布衣";
-        prompt = `
-          Task: Describe appearance based on: Weapon [${weapon}], Armor [${body}].
-          Rule: Chinese only. Max 60 chars.
-          Example: "身披兰尼斯特金甲，手持巨剑，宛如一头准备噬人的雄狮。"
-          Your Description:
-        `;
-        break;
-
       case 'start_game':
         prompt = `
-          Task: Write the OPENING PARAGRAPH of the story.
-          Context: ${context.name} is standing in ${context.location}.
-          Requirements: 
-          - 150+ Chinese characters.
-          - Describe the ominous atmosphere, the signs of war, and the biting cold.
-          - Mention a specific detail about the location (e.g. the smell of the crypts, the noise of the market).
+          Task: Write the OPENING PARAGRAPH of the hero's saga in ${context.location}.
+          Mood: Ominous. The calm before the storm.
+          Content: Describe the sensory details of the location. Establish the hero's lowly status in the grand game of thrones.
         `;
         break;
       
       case 'quest_start':
         prompt = `${baseInstruction} 
-        Event: The hero accepts a mission: "${context.questScript?.title}".
+        Event: Accepting Quest "${context.questScript?.title}".
         Details: ${context.questScript?.description}.
-        Action: Preparation and departure. The weight of the task ahead.
+        Action: The hero meets ${npcName}. Describe the interaction. The NPC gives the order. The hero feels the weight of destiny (or just the weight of gold).
         `;
         break;
 
       case 'quest_journey':
         prompt = `${baseInstruction} 
-        Event: A scene on the road during the journey.
-        Scenario: ${pacing === 'scene' ? 'A breakdown of the wagon, a discovery of a corpse, or a conversation by the fire.' : 'A sudden gust of wind, a distant wolf howl, or the pain in the boots.'}
-        `;
-        break;
-
-      case 'idle_event':
-        prompt = `${baseInstruction} 
-        Event: Killing time in ${context.location}.
-        Scenario: ${pacing === 'scene' ? 'Observing a local lord, witnessing a crime, or reflecting on a past trauma.' : 'Drinking sour wine, sharpening a blade, or watching a raven fly.'}
+        Event: Journeying through Westeros.
+        Prompt: Describe a scene on the road. A hanged man? A direwolf track? A Lannister patrol?
+        Mandatory: Incorporate "${envFlavor}".
         `;
         break;
 
       case 'quest_climax':
         prompt = `${baseInstruction} 
-        Event: The Climax Battle vs ${context.questScript?.antagonist}.
-        Twist: ${context.questScript?.twist}.
-        Instruction: Brutal, visceral combat. Focus on the physical struggle, the fear, and the violence.
+        Event: Climax vs ${context.questScript?.antagonist}. Twist: ${context.questScript?.twist}.
+        Instruction: A brutal, gritty combat scene. Describe the impact of steel on steel/flesh.
         `;
         break;
 
       case 'quest_end':
         prompt = `${baseInstruction} 
-        Event: Mission Accomplished.
-        Instruction: The aftermath. Is the hero relieved? Or disgusted by what they had to do?
+        Event: Quest Completion.
+        Instruction: The aftermath. The hero returns to ${npcName} (if applicable) or looks at the reward with cynicism.
         `;
         break;
         
-      case 'recruit_companion':
+      case 'idle_event':
         prompt = `${baseInstruction} 
-        Event: Meeting a new companion. 
-        Instruction: Describe them vividly. Why are they dangerous or useful?
+        Event: Idle in ${context.location}.
+        Prompt: A slice-of-life moment in Westeros. Drinking in a tavern? Watching the city watch? shivering in the cold?
         `;
-        break;
-        
-      case 'god_action':
-        prompt = `${baseInstruction} 
-        Event: A twist of fate (Divine Intervention).
-        Instruction: Describe a sudden stroke of luck or misfortune that feels like the work of the Old Gods.
-        `;
-        break;
-        
-      case 'generate_rumor':
-        prompt = `Write a dark rumor from the Seven Kingdoms. Format: "【Title】Content". Chinese Only. Max 30 words.`;
         break;
 
       default:
-        prompt = `${baseInstruction} Describe a moment in the hero's life.`;
+        prompt = `${baseInstruction} Describe a brief moment.`;
     }
 
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 0.85, 
+      temperature: 0.9, 
       max_tokens: 1024, 
     });
 
     let text = completion.choices[0]?.message?.content || "";
-    
-    // 清洗
     if (eventType.includes('generate')) {
         text = text.replace(/^(Based on|The hero|Here is|Scene:|Chapter 1).*:[\s\n]*/i, '');
         text = text.replace(/^["']|["']$/g, ''); 

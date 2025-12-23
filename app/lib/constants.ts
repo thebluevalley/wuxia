@@ -25,22 +25,11 @@ export type Equipment = {
 };
 
 export type Faction = 'stark' | 'lannister' | 'targaryen' | 'baratheon' | 'watch' | 'wildling' | 'citadel' | 'neutral' | 'faith';
-export const FACTIONS: Record<Faction, string> = {
-  stark: "史塔克家族 (狼)",
-  lannister: "兰尼斯特家族 (狮)",
-  targaryen: "坦格利安家族 (龙)",
-  baratheon: "拜拉席恩家族 (鹿)",
-  watch: "守夜人军团",
-  wildling: "自由民",
-  citadel: "学城",
-  faith: "七神教会",
-  neutral: "平民"
-};
 
-export type QuestCategory = 'combat' | 'life';
+// 任务类型：新增 'main' (主线)
+export type QuestCategory = 'main' | 'side'; 
 export type QuestRank = 1 | 2 | 3 | 4 | 5;
 export type QuestStage = 'start' | 'road' | 'climax' | 'end'; 
-export type QuestType = 'search' | 'hunt' | 'challenge' | 'train' | 'life';
 
 export type Quest = { 
   id: string;
@@ -54,13 +43,13 @@ export type Quest = {
     objective: string;
     antagonist: string;
     twist: string;
+    npc?: string; // 关键任务发布人
   };
   desc: string; 
   stage: QuestStage;
   progress: number; 
   total: number;
   reqLevel: number;
-  isAuto?: boolean;
   staminaCost: number; 
   rewards: { gold: number; exp: number; item?: Item; };
 };
@@ -90,6 +79,10 @@ export type HeroState = {
   name: string; level: number; gender: '男' | '女'; age: number; personality: string; title: string; motto: string;
   godPower: number; 
   unlockedFeatures: string[]; storyStage: string;
+  
+  // ⚠️ 核心：主线进度索引
+  mainStoryIndex: number; 
+
   pet: Pet | null;
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
   stamina: number; maxStamina: number;
@@ -97,15 +90,7 @@ export type HeroState = {
   reputation: Record<Faction, number>;
   
   tags: string[]; 
-  actionCounts: {
-    kills: number;        
-    retreats: number;     
-    gambles: number;      
-    charity: number;      
-    betrayals: number;    
-    shopping: number;     
-    drinking: number;     
-  }; 
+  actionCounts: { kills: number; retreats: number; gambles: number; charity: number; betrayals: number; shopping: number; drinking: number; }; 
   description: string; 
   equipmentDescription: string; 
 
@@ -125,182 +110,182 @@ export type HeroState = {
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
-// ⚠️ 核心新增：出身剧情模版 (Origin Stories)
-export const ORIGIN_STORIES = {
-  "私生子": {
+// ⚠️ 核心设定：主线史诗 (Main Saga)
+// 这里的每一个任务都是原著的一个关键节点
+export const MAIN_SAGA = [
+  {
+    title: "序章：凛冬将至",
+    npc: "艾德·史塔克",
+    desc: "劳勃国王的车队即将抵达临冬城。公爵大人命令你协助罗德利克爵士加强城防，并准备迎接皇室。",
+    obj: "迎接国王",
+    antagonist: "严寒与忙碌",
+    twist: "你在神木林看到了瑟曦王后和詹姆爵士在争吵，但你不敢出声。",
     location: "临冬城",
-    intro: "那是长夏的最后一年，国王劳勃·拜拉席恩的庞大车队正沿着国王大道向临冬城进发。而你，作为临冬城里一个不起眼的私生子，正站在城墙的角落里，看着史塔克家族的孩子们排练迎接皇室的礼仪。你的手里握着一把木剑，那是琼恩·雪诺送给你的。",
-    first_interaction: "琼恩·雪诺"
+    reqLevel: 1
   },
-  "侍从": {
+  {
+    title: "国王大道",
+    npc: "琼恩·雪诺",
+    desc: "艾德公爵决定南下担任首相，而琼恩将前往长城。你决定护送雪诺一程，直到国王大道的分岔口。",
+    obj: "护送雪诺",
+    antagonist: "路上的强盗",
+    twist: "临别时，雪诺把他的冰原狼白灵托付给你照看了一晚。",
+    location: "国王大道",
+    reqLevel: 3
+  },
+  {
+    title: "狮狼之争",
+    npc: "凯特琳·徒利",
+    desc: "在十字路口客栈，凯特琳夫人认出了“小恶魔”提利昂。她命令在场的所有封臣协助她逮捕这个兰尼斯特。",
+    obj: "逮捕小恶魔",
+    antagonist: "兰尼斯特卫兵",
+    twist: "提利昂即使被绑着，嘴巴也像刀子一样锋利。",
+    location: "十字路口客栈",
+    reqLevel: 5
+  },
+  {
+    title: "首相的比武大会",
+    npc: "培提尔·贝里席",
+    desc: "君临城正在举办盛大的比武大会。小指头暗示你，如果能在比武中制造一点“意外”，会有丰厚的回报。",
+    obj: "参加比武",
+    antagonist: "魔山格雷果",
+    twist: "魔山一剑砍下了他坐骑的头，鲜血溅了你一身。",
     location: "君临城",
-    intro: "君临城的空气里永远弥漫着一股腐烂与香水混合的味道。作为红堡里的一名低阶侍从，你刚帮“小恶魔”提利昂·兰尼斯特倒完酒。他那双异色的眼睛似乎看穿了你的窘迫，扔给你一枚金龙，让你去跳蚤窝给他找个干净的女人。",
-    first_interaction: "提利昂·兰尼斯特"
+    reqLevel: 10
   },
-  "守夜人新兵": {
-    location: "绝境长城",
-    intro: "升降梯的绞盘发出刺耳的嘎吱声，寒风像刀子一样割过你的脸颊。你站在七百尺高的冰墙之上，身边是同样瑟瑟发抖的山姆威尔·塔利。教头艾里沙·索恩爵士刚刚嘲笑了你的出身，但你知道，在这长城之外，无论你是贵族还是强盗，死人的眼睛里只有蓝色。",
-    first_interaction: "山姆威尔·塔利"
+  {
+    title: "权力的游戏",
+    npc: "瓦里斯",
+    desc: "劳勃国王狩猎归来身受重伤。八爪蜘蛛瓦里斯在深夜找到了你，让你把一封密信送给史坦尼斯。",
+    obj: "送信",
+    antagonist: "金袍子",
+    twist: "当你回来时，艾德·史塔克已经被捕了。",
+    location: "红堡",
+    reqLevel: 15
+  },
+  {
+    title: "黑水河之战",
+    npc: "提利昂·兰尼斯特",
+    desc: "史坦尼斯的舰队逼近君临。作为代理首相，提利昂命令你负责点燃野火。",
+    obj: "守卫泥门",
+    antagonist: "史坦尼斯的大军",
+    twist: "绿色的火焰吞噬了一切，包括你的战友。",
+    location: "君临城墙",
+    reqLevel: 25
+  },
+  {
+    title: "血色婚礼",
+    npc: "罗柏·史塔克",
+    desc: "少狼主将在孪河城参加婚礼。虽然是不祥之地，但他必须去。你是护卫之一。",
+    obj: "参加婚宴",
+    antagonist: "弗雷家族的弩手",
+    twist: "卡斯特梅的雨季响起，你拼死杀出重围，但国王死了。",
+    location: "孪河城",
+    reqLevel: 40
+  },
+  {
+    title: "长夜守望",
+    npc: "守夜人总司令",
+    desc: "绝境长城告急。野人王曼斯·雷德集结了十万大军。不论之前的恩怨，你必须北上支援。",
+    obj: "死守长城",
+    antagonist: "野人与猛犸象",
+    twist: "野人只是在逃命，真正的威胁在他们身后——异鬼。",
+    location: "黑城堡",
+    reqLevel: 60
   }
+];
+
+// ⚠️ 支线任务池 (Side Quests) - 填充世界
+export const SIDE_QUESTS = {
+  "临冬城": [
+    { title: "清理狼林", desc: "狼林里的强盗最近越来越猖狂了。", obj: "剿匪", antagonist: "强盗首领" },
+    { title: "铁匠的委托", desc: "微肯师傅需要一些上好的铁矿石。", obj: "采集", antagonist: "严寒" }
+  ],
+  "君临城": [
+    { title: "跳蚤窝的讨债人", desc: "小指头的妓院有一笔烂账要收。", obj: "讨债", antagonist: "赖账的佣兵" },
+    { title: "下水道的秘密", desc: "有人说在下水道看到了坦格利安的旧物。", obj: "探索", antagonist: "食人鼠" }
+  ],
+  "绝境长城": [
+    { title: "鬼影森林巡逻", desc: "游骑兵需要人手去先民拳峰侦查。", obj: "巡逻", antagonist: "尸鬼" },
+    { title: "修缮长城", desc: "东海望的城墙塌了一角。", obj: "苦力", antagonist: "高空坠落" }
+  ],
+  "default": [
+    { title: "护送商队", desc: "一队来自自由贸易城邦的商人需要护卫。", obj: "护送", antagonist: "多斯拉克强盗" },
+    { title: "比武招亲", desc: "某个小领主为了嫁女儿举办的比武。", obj: "决斗", antagonist: "流浪骑士" }
+  ]
 };
 
 export const WORLD_ARCHIVE = [
-  "【疯王之死】：詹姆·兰尼斯特在铁王座下刺杀了疯王伊里斯，终结了坦格利安王朝。",
-  "【篡夺者战争】：劳勃·拜拉席恩在他的大锤下赢得了王冠。",
-  "【凛冬将至】：史塔克家族的族语，这不仅仅是一句口号，更是古老的预言。",
-  "【守夜人】：长夜将至，我从今开始守望，至死方休。",
+  "【疯王之死】：詹姆·兰尼斯特在铁王座下刺杀了疯王伊里斯。",
+  "【五王之战】：维斯特洛陷入了四分五裂，铁王座、北境、铁群岛都在流血。",
+  "【守夜人誓言】：长夜将至，我从今开始守望，至死方休。",
+  "【凡人皆有一死】：Valar Morghulis，这是布拉佛斯无面者的箴言。",
   "【兰尼斯特有债必偿】：这不仅是关于金钱，更是关于复仇。",
-  "【凡人皆有一死】：Valar Morghulis。",
-  "【血色婚礼】：弗雷家族背叛了宾客权利，屠杀了北境之王。",
-  "【异鬼】：老奶妈故事里的怪物，它们随着寒风而来，那是八千年前的事了。"
+  "【龙之母】：在狭海对岸，最后的真龙孵化了三颗龙蛋。"
 ];
-
-export const PERSONALITIES = ["荣誉感", "权谋家", "残暴", "忠诚", "贪婪", "信仰坚定", "疯癫", "冷酷", "野心勃勃"];
-export const NPC_NAMES_MALE = ["琼恩", "泰温", "詹姆", "艾德", "罗柏", "提利昂", "培提尔", "瓦里斯", "劳勃", "雷加", "布兰", "山姆", "乔里克", "达里奥", "波隆"];
-export const NPC_NAMES_FEMALE = ["丹妮莉丝", "瑟曦", "珊莎", "艾莉亚", "凯特琳", "玛格丽", "布蕾妮", "耶哥蕊特", "莱安娜", "梅丽珊卓", "阿莎"];
-export const NPC_NAMES_LAST = ["史塔克", "兰尼斯特", "坦格利安", "拜拉席恩", "徒利", "提利尔", "马泰尔", "格雷乔伊", "雪诺", "佛雷", "波顿", "莫尔蒙"];
 
 export const NPC_ARCHETYPES = {
   common: [
-    { job: "酒馆老板", buff: "luck", desc: "擦着杯子，眼神闪烁，那是间谍的眼神。" },
-    { job: "流浪歌手", buff: "exp", desc: "由于唱了一首嘲讽乔佛里的歌，他的舌头被割掉了。" },
-    { job: "金袍子", buff: "attack", desc: "比起维护治安，他更擅长勒索商贩。" }
+    { job: "酒馆老板", buff: "luck", desc: "消息灵通，但贪财。" },
+    { job: "雇佣兵", buff: "attack", desc: "只认钱，不认主。" },
+    { job: "吟游诗人", buff: "exp", desc: "会唱《卡斯特梅的雨季》。" }
   ],
   rare: [
-    { job: "学士", buff: "exp", desc: "颈上的链条代表着他在旧镇学到的知识：医术、天文、毒药。" },
-    { job: "佣兵", buff: "attack", desc: "只要金龙到位，他连婴儿都敢杀。" },
-    { job: "红袍祭司", buff: "luck", desc: "长夜黑暗，处处险恶。他在火焰中看到了你的命运。" }
+    { job: "学士", buff: "exp", desc: "精通医术和毒药。" },
+    { job: "守夜人游骑兵", buff: "defense", desc: "在长城外活下来的老兵。" }
   ],
   epic: [
-    { job: "御林铁卫", buff: "defense", desc: "白袍之下，隐藏着无数肮脏的皇室秘密。" },
-    { job: "无面者", buff: "attack", desc: "凡人皆有一死，凡人皆需侍奉。" }, 
-    { job: "易形者", buff: "luck", desc: "他的眼睛翻白，正透过一只鹰俯瞰着你。" }
+    { job: "御林铁卫", buff: "defense", desc: "剑术超群，誓死效忠。" },
+    { job: "红袍女祭司", buff: "luck", desc: "信仰光之王，能在火中看到未来。" }
   ],
   legendary: [
-    { job: "龙之母", buff: "attack", desc: "卡丽熙，不焚者，镣铐破除者。" },
-    { job: "弑君者", buff: "attack", desc: "他做了一件无可挽回的错事，却拯救了全城的人。" }
+    { job: "无面者", buff: "attack", desc: "顶级的刺客，没有名字。" }
   ]
 };
 
-export const NPC_TRAITS = ["私生子", "侏儒", "弑亲者", "守夜人", "骑士", "学士", "野人", "太监", "酒鬼", "美人"];
+export const PERSONALITIES = ["荣誉", "狡诈", "残忍", "忠诚", "贪婪", "虔诚", "疯癫"];
+export const NPC_NAMES_MALE = ["琼恩", "詹姆", "提利昂", "艾德", "罗柏", "泰温", "培提尔", "瓦里斯", "山姆", "布兰"];
+export const NPC_NAMES_FEMALE = ["丹妮莉丝", "瑟曦", "珊莎", "艾莉亚", "凯特琳", "玛格丽", "布蕾妮", "耶哥蕊特"];
+export const NPC_NAMES_LAST = ["史塔克", "兰尼斯特", "拜拉席恩", "坦格利安", "徒利", "提利尔", "雪诺", "佛雷", "波顿"];
+export const NPC_TRAITS = ["私生子", "侏儒", "弑亲者", "骑士", "野人", "学士"];
 
-export const SKILL_LIBRARY = {
-  combat: ["水舞者剑术", "双手巨剑", "长矛方阵", "多斯拉克马术", "十字弓"],
-  intrigue: ["谎言", "毒药", "情报网", "政治联姻"],
-  survival: ["生火", "狩猎", "抗寒", "草药学"],
-  knowledge: ["瓦雷利亚语", "历史", "战术", "渡鸦"],
-  command: ["鼓舞", "后勤", "攻城", "海战"]
-};
-
-export const PET_TEMPLATES = [
-  { type: "冰原狼", desc: "北境之魂，忠诚且致命。" },
-  { type: "幼龙", desc: "瓦雷利亚的末裔，火焰的化身。" },
-  { type: "三眼乌鸦", desc: "它在看着你，一直看着你。" },
-  { type: "影子山猫", desc: "潜伏在明月山脉的幽灵。" }
+export const LOOT_TABLE: Partial<Item>[] = [
+  { name: "青亭岛红酒", type: 'consumable', desc: "贵族享用的美酒。", price: 100, minLevel: 1, quality: 'common', effect: 50 },
+  { name: "罂粟花奶", type: 'consumable', desc: "强效止痛药。", price: 50, minLevel: 10, quality: 'rare', effect: 100 },
+  { name: "瓦雷利亚钢匕首", type: 'weapon', desc: "龙骨柄，锋利无比。", price: 5000, minLevel: 50, quality: 'legendary', power: 150 },
+  { name: "劳勃的战锤", type: 'weapon', desc: "曾经击碎雷加胸甲的武器。", price: 4000, minLevel: 40, quality: 'epic', power: 120 },
+  { name: "守夜人黑衣", type: 'body', desc: "不仅保暖，也是誓言的象征。", price: 50, minLevel: 5, quality: 'common', power: 20 },
+  { name: "兰尼斯特金甲", type: 'body', desc: "华丽且防御力极高。", price: 3000, minLevel: 30, quality: 'legendary', power: 100 }
 ];
 
-export const ARENA_OPPONENTS = ["魔山", "猎狗", "红毒蛇", "巴利斯坦", "詹姆·兰尼斯特", "布蕾妮", "巨人旺旺", "卓戈卡奥"];
-
 export const MAP_LOCATIONS = {
-  common: ["十字路口客栈", "跳蚤窝", "红堡地牢", "鼹鼠村", "避冬市镇", "孪河城"],
-  search: ["旧镇学城", "龙石岛", "赫伦堡", "先民拳峰", "瓦雷利亚废墟"],
-  hunt:   ["御林", "鬼影森林", "多恩沙漠", "铁群岛", "颈泽"],
-  challenge: ["比武审判场", "绝境长城", "鹰巢城月门", "极乐塔", "弥林竞技场"],
-  train:  ["黑白之院", "神木林", "长夜堡", "风息堡", "凯岩城"],
-  life:   ["小指头的妓院", "高庭", "奔流城", "临冬城大厅", "君临集市"]
+  common: ["跳蚤窝", "十字路口客栈", "鼹鼠村"],
+  search: ["龙石岛", "旧镇学城", "赫伦堡"],
+  hunt: ["御林", "鬼影森林", "颈泽"],
+  challenge: ["比武审判场", "绝境长城", "弥林竞技场"],
+  train: ["红堡教头场", "黑城堡演武场"],
+  life: ["高庭花园", "临冬城大厅", "君临集市"]
 };
 
 export const WORLD_MAP = [
-  { name: "临冬城", type: "life", minLv: 1 }, { name: "狼林", type: "hunt", minLv: 1 }, { name: "神木林", type: "train", minLv: 1 },
-  { name: "国王大道", type: "common", minLv: 10 }, { name: "十字路口客栈", type: "life", minLv: 10 }, { name: "孪河城", type: "challenge", minLv: 15 },
-  { name: "君临城", type: "life", minLv: 30 }, { name: "跳蚤窝", type: "common", minLv: 30 }, { name: "红堡", type: "search", minLv: 35 },
-  { name: "鹰巢城", type: "challenge", minLv: 45 }, { name: "高庭", type: "life", minLv: 50 },
-  { name: "绝境长城", type: "train", minLv: 60 }, { name: "黑城堡", type: "common", minLv: 60 }, { name: "鬼影森林", type: "hunt", minLv: 65 },
-  { name: "铁王座", type: "common", minLv: 99 }
+  { name: "临冬城", type: "life", minLv: 1 }, 
+  { name: "国王大道", type: "common", minLv: 5 },
+  { name: "君临城", type: "life", minLv: 10 },
+  { name: "绝境长城", type: "train", minLv: 20 },
+  { name: "铁王座", type: "challenge", minLv: 50 }
 ];
 
 export const STORY_STAGES = [
-  { level: 1, name: "私生子", desc: "在这个残酷世界中，私生子的命比狗还贱。" },
-  { level: 15, name: "侍从", desc: "你学会了擦亮盔甲，也学会了在权力的游戏中低头。" },
-  { level: 40, name: "骑士", desc: "圣油涂抹在额头，但你知道誓言在欲望面前一文不值。" },
-  { level: 70, name: "领主", desc: "你拥有了城堡和旗帜，但背后的匕首也更多了。" },
-  { level: 100, name: "王者", desc: "当你玩权力的游戏时，不赢，就是死。" }
-];
-
-export const FLAVOR_TEXTS = {
-  environment: ["凛冬的寒风呼啸", "君临城的腐臭味", "学士塔的乌鸦叫声", "铁王座的阴影", "狭海的咸湿海风", "北境的皑皑白雪"],
-  action: ["擦拭瓦雷利亚钢剑", "喝了一口酸涩的红酒", "把玩着金龙币", "在心树前祈祷", "低声密谋", "裹紧了毛皮斗篷"],
-  object: ["龙晶匕首", "学士的项链", "无面者的硬币", "族谱", "半个洋葱", "染血的白袍"]
-};
-
-// ⚠️ 剧情剧本：权游风格
-export const QUEST_SCRIPTS = {
-  "私生子": [
-    { title: "私生子的证明", desc: "凯特琳·徒利夫人厌恶地看着你。你需要证明自己配得上史塔克的血脉。", obj: "狩猎野猪", antagonist: "森林里的巨型野猪", twist: "你救了罗柏·史塔克一命，但他让你不要声张。", faction: 'stark' },
-    { title: "守夜人的召唤", desc: "班扬·史塔克回到了临冬城，他在招募去长城的人。", obj: "加入守夜人", antagonist: "严酷的教头", twist: "长城上缺的不是英雄，是炮灰。", faction: 'watch' }
-  ],
-  "侍从": [
-    { title: "国王的私生子", desc: "首相艾德·史塔克在调查前任首相的死因，他让你去寻找一个铁匠铺的学徒。", obj: "寻找詹德利", antagonist: "金袍子", twist: "那个学徒长得和劳勃国王一模一样。", faction: 'stark' },
-    { title: "比武大会的阴谋", desc: "魔山在比武中杀死了对手，你发现了有人在长枪上动了手脚。", obj: "调查线索", antagonist: "派席尔大学士", twist: "这一切都是瑟曦太后授意的。", faction: 'lannister' }
-  ],
-  "骑士": [
-    { title: "五王之战", desc: "蓝礼、史坦尼斯、罗柏、乔佛里、巴隆，五个国王都在宣称王权。", obj: "选择阵营", antagonist: "战场上的逃兵", twist: "无论谁赢，百姓都输了。", faction: 'neutral' }
-  ],
-  "领主": [
-    { title: "红色婚礼", desc: "无论如何，不要去孪河城参加婚礼。", obj: "阻止婚礼", antagonist: "瓦德·佛雷", twist: "这是一个无法改变的悲剧。", faction: 'stark' }
-  ],
-  "default": [
-    { title: "凡人皆有一死", desc: "混乱是阶梯。", obj: "生存", antagonist: "命运", twist: "今天不是死期。", faction: 'neutral' }
-  ]
-};
-
-export const WORLD_LORE = `
-背景：七大王国，铁王座之争。
-威胁：凛冬将至，异鬼苏醒。
-基调：写实、残酷、低魔。没有绝对的主角光环，任何人随时可能死去。
-`;
-
-export const QUEST_SOURCES = {
-  search: ["寻找龙蛋"], hunt: ["猎杀冰原狼"], challenge: ["比武审判"], train: ["黑白之院受训"], life: ["御前会议"]
-};
-
-export const LOOT_TABLE: Partial<Item>[] = [
-  { name: "多恩红酒", type: 'consumable', desc: "像血一样红，像复仇一样甜。", price: 100, minLevel: 10, quality: 'common', effect: 50 },
-  { name: "发霉的黑面包", type: 'consumable', desc: "平民的口粮，硬得能砸死人。", price: 1, minLevel: 1, quality: 'common', effect: 10 },
-  { name: "罂粟花奶", type: 'consumable', desc: "学士用来止痛的药，喝多了会做梦。", price: 50, minLevel: 15, quality: 'rare', effect: 100 },
-  { name: "野火罐", type: 'consumable', desc: "绿色的液体，极不稳定，能燃烧一切。", price: 500, minLevel: 40, quality: 'epic', effect: 1000 },
-  { name: "《七星圣经》", type: 'book', desc: "七神教会的经典。", price: 50, minLevel: 5, quality: 'common', effect: "虔诚" },
-  { name: "《龙王的谱系》", type: 'book', desc: "记载了坦格利安家族的历史。", price: 200, minLevel: 20, quality: 'rare', effect: "瓦雷利亚语" },
-  { name: "瓦雷利亚钢匕首", type: 'weapon', desc: "龙骨柄，波浪纹，那是古瓦雷利亚的魔法。", price: 5000, minLevel: 50, quality: 'legendary', power: 150 },
-  { name: "缝衣针", type: 'weapon', desc: "这是琼恩送给艾莉亚的礼物，剑尖锋利。", price: 3000, minLevel: 30, quality: 'epic', power: 80 },
-  { name: "劳勃的战锤", type: 'weapon', desc: "沉重无比，神力者方能挥舞。", price: 4000, minLevel: 40, quality: 'epic', power: 120 },
-  { name: "守夜人斗篷", type: 'body', desc: "黑色的羊毛，抵御绝境长城的严寒。", price: 50, minLevel: 10, quality: 'common', power: 20 },
-  { name: "兰尼斯特金甲", type: 'body', desc: "华丽、昂贵，但能不能防住利剑很难说。", price: 5000, minLevel: 50, quality: 'legendary', power: 150 },
-  { name: "国王之手胸针", type: 'accessory', desc: "这是权力的象征，也是死亡的邀请函。", price: 1000, minLevel: 40, quality: 'epic', power: 50 },
+  { level: 1, name: "无名之辈" },
+  { level: 20, name: "风云人物" },
+  { level: 50, name: "一方诸侯" },
+  { level: 80, name: "维斯特洛传说" }
 ];
 
 export const STATIC_LOGS = {
   idle: [
-    "凛冬的寒风吹过，你裹紧了破旧的斗篷。",
-    "远处君临城的钟声敲响了，那是国王驾崩的丧钟吗？",
-    "一只乌鸦落在枝头，黑色的眼睛死死盯着你，仿佛在说：雪诺。",
-    "路边的乞丐在唱着《卡斯特梅的雨季》，让人不寒而栗。",
     "你擦拭着剑上的锈迹，在这乱世，这是你唯一的朋友。",
-  ],
-  fight: [
-    "钢铁碰撞的声音在空旷的战场上回荡。",
-    "鲜血染红了雪地，像极了那一年的心树叶子。",
-    "没有荣誉，只有生存。你将剑刺入了对手的喉咙。",
-    "痛觉让你清醒，这说明你还活着。",
-  ],
-  town: [
-    "跳蚤窝的街道上流淌着污水，散发着腐烂的味道。",
-    "红堡高耸入云，那是权力的中心，也是谎言的温床。",
-    "金袍子卫兵粗暴地推开路人，为一辆兰尼斯特的马车开道。",
-  ],
-  arena: [
-    "这里是比武审判，只有胜利者才是无罪的。",
-    "观众们高呼着嗜血的口号，他们渴望看到鲜血。",
-    "魔山那庞大的身躯像一座小山，遮住了阳光。",
+    "远处传来乌鸦的叫声，仿佛在预示着什么。",
+    "寒风凛冽，你裹紧了破旧的斗篷。"
   ]
 };
