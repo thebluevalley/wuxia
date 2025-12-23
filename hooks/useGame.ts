@@ -84,7 +84,6 @@ const getLocationByQuest = (questType: QuestType, level: number): string => {
   return pool[Math.floor(Math.random() * pool.length)].name;
 };
 
-// ⚠️ 核心修复：SkillType 适配 (attack -> combat, medical -> survival)
 const getInitialSkills = (): Skill[] => [{ name: "基础剑术", type: 'combat', level: 1, exp: 0, maxExp: 100, desc: "维斯特洛通用的防身剑术" }];
 const getInitialLifeSkills = (): Skill[] => [{ name: "伤口处理", type: 'survival', level: 1, exp: 0, maxExp: 100, desc: "在乱世中活下去的必备技能" }];
 
@@ -156,7 +155,8 @@ export function useGame() {
       currentQuest: null, queuedQuest: null, questBoard: initialBoard, lastQuestRefresh: Date.now(), 
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0,
-      reputation: { alliance: 0, freedom: 0, court: 0, sword: 0, healer: 0, cult: 0, invader: 0, hidden: 0, neutral: 0 },
+      // ⚠️ 核心修复：使用新的七国势力 Key
+      reputation: { stark: 0, lannister: 0, targaryen: 0, baratheon: 0, watch: 0, wildling: 0, citadel: 0, neutral: 0, faith: 0 },
       narrativeHistory: "凛冬将至。",
       tags: ["私生子"], 
       actionCounts: { kills: 0, retreats: 0, gambles: 0, charity: 0, betrayals: 0, shopping: 0, drinking: 0 },
@@ -236,7 +236,7 @@ export function useGame() {
     const currentHero = explicitHero || hero;
     if (!currentHero) return false;
     const showCompanion = Math.random() > 0.7;
-    const companionInfo = (showCompanion && currentHero.companion) ? `伙伴:${currentHero.companion.title} ${currentHero.companion.name} (性别:${currentHero.companion.gender}, 性格:${currentHero.companion.personality})` : "独行";
+    const companionInfo = (showCompanion && currentHero.companion) ? `伙伴:${currentHero.companion.title} ${currentHero.companion.name} (性别:${currentHero.companion.gender}, 性格:${currentHero.companion.personality})` : "独行 (暂不描写伙伴)";
     try {
       const bestSkill = currentHero.martialArts.sort((a,b) => b.level - a.level)[0];
       const context = { 
@@ -345,7 +345,6 @@ export function useGame() {
           existingSkill.exp += 100;
           logs.push(`【研读】阅读 ${book.name}，${skillName}熟练度提升！`);
        } else {
-          // ⚠️ 核心修复：类型改为 combat
           hero.martialArts.push({ name: skillName, type: 'combat', level: 1, exp: 0, maxExp: 100, desc: "通过书籍习得的技能" });
           logs.push(`【学习】阅读 ${book.name}，习得【${skillName}】！`);
        }
