@@ -517,5 +517,6 @@ export function useGame() {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [hero?.name]);
 
-  return { hero, login, godAction, loading, error, clearError: () => setError(null), hireCompanion, acceptQuest, useItem };
+  // ⚠️ 核心修复：移除 useItem
+  return { hero, login, godAction, loading, error, clearError: () => setError(null), hireCompanion, acceptQuest };
 }

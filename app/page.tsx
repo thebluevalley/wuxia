@@ -5,7 +5,8 @@ import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Foot
 import { ItemType, Quality, QuestRank } from '@/app/lib/constants';
 
 export default function Home() {
-  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest, useItem } = useGame();
+  // ⚠️ 核心修复：移除 useItem
+  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'equip' | 'messages' | 'tavern'>('logs');
@@ -217,6 +218,7 @@ export default function Home() {
 
   const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
 
+  // ⚠️ 移除手动使用按钮
   const BagView = () => (
     <div className="p-4 h-full overflow-y-auto">
       <div className="flex justify-between items-center mb-4 px-2">
