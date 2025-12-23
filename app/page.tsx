@@ -2,20 +2,47 @@
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
-// ⚠️ 核心修复：添加 Item 到导入列表
 import { Item, ItemType, Quality, QuestRank } from '@/app/lib/constants';
+
+// ⚠️ 核心新增：打字机效果组件
+// 文字逐字显示，且每个字都有淡入效果，模拟墨水晕染/打字感
+const TypewriterText = ({ text, className }: { text: string, className?: string }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  
+  useEffect(() => {
+    let index = 0;
+    // 每次挂载时，重置并开始动画
+    setDisplayedText(''); 
+    const timer = setInterval(() => {
+      if (index < text.length) {
+        // 使用函数式更新，确保状态正确
+        setDisplayedText((prev) => prev + text.charAt(index));
+        index++;
+      } else {
+        clearInterval(timer);
+      }
+    }, 40); // 打字速度：40ms/字，既有呼吸感又不拖沓
+
+    return () => clearInterval(timer);
+  }, [text]);
+
+  return <span className={className}>{displayedText}</span>;
+};
 
 export default function Home() {
   const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
-  // 移除 'equip' tab
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'messages' | 'tavern'>('logs');
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // 自动滚动到底部
   useEffect(() => {
-    if (activeTab === 'logs') bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [hero?.logs, activeTab]);
+    if (activeTab === 'logs') {
+       // 稍微延迟一点滚动，等待打字机效果开始
+       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+  }, [hero?.logs.length, activeTab]); // 监听 logs 长度变化
 
   const getQualityColor = (q: Quality) => {
     switch (q) {
@@ -131,16 +158,29 @@ export default function Home() {
   const LogsView = () => (
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
-        {hero.logs.map((log) => (
-          <div key={log.id} className="animate-in fade-in slide-in-from-bottom-2 duration-700 flex gap-2 items-baseline">
+        {hero.logs.map((log, index) => (
+          <div key={log.id} className="flex gap-2 items-baseline mb-2">
             <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
-            <span className={`text-[14px] leading-7 text-justify ${
-              log.type === 'highlight' ? 'text-amber-900' : 
-              log.type === 'system' ? 'text-stone-400 text-xs italic' : 
-              'text-black' 
-            }`}>
-              {log.text}
-            </span>
+            {/* ⚠️ 应用 TypewriterText 组件 */}
+            {/* 只有最新的 3 条日志才使用打字机效果，旧的直接显示，优化性能 */}
+            {index >= hero.logs.length - 3 ? (
+               <TypewriterText 
+                 text={log.text} 
+                 className={`text-[14px] leading-7 text-justify font-medium ${
+                   log.type === 'highlight' ? 'text-amber-900' : 
+                   log.type === 'system' ? 'text-stone-400 text-xs italic' : 
+                   'text-black' 
+                 }`} 
+               />
+            ) : (
+               <span className={`text-[14px] leading-7 text-justify font-medium ${
+                   log.type === 'highlight' ? 'text-amber-900' : 
+                   log.type === 'system' ? 'text-stone-400 text-xs italic' : 
+                   'text-black' 
+                 }`}>
+                 {log.text}
+               </span>
+            )}
           </div>
         ))}
         <div ref={bottomRef} className="h-4" />
@@ -160,7 +200,6 @@ export default function Home() {
     </div>
   );
 
-  // ⚠️ 辅助组件：装备槽 (修复了类型问题)
   const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
     <div className="flex flex-col items-center bg-white p-2 rounded border border-stone-100">
        <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${item ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-300'}`}>{icon}</div>

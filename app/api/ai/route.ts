@@ -16,7 +16,6 @@ export async function POST(req: Request) {
     const stage = context.storyStage || "微尘";
     const tags = context.tags ? context.tags.join("、") : "无";
     
-    // Tone Setup
     let toneInstruction = "";
     if (stage === "微尘") {
         toneInstruction = "Tone: Down-to-earth, Vibrant, Humorous.";
@@ -28,21 +27,27 @@ export async function POST(req: Request) {
         toneInstruction = "Tone: Epic, Melancholic.";
     }
 
-    const isLong = Math.random() > 0.6;
+    // ⚠️ 核心调整：长短句分布调整 (70% 概率为短句，创造呼吸感)
+    const isLong = Math.random() > 0.7; 
     const lengthInstruction = isLong 
-        ? "Write a rich paragraph (max 60 words)." 
-        : "Write a short sentence (max 15 words).";
+        ? "Length: A descriptive paragraph (40-60 words). Paint a scene." 
+        : "Length: A single, punchy sentence (5-15 words). A fleeting thought or action.";
 
     const baseInstruction = `
-      You are a Wuxia Novelist (Jin Yong / Gu Long style). 
+      You are a Wuxia Storyteller (Jin Yong style). 
       Language: SIMPLIFIED CHINESE ONLY.
       ${toneInstruction}
+      ${lengthInstruction}
       Lore Context: ${loreSnippet}
+      
+      CRITICAL RULES:
+      1. COMPLETENESS: Every output must be a COMPLETE thought. No trailing sentences. No "and then...".
+      2. INDEPENDENCE: The text must make sense on its own.
+      3. SHOW, DON'T TELL: Use sensory details (smell, sound, temperature).
       
       Hero: ${context.name} (${stage}).
       Tags: [${tags}].
       Quest: ${context.questScript?.title || "Wandering"}.
-      History: ${context.narrativeHistory?.slice(-200) || ""}.
     `;
 
     let prompt = "";
@@ -51,56 +56,57 @@ export async function POST(req: Request) {
       case 'generate_description':
         prompt = `
           Task: Write a character portrait based strictly on tags: [${tags}].
-          STRICT RULES: CHINESE ONLY. Max 50 chars. Show, Don't Tell.
+          STRICT RULES: CHINESE ONLY. Max 50 chars. Combine tags into a visual image.
           Example: "他斜倚在墙角，腹部的伤口还在渗血，却仍举着酒壶狂饮。"
           Your Description:
         `;
         break;
 
       case 'generate_equip_desc':
-        // ⚠️ 新增：装备外观描写
         const weapon = context.equipment?.weapon?.name || "空手";
         const body = context.equipment?.body?.name || "布衣";
-        const head = context.equipment?.head?.name || "无";
         prompt = `
-          Task: Describe the hero's appearance based on their gear.
-          Weapon: ${weapon}, Body: ${body}, Head: ${head}.
-          STRICT RULES: CHINESE ONLY. Max 40 chars. Visualize the combination.
-          Example: "他身披重甲，手持巨剑，宛如一尊不可战胜的铁塔。"
+          Task: Describe appearance based on gear: Weapon [${weapon}], Armor [${body}].
+          STRICT RULES: CHINESE ONLY. Max 40 chars. Visual & Cool.
           Your Description:
         `;
         break;
 
       case 'start_game':
-        prompt = `${baseInstruction} Write an opening scene. The hero stands in ${context.location}.`;
+        prompt = `${baseInstruction} Write an opening scene. The hero stands in ${context.location}. Atmosphere is key.`;
         break;
       
       case 'quest_start':
-        prompt = `${baseInstruction} Event: Start "${context.questScript?.title}". Details: ${context.questScript?.description}. Action: Set off.`;
+        prompt = `${baseInstruction} Event: Start "${context.questScript?.title}". Details: ${context.questScript?.description}. Action: The hero sets off.`;
         break;
 
       case 'quest_journey':
-        prompt = `${baseInstruction} Event: On the road. Action: Slice-of-life scene. Mandatory: Use flavor text "${envFlavor}".`;
+        prompt = `${baseInstruction} 
+        Event: A moment on the road. 
+        Action: A slice-of-life scene or scenery description. 
+        Mandatory: Use flavor text "${envFlavor}".`;
         break;
 
       case 'idle_event':
-        prompt = `${baseInstruction} Event: Wandering in ${context.location}. Action: Reflect tags [${tags}].`;
+        prompt = `${baseInstruction} 
+        Event: Wandering in ${context.location}. 
+        Action: A small interaction (drinking, observing, resting). Reflect tags [${tags}].`;
         break;
 
       case 'quest_climax':
-        prompt = `${baseInstruction} Event: Climax vs ${context.questScript?.antagonist}. Twist: ${context.questScript?.twist}. Action: Confrontation.`;
+        prompt = `${baseInstruction} Event: Climax vs ${context.questScript?.antagonist}. Action: A decisive moment. Focus on the clash of wills.`;
         break;
 
       case 'quest_end':
-        prompt = `${baseInstruction} Event: Conclusion. Objective: ${context.questScript?.objective}. Action: Aftermath.`;
+        prompt = `${baseInstruction} Event: Conclusion. Objective: ${context.questScript?.objective}. Action: The dust settles. How does the hero feel?`;
         break;
         
       case 'recruit_companion':
-        prompt = `${baseInstruction} Hero meets a new companion. Bond formed.`;
+        prompt = `${baseInstruction} Hero meets a new companion. A shared glance or words.`;
         break;
         
       case 'god_action':
-        prompt = `${baseInstruction} A moment of destiny.`;
+        prompt = `${baseInstruction} A moment of serendipity.`;
         break;
         
       case 'generate_rumor':
@@ -114,13 +120,14 @@ export async function POST(req: Request) {
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 0.8, 
+      temperature: 0.85, 
       max_tokens: 300,
     });
 
     let text = completion.choices[0]?.message?.content || "";
     
-    if (eventType === 'generate_description' || eventType === 'generate_equip_desc') {
+    // 清洗：移除可能的英文解释或引号
+    if (eventType.includes('generate')) {
         text = text.replace(/^(Based on|The hero|Here is).*:[\s\n]*/i, '');
         text = text.replace(/^["']|["']$/g, ''); 
     }
