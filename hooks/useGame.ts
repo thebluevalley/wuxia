@@ -20,59 +20,44 @@ const calculateTags = (hero: HeroState): string[] => {
   const { hp, maxHp, stamina, gold, attributes, actionCounts, inventory, equipment, level, companion, stats } = hero;
 
   if (hp < maxHp * 0.1) tags.add("濒死");
-  if (stamina < 20) tags.add("力竭");
-  if (gold > 10000) tags.add("富有");
-  if (attributes.strength > 20) tags.add("强壮");
+  else if (hp < maxHp * 0.3) tags.add("重伤");
   
+  if (stamina < 20) tags.add("力竭");
+  else if (stamina > 100) tags.add("精力充沛");
+
+  if (gold > 50000) tags.add("巨富");
+  else if (gold < 50) tags.add("赤贫");
+
+  if (actionCounts.kills > 100) tags.add("屠夫");
+  if (actionCounts.drinking > 20) tags.add("酒鬼");
+
+  if (attributes.strength > 20) tags.add("魔山之力");
+  if (attributes.intelligence > 20) tags.add("小恶魔之智");
+
   const weaponName = equipment.weapon?.name || "";
   if (weaponName.includes("剑")) tags.add("剑客");
-  else if (!equipment.weapon) tags.add("空手");
+  else if (weaponName.includes("锤")) tags.add("战士");
+  else if (weaponName.includes("匕首")) tags.add("刺客");
+  else if (!equipment.weapon) tags.add("赤手空拳");
+  
+  if (stats.arenaWins > 50) tags.add("竞技场之王");
 
   return Array.from(tags).slice(0, 10);
 };
 
-// ⚠️ 核心重构：生成任务板 (包含主线)
+// ⚠️ 核心重构：只生成支线任务 (Side Quests Only)
+// 主线现在由系统自动派发，不占用酒馆栏位
 const generateQuestBoard = (hero: HeroState): Quest[] => {
   const quests: Quest[] = [];
-  const { level, mainStoryIndex, location } = hero;
+  const { level, location } = hero;
 
-  // 1. 检查是否有可用的主线任务
-  if (mainStoryIndex < MAIN_SAGA.length) {
-      const saga = MAIN_SAGA[mainStoryIndex];
-      // 只有等级达到要求才显示主线
-      if (level >= (saga.reqLevel || 1)) {
-          quests.push({
-              id: `main_${mainStoryIndex}`,
-              name: `【主线】${saga.title}`,
-              category: 'main',
-              rank: 5, // 主线总是最高星级
-              faction: 'neutral', // 或根据 saga.faction
-              script: {
-                  title: saga.title,
-                  description: saga.desc,
-                  objective: saga.obj,
-                  antagonist: saga.antagonist,
-                  twist: saga.twist,
-                  npc: saga.npc
-              },
-              desc: `(关键剧情) ${saga.desc}`,
-              stage: 'start',
-              progress: 0,
-              total: 500 + (mainStoryIndex * 200), // 主线进度条更长
-              reqLevel: saga.reqLevel || 1,
-              staminaCost: 30, // 主线消耗大
-              rewards: { gold: 500 + (mainStoryIndex * 200), exp: 1000 + (mainStoryIndex * 500) }
-          });
-      }
-  }
-
-  // 2. 填充支线任务 (Side Quests)
+  // 填充支线任务
   const locationKey = SIDE_QUESTS[location as keyof typeof SIDE_QUESTS] ? location : "default";
   // @ts-ignore
   const sidePool = SIDE_QUESTS[locationKey] || SIDE_QUESTS["default"];
 
-  const fillCount = 3 - quests.length; // 补足3个任务
-  for (let i = 0; i < fillCount; i++) {
+  // 生成 4 个支线供选择
+  for (let i = 0; i < 4; i++) {
       const template = sidePool[Math.floor(Math.random() * sidePool.length)];
       const rank = Math.ceil(Math.random() * 3) as QuestRank;
       quests.push({
@@ -91,9 +76,9 @@ const generateQuestBoard = (hero: HeroState): Quest[] => {
           desc: template.desc,
           stage: 'start',
           progress: 0,
-          total: rank * 150,
+          total: rank * 120, // 缩短支线长度，加快节奏
           reqLevel: Math.max(1, level - 2),
-          staminaCost: rank * 10,
+          staminaCost: rank * 8,
           rewards: { gold: rank * 50, exp: rank * 80 }
       });
   }
@@ -102,7 +87,9 @@ const generateQuestBoard = (hero: HeroState): Quest[] => {
 };
 
 const getLocationByQuest = (questType: any, level: number): string => {
-  return "荒野"; // 简化逻辑
+  // 简单随机一个地图位置，用于支线切换场景
+  const map = WORLD_MAP[Math.floor(Math.random() * WORLD_MAP.length)];
+  return map.name;
 };
 
 const getInitialSkills = (): Skill[] => [{ name: "基础剑术", type: 'combat', level: 1, exp: 0, maxExp: 100, desc: "维斯特洛通用的防身剑术" }];
@@ -110,14 +97,36 @@ const getInitialLifeSkills = (): Skill[] => [{ name: "伤口处理", type: 'surv
 
 const generateVisitors = (): Companion[] => {
   const visitors: Companion[] = [];
-  // ... (保留原有生成逻辑，简化展示)
-  return visitors; 
+  const tiers: Quality[] = [];
+  for (let i = 0; i < 5; i++) { const rand = Math.random(); let tier: Quality = 'common'; if (rand < 0.02) tier = 'legendary'; else if (rand < 0.10) tier = 'epic'; else if (rand < 0.35) tier = 'rare'; else tier = 'common'; tiers.push(tier); }
+  const commonCount = tiers.filter(t => t === 'common').length;
+  if (commonCount === 5) { const luckyIndex = Math.floor(Math.random() * 5); const pityRoll = Math.random(); if (pityRoll < 0.1) tiers[luckyIndex] = 'legendary'; else if (pityRoll < 0.4) tiers[luckyIndex] = 'epic'; else tiers[luckyIndex] = 'rare'; }
+  tiers.forEach((tier, i) => {
+    const templates = NPC_ARCHETYPES[tier]; const template = templates[Math.floor(Math.random() * templates.length)];
+    let gender: '男' | '女' = Math.random() > 0.5 ? '男' : '女';
+    if (template.job.includes('女') || template.job.includes('花')) gender = '女';
+    if (template.job.includes('僧') || template.job.includes('少')) gender = '男';
+    const firstNameList = gender === '男' ? NPC_NAMES_MALE : NPC_NAMES_FEMALE;
+    const firstName = firstNameList[Math.floor(Math.random() * firstNameList.length)];
+    const lastName = NPC_NAMES_LAST[Math.floor(Math.random() * NPC_NAMES_LAST.length)];
+    const trait = NPC_TRAITS[Math.floor(Math.random() * NPC_TRAITS.length)];
+    const priceMap = { common: 200, rare: 1000, epic: 5000, legendary: 20000 };
+    const buffVal = { common: 5, rare: 15, epic: 30, legendary: 80 };
+    visitors.push({ id: Date.now() + i + Math.random().toString(), name: `${firstName}·${lastName}`, gender, title: template.job, archetype: template.job, personality: trait, desc: template.desc, quality: tier, price: priceMap[tier], buff: { type: template.buff as any, val: buffVal[tier] } });
+  });
+  return visitors;
 };
 
 const rollLoot = (level: number, luck: number): Partial<Item> | null => {
     const validItems = LOOT_TABLE.filter(i => (i.minLevel || 1) <= level);
     if (validItems.length === 0) return null;
-    return validItems[Math.floor(Math.random() * validItems.length)];
+    const rand = Math.random() * 100 - (luck * 0.5);
+    let targetQuality: Quality = 'common';
+    if (rand < 2) targetQuality = 'legendary'; else if (rand < 10) targetQuality = 'epic'; else if (rand < 30) targetQuality = 'rare'; else targetQuality = 'common';
+    let pool = validItems.filter(i => i.quality === targetQuality);
+    if (pool.length === 0) pool = validItems.filter(i => i.quality === 'common');
+    if (pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
 };
 
 // --- Main Hook ---
@@ -136,13 +145,14 @@ export function useGame() {
   const login = async (name: string, password: string) => {
     setLoading(true); setError(null);
     const initialStage = "私生子";
-    
-    // 初始化英雄
+    const initialBoard = generateQuestBoard({ level: 1, location: "临冬城" } as HeroState);
+
     const newHero: HeroState = {
-      name, level: 1, gender: '男', age: 16, 
-      personality: "坚韧", title: initialStage, motto: "凡人皆有一死", godPower: 100, unlockedFeatures: [], 
+      name, level: 1, gender: Math.random() > 0.5 ? '男' : '女', age: 16, 
+      personality: PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)], 
+      title: initialStage, motto: "凡人皆有一死", godPower: 100, unlockedFeatures: [], 
       pet: null, storyStage: initialStage,
-      mainStoryIndex: 0, // ⚠️ 从第0章开始
+      mainStoryIndex: 0, 
       attributes: { constitution: 10, strength: 10, dexterity: 10, intelligence: 10, luck: 10 },
       stamina: 120, maxStamina: 120,
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 200, 
@@ -152,10 +162,8 @@ export function useGame() {
       inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
       stats: { kills: 0, days: 1, arenaWins: 0 },
-      currentQuest: null, queuedQuest: null, 
-      questBoard: [], // 稍后生成
-      lastQuestRefresh: 0, 
-      tavern: { visitors: [], lastRefresh: 0 },
+      currentQuest: null, queuedQuest: null, questBoard: initialBoard, lastQuestRefresh: Date.now(), 
+      tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0,
       reputation: { stark: 0, lannister: 0, targaryen: 0, baratheon: 0, watch: 0, wildling: 0, citadel: 0, neutral: 0, faith: 0 },
       narrativeHistory: "凛冬将至。",
@@ -164,9 +172,6 @@ export function useGame() {
       description: "一个默默无闻的私生子。",
       equipmentDescription: "一身布衣。" 
     };
-    
-    // 生成初始任务板
-    newHero.questBoard = generateQuestBoard(newHero);
 
     if (!supabase) { setHero(newHero); setLoading(false); setTimeout(() => triggerAI('start_game', undefined, undefined, newHero), 500); return; }
 
@@ -175,12 +180,15 @@ export function useGame() {
       if (user) {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
-        // 修复老数据可能缺少的字段
+        if (!mergedData.equipmentDescription) mergedData.equipmentDescription = "衣着朴素。";
         if (mergedData.mainStoryIndex === undefined) mergedData.mainStoryIndex = 0;
         
-        // 刷新任务板以显示主线
+        // 登录时刷新一次任务板
         mergedData.questBoard = generateQuestBoard(mergedData);
 
+        if (!mergedData.logs || mergedData.logs.length === 0) {
+            mergedData.logs = [{ id: "init_resume", text: "你从沉睡中醒来，周围的一切既熟悉又陌生。战乱的硝烟似乎从未散去。", type: "highlight", time: "08:00" }];
+        }
         setHero(mergedData);
         setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
       } else {
@@ -218,42 +226,28 @@ export function useGame() {
     const hero = heroRef.current;
     const quest = hero.questBoard.find(q => q.id === questId);
     if (!quest) return;
-    if (hero.level < quest.reqLevel) { addMessage('system', '拒绝', `等级不足 (需Lv.${quest.reqLevel})`); return; }
-    if (hero.stamina < quest.staminaCost) { addMessage('system', '疲惫', `体力不足`); return; }
-    if (hero.queuedQuest) { addMessage('system', '繁忙', `已有任务在身`); return; }
+    if (hero.level < quest.reqLevel) { addMessage('system', '拒绝', `能力不足，需要等级 ${quest.reqLevel}。`); return; }
+    if (hero.stamina < quest.staminaCost) { addMessage('system', '疲惫', `体力不足，无法远行。`); return; }
+    if (hero.queuedQuest) { addMessage('system', '繁忙', `你已经有任务在身了。`); return; }
 
     const newBoard = hero.questBoard.filter(q => q.id !== questId); 
+    setHero(prev => prev ? { ...prev, stamina: prev.stamina - quest.staminaCost, queuedQuest: quest, questBoard: newBoard } : null);
     
-    // ⚠️ 如果是主线任务，直接改变当前位置到剧情发生地
-    let newLocation = hero.location;
-    if (quest.category === 'main') {
-        const saga = MAIN_SAGA.find(s => s.title === quest.script.title);
-        if (saga && saga.location) newLocation = saga.location;
-    }
-
-    setHero(prev => prev ? { 
-        ...prev, 
-        stamina: prev.stamina - quest.staminaCost, 
-        queuedQuest: quest, 
-        questBoard: newBoard,
-        location: newLocation // 瞬移到剧情点
-    } : null);
-    
-    addMessage('system', '誓言', `接受委托：${quest.name}`);
-    triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest, location: newLocation }); 
+    addMessage('system', '誓言', `接受支线委托：${quest.name}`);
+    // 支线任务依然需要手动触发 AI 铺垫
+    triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest }); 
   };
 
-  // ... (hireCompanion 保持不变) ...
   const hireCompanion = (visitorId: string) => {
     if (!hero) return;
     const visitor = hero.tavern.visitors.find(v => v.id === visitorId);
     if (!visitor) return;
-    if (hero.gold < visitor.price) { addMessage('system', '穷困', "囊中羞涩。"); return; }
+    if (hero.gold < visitor.price) { addMessage('system', '穷困', "囊中羞涩，无法支付雇佣金。"); return; }
     setHero(prev => {
       if (!prev) return null;
       return { ...prev, gold: prev.gold - visitor.price, companion: visitor, companionExpiry: Date.now() + 24 * 60 * 60 * 1000, tavern: { ...prev.tavern, visitors: prev.tavern.visitors.filter(v => v.id !== visitorId) } };
     });
-    addMessage('system', '结盟', `招募了【${visitor.name}】。`);
+    addMessage('system', '结盟', `支付 ${visitor.price} 金龙，招募了【${visitor.name}】。`);
     triggerAI("recruit_companion", "", "recruit", { ...hero, companion: visitor });
   };
 
@@ -261,14 +255,14 @@ export function useGame() {
     const currentHero = explicitHero || hero;
     if (!currentHero) return false;
     const showCompanion = Math.random() > 0.7;
-    const companionInfo = (showCompanion && currentHero.companion) ? `伙伴:${currentHero.companion.title} ${currentHero.companion.name}` : "独行";
+    const companionInfo = (showCompanion && currentHero.companion) ? `伙伴:${currentHero.companion.title} ${currentHero.companion.name} (性别:${currentHero.companion.gender}, 性格:${currentHero.companion.personality})` : "独行";
     
-    // ⚠️ 注入更多原著上下文
     const mainSagaInfo = currentHero.mainStoryIndex < MAIN_SAGA.length 
         ? `当前篇章: ${MAIN_SAGA[currentHero.mainStoryIndex].title}` 
         : "传说终章";
 
     try {
+      const bestSkill = currentHero.martialArts.sort((a,b) => b.level - a.level)[0];
       const context = { 
         ...currentHero, 
         storyStage: getStoryStage(currentHero.level), 
@@ -276,8 +270,13 @@ export function useGame() {
         mainSaga: mainSagaInfo,
         questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
         questStage: currentHero.currentQuest?.stage,
+        questInfo: currentHero.currentQuest ? `[${currentHero.currentQuest.category}] ${currentHero.currentQuest.name}` : "无任务，游历中", 
+        petInfo: currentHero.pet ? `灵宠:${currentHero.pet.type}` : "无", 
         companionInfo: companionInfo, 
+        skillInfo: `擅长${bestSkill?.name || '乱舞'}(Lv.${bestSkill?.level || 1})`, 
         narrativeHistory: currentHero.narrativeHistory,
+        recentLogs: recentLogsRef.current, 
+        lastLogLen: recentLogsRef.current[0]?.length || 0,
         tags: currentHero.tags || [],
         equipment: currentHero.equipment
       };
@@ -285,10 +284,19 @@ export function useGame() {
       if (!res.ok) return false;
       const data = await res.json();
       if (data.text) {
-        if (eventType.includes('generate_')) {
-            // handle description updates
-        } else if (eventType === 'generate_rumor') {
-           addMessage('rumor', '风声', data.text);
+        if (eventType === 'generate_description') {
+            setHero(h => h ? { ...h, description: data.text } : null);
+            return true;
+        }
+        if (eventType === 'generate_equip_desc') {
+            setHero(h => h ? { ...h, equipmentDescription: data.text } : null);
+            return true;
+        }
+
+        if (eventType === 'generate_rumor') {
+           let title = "风声"; let content = data.text;
+           if (data.text.includes("：")) { const parts = data.text.split("："); title = parts[0]; content = parts.slice(1).join("："); }
+           addMessage('rumor', title, content);
         } else {
            const fullText = suffix ? `${data.text} ${suffix}` : data.text;
            addLog(fullText, 'highlight');
@@ -297,22 +305,23 @@ export function useGame() {
       }
     } catch (e) { 
         console.error(e); 
-        addLog("风雪太大了，你看不清前方的路...", "highlight");
+        const fallback = STATIC_LOGS.idle[Math.floor(Math.random() * STATIC_LOGS.idle.length)];
+        addLog(fallback, "highlight");
     }
     return false;
   };
 
-  // ... (godAction, autoManageInventory, 保持不变) ...
+  // ... (godAction, autoManageInventory 保持不变，省略以节省空间) ...
   const godAction = async (type: 'bless' | 'punish') => {
     if (!hero) return;
     if (hero.godPower < 25) { addMessage('system', '命运', "命运值不足。"); return; }
     if (type === 'bless') { 
       setHero(h => h ? {...h, hp: h.maxHp, godPower: h.godPower - 25} : null); 
-      addMessage('system', '眷顾', "伤势尽愈！");
+      addMessage('system', '眷顾', "伤势尽愈！(HP恢复)");
       triggerAI('god_action', ''); 
     } else { 
       setHero(h => h ? {...h, hp: Math.max(1, h.hp - 20), exp: h.exp + 50, godPower: h.godPower - 25} : null); 
-      addMessage('system', '试炼', "意志更坚！");
+      addMessage('system', '试炼', "虽受皮肉之苦，却觉意志更坚！(经验+50)");
       triggerAI('god_action', ''); 
     }
   };
@@ -322,13 +331,81 @@ export function useGame() {
     const logs: string[] = []; 
     let updated = false;
     let equipChanged = false;
+
     const newTags = calculateTags(hero);
     const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(hero.tags);
     if (tagsChanged) { hero.tags = newTags; updated = true; }
-    // ... (Inventory logic omitted for brevity, keep existing logic) ...
-    // 假设这里保留原有的装备/吃药逻辑
+
+    hero.inventory.forEach(item => {
+      const equipPower = item.power || 0;
+      if (equipPower > 0) {
+        let slotKey: keyof Equipment | null = null;
+        if (item.type === 'weapon') slotKey = 'weapon';
+        else if (item.type === 'head') slotKey = 'head';
+        else if (item.type === 'body') slotKey = 'body';
+        else if (item.type === 'legs') slotKey = 'legs';
+        else if (item.type === 'feet') slotKey = 'feet';
+        else if (item.type === 'accessory') slotKey = 'accessory';
+
+        if (slotKey) {
+          const currentEquip = hero.equipment[slotKey];
+          const currentPower = currentEquip?.power || 0;
+          if (equipPower > currentPower) {
+            if (currentEquip) hero.inventory.push(currentEquip);
+            hero.equipment[slotKey] = item;
+            const idx = hero.inventory.findIndex(i => i.id === item.id);
+            if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
+            logs.push(`装备了 ${item.name}`); 
+            updated = true;
+            equipChanged = true;
+          }
+        }
+      }
+    });
     
+    const books = hero.inventory.filter(i => i.type === 'book');
+    books.forEach(book => {
+       const skillName = String(book.effect);
+       const existingSkill = hero.martialArts.find(s => s.name === skillName);
+       if (existingSkill) {
+          existingSkill.exp += 100;
+          logs.push(`研读 ${book.name}`);
+       } else {
+          hero.martialArts.push({ name: skillName, type: 'combat', level: 1, exp: 0, maxExp: 100, desc: "通过书籍习得" });
+          logs.push(`习得 ${skillName}`);
+       }
+       const idx = hero.inventory.findIndex(i => i.id === book.id);
+       if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
+       updated = true;
+    });
+
+    if (hero.hp < hero.maxHp * 0.5) {
+       const potion = hero.inventory.find(i => i.type === 'consumable' && !i.desc.includes("精力"));
+       if (potion) {
+          const heal = Number(potion.effect) || 0;
+          hero.hp = Math.min(hero.maxHp, hero.hp + heal);
+          logs.push(`使用了 ${potion.name}`);
+          const idx = hero.inventory.findIndex(i => i.id === potion.id);
+          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
+          updated = true;
+       }
+    }
+
+    if (hero.stamina < hero.maxStamina * 0.2) {
+       const food = hero.inventory.find(i => i.type === 'consumable' && (i.desc.includes("精力") || i.desc.includes("补气")));
+       if (food) {
+          const regen = Number(food.effect) || 0;
+          hero.stamina = Math.min(hero.maxStamina, hero.stamina + regen);
+          logs.push(`使用了 ${food.name}`);
+          const idx = hero.inventory.findIndex(i => i.id === food.id);
+          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
+          hero.actionCounts.drinking++; 
+          updated = true;
+       }
+    }
+
     if (equipChanged) { setTimeout(() => triggerAI('generate_equip_desc', '', undefined, hero), 100); }
+
     return { hero: updated ? hero : currentHero, logs, tagsChanged };
   };
 
@@ -345,10 +422,46 @@ export function useGame() {
       let aiEvent: string | null = null;
       let newQuest = managedHero.currentQuest;
       let queued = managedHero.queuedQuest;
+
+      // ⚠️ 1. 核心重构：主线强制接取逻辑 (Auto Accept Main Quest)
+      // 如果当前没有任务 (idle)，且没有排队的任务，检查是否可以开始下一章主线
+      if (!newQuest && !queued && managedHero.mainStoryIndex < MAIN_SAGA.length) {
+          const nextSaga = MAIN_SAGA[managedHero.mainStoryIndex];
+          if (managedHero.level >= nextSaga.reqLevel) {
+              // 强制接取主线
+              newQuest = {
+                  id: `main_${managedHero.mainStoryIndex}`,
+                  name: `【主线】${nextSaga.title}`,
+                  category: 'main',
+                  rank: 5,
+                  faction: 'neutral',
+                  script: {
+                      title: nextSaga.title,
+                      description: nextSaga.desc,
+                      objective: nextSaga.obj,
+                      antagonist: nextSaga.antagonist,
+                      twist: nextSaga.twist,
+                      npc: nextSaga.npc
+                  },
+                  desc: nextSaga.desc,
+                  stage: 'start',
+                  progress: 0,
+                  total: 300, // 主线长度
+                  reqLevel: nextSaga.reqLevel,
+                  staminaCost: 0, // 主线强制执行，不消耗体力
+                  rewards: { gold: 1000, exp: 2000 }
+              };
+              managedHero.currentQuest = newQuest;
+              managedHero.location = nextSaga.location; // 瞬移到剧情点
+              managedHero.state = 'fight'; 
+              
+              addMessage('system', '宿命', `命运的齿轮转动：${nextSaga.title}`);
+              aiEvent = 'quest_start'; // 立即触发 AI 描述
+          }
+      }
       
       if (newQuest) {
-        // Quest Progression Logic ...
-        if (newQuest.progress === 0 && newQuest.stage === 'start') {
+        if (newQuest.progress === 0 && newQuest.stage === 'start' && !aiEvent) {
            newQuest.stage = 'road';
            aiEvent = 'quest_start';
         }
@@ -366,19 +479,17 @@ export function useGame() {
            managedHero.exp += newQuest.rewards.exp;
            addMessage('system', '报偿', `委托【${newQuest.name}】已完成。`);
 
-           // ⚠️ 主线完成逻辑：推进篇章
            if (newQuest.category === 'main') {
                managedHero.mainStoryIndex += 1;
-               addMessage('system', '史诗', `【${newQuest.name}】篇章结束。新的命运已开启。`);
-               // 强制刷新任务板，出现下一章主线
-               managedHero.questBoard = generateQuestBoard(managedHero);
+               addMessage('system', '史诗', `【${newQuest.name}】篇章结束。`);
            }
 
            if (queued) {
-             // ... queue logic
+             const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', managedHero.level);
              newQuest = queued;
              queued = null;
-             managedHero.state = 'fight'; 
+             managedHero.location = targetLoc; 
+             managedHero.state = newQuest.category === 'combat' ? 'fight' : 'idle';
              setTimeout(() => triggerAI('quest_start', '', undefined, managedHero), 500);
           } else {
              newQuest = null; 
@@ -393,29 +504,38 @@ export function useGame() {
              managedHero.currentQuest = newQuest; managedHero.queuedQuest = queued;
              managedHero.state = 'fight'; 
              aiEvent = 'quest_start';
-         } else if (Math.random() < 0.3) { 
-             // 自动接取填充任务 (不接主线，主线必须手动)
-             // ... filler logic
+         } 
+         // 如果闲置，系统会自动接取主线 (上面逻辑)，所以这里不需要填充逻辑
+      }
+
+      if (managedHero.state !== 'town' && Math.random() < 0.15) {
+         const luck = managedHero.attributes.luck + (managedHero.companion?.buff.type === 'luck' ? managedHero.companion.buff.val : 0);
+         const loot = rollLoot(managedHero.level, luck);
+         if (loot) {
+            const lootItem = { ...loot, id: Date.now().toString(), count: 1 } as Item;
+            const idx = managedHero.inventory.findIndex(i => i.name === lootItem.name);
+            if (idx >= 0) managedHero.inventory[idx].count++; else managedHero.inventory.push(lootItem);
+            addMessage('system', '战利品', `获得了 ${lootItem.name}。`);
          }
       }
 
-      // ... Loot Logic ...
-
-      // ⚠️ 自动生成逻辑：如果当前空闲，大概率触发闲逛剧情
+      // ⚠️ 核心：频率保持 100% (Else 必定触发)
+      // 如果没有主线/任务事件，就强制生成环境描写
       if (aiEvent) {
          setHero(managedHero);
          await triggerAI(aiEvent);
-      } else if (!aiEvent && managedHero.currentQuest && Math.random() < 0.95) { 
+      } else if (!aiEvent && managedHero.currentQuest) { 
          setHero(managedHero);
          await triggerAI('quest_journey');
-      } else if (!aiEvent && !managedHero.currentQuest && Math.random() < 0.95) { 
+      } else if (!aiEvent && !managedHero.currentQuest) { 
          setHero(managedHero);
          await triggerAI('idle_event');
       } else {
          setHero(managedHero);
       }
       
-      const nextTick = Math.floor(Math.random() * (20000 - 15000) + 15000); 
+      // ⚠️ 心跳加速：8s - 15s (紧凑节奏)
+      const nextTick = Math.floor(Math.random() * (15000 - 8000) + 8000); 
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
     timerRef.current = setTimeout(gameLoop, 2000);
