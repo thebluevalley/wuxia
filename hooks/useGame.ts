@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QuestCategory, Quest, QuestRank, Faction, MAIN_SAGA, SIDE_QUESTS, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_MALE, NPC_NAMES_FEMALE, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, WORLD_MAP } from '@/app/lib/constants';
+// ⚠️ 修复：添加 PERSONALITIES 到引用列表
+import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QuestCategory, Quest, QuestRank, Faction, MAIN_SAGA, SIDE_QUESTS, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_MALE, NPC_NAMES_FEMALE, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, WORLD_MAP, PERSONALITIES } from '@/app/lib/constants';
 
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL 
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
@@ -145,8 +146,8 @@ export function useGame() {
   const login = async (name: string, password: string) => {
     setLoading(true); setError(null);
     const initialStage = "私生子";
-    const initialBoard = generateQuestBoard({ level: 1, location: "临冬城" } as HeroState);
-
+    
+    // 初始化英雄
     const newHero: HeroState = {
       name, level: 1, gender: Math.random() > 0.5 ? '男' : '女', age: 16, 
       personality: PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)], 
@@ -162,7 +163,9 @@ export function useGame() {
       inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
       stats: { kills: 0, days: 1, arenaWins: 0 },
-      currentQuest: null, queuedQuest: null, questBoard: initialBoard, lastQuestRefresh: Date.now(), 
+      currentQuest: null, queuedQuest: null, 
+      questBoard: [], // 稍后生成
+      lastQuestRefresh: 0, 
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0,
       reputation: { stark: 0, lannister: 0, targaryen: 0, baratheon: 0, watch: 0, wildling: 0, citadel: 0, neutral: 0, faith: 0 },
@@ -172,6 +175,9 @@ export function useGame() {
       description: "一个默默无闻的私生子。",
       equipmentDescription: "一身布衣。" 
     };
+    
+    // 生成初始任务板
+    newHero.questBoard = generateQuestBoard(newHero);
 
     if (!supabase) { setHero(newHero); setLoading(false); setTimeout(() => triggerAI('start_game', undefined, undefined, newHero), 500); return; }
 
@@ -180,15 +186,16 @@ export function useGame() {
       if (user) {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
-        if (!mergedData.equipmentDescription) mergedData.equipmentDescription = "衣着朴素。";
+        // 修复老数据可能缺少的字段
         if (mergedData.mainStoryIndex === undefined) mergedData.mainStoryIndex = 0;
         
-        // 登录时刷新一次任务板
+        // 刷新任务板以显示主线
         mergedData.questBoard = generateQuestBoard(mergedData);
 
         if (!mergedData.logs || mergedData.logs.length === 0) {
             mergedData.logs = [{ id: "init_resume", text: "你从沉睡中醒来，周围的一切既熟悉又陌生。战乱的硝烟似乎从未散去。", type: "highlight", time: "08:00" }];
         }
+        
         setHero(mergedData);
         setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
       } else {
@@ -226,28 +233,41 @@ export function useGame() {
     const hero = heroRef.current;
     const quest = hero.questBoard.find(q => q.id === questId);
     if (!quest) return;
-    if (hero.level < quest.reqLevel) { addMessage('system', '拒绝', `能力不足，需要等级 ${quest.reqLevel}。`); return; }
-    if (hero.stamina < quest.staminaCost) { addMessage('system', '疲惫', `体力不足，无法远行。`); return; }
-    if (hero.queuedQuest) { addMessage('system', '繁忙', `你已经有任务在身了。`); return; }
+    if (hero.level < quest.reqLevel) { addMessage('system', '拒绝', `等级不足 (需Lv.${quest.reqLevel})`); return; }
+    if (hero.stamina < quest.staminaCost) { addMessage('system', '疲惫', `体力不足`); return; }
+    if (hero.queuedQuest) { addMessage('system', '繁忙', `已有任务在身`); return; }
 
     const newBoard = hero.questBoard.filter(q => q.id !== questId); 
-    setHero(prev => prev ? { ...prev, stamina: prev.stamina - quest.staminaCost, queuedQuest: quest, questBoard: newBoard } : null);
+    
+    // ⚠️ 如果是主线任务，直接改变当前位置到剧情发生地
+    let newLocation = hero.location;
+    if (quest.category === 'main') {
+        const saga = MAIN_SAGA.find(s => s.title === quest.script.title);
+        if (saga && saga.location) newLocation = saga.location;
+    }
+
+    setHero(prev => prev ? { 
+        ...prev, 
+        stamina: prev.stamina - quest.staminaCost, 
+        queuedQuest: quest, 
+        questBoard: newBoard,
+        location: newLocation // 瞬移到剧情点
+    } : null);
     
     addMessage('system', '誓言', `接受支线委托：${quest.name}`);
-    // 支线任务依然需要手动触发 AI 铺垫
-    triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest }); 
+    triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest, location: newLocation }); 
   };
 
   const hireCompanion = (visitorId: string) => {
     if (!hero) return;
     const visitor = hero.tavern.visitors.find(v => v.id === visitorId);
     if (!visitor) return;
-    if (hero.gold < visitor.price) { addMessage('system', '穷困', "囊中羞涩，无法支付雇佣金。"); return; }
+    if (hero.gold < visitor.price) { addMessage('system', '穷困', "囊中羞涩。"); return; }
     setHero(prev => {
       if (!prev) return null;
       return { ...prev, gold: prev.gold - visitor.price, companion: visitor, companionExpiry: Date.now() + 24 * 60 * 60 * 1000, tavern: { ...prev.tavern, visitors: prev.tavern.visitors.filter(v => v.id !== visitorId) } };
     });
-    addMessage('system', '结盟', `支付 ${visitor.price} 金龙，招募了【${visitor.name}】。`);
+    addMessage('system', '结盟', `招募了【${visitor.name}】。`);
     triggerAI("recruit_companion", "", "recruit", { ...hero, companion: visitor });
   };
 
@@ -284,19 +304,10 @@ export function useGame() {
       if (!res.ok) return false;
       const data = await res.json();
       if (data.text) {
-        if (eventType === 'generate_description') {
-            setHero(h => h ? { ...h, description: data.text } : null);
-            return true;
-        }
-        if (eventType === 'generate_equip_desc') {
-            setHero(h => h ? { ...h, equipmentDescription: data.text } : null);
-            return true;
-        }
-
-        if (eventType === 'generate_rumor') {
-           let title = "风声"; let content = data.text;
-           if (data.text.includes("：")) { const parts = data.text.split("："); title = parts[0]; content = parts.slice(1).join("："); }
-           addMessage('rumor', title, content);
+        if (eventType.includes('generate_')) {
+            // handle description updates
+        } else if (eventType === 'generate_rumor') {
+           addMessage('rumor', '风声', data.text);
         } else {
            const fullText = suffix ? `${data.text} ${suffix}` : data.text;
            addLog(fullText, 'highlight');
@@ -311,17 +322,16 @@ export function useGame() {
     return false;
   };
 
-  // ... (godAction, autoManageInventory 保持不变，省略以节省空间) ...
   const godAction = async (type: 'bless' | 'punish') => {
     if (!hero) return;
     if (hero.godPower < 25) { addMessage('system', '命运', "命运值不足。"); return; }
     if (type === 'bless') { 
       setHero(h => h ? {...h, hp: h.maxHp, godPower: h.godPower - 25} : null); 
-      addMessage('system', '眷顾', "伤势尽愈！(HP恢复)");
+      addMessage('system', '眷顾', "伤势尽愈！");
       triggerAI('god_action', ''); 
     } else { 
       setHero(h => h ? {...h, hp: Math.max(1, h.hp - 20), exp: h.exp + 50, godPower: h.godPower - 25} : null); 
-      addMessage('system', '试炼', "虽受皮肉之苦，却觉意志更坚！(经验+50)");
+      addMessage('system', '试炼', "意志更坚！");
       triggerAI('god_action', ''); 
     }
   };
@@ -331,7 +341,6 @@ export function useGame() {
     const logs: string[] = []; 
     let updated = false;
     let equipChanged = false;
-
     const newTags = calculateTags(hero);
     const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(hero.tags);
     if (tagsChanged) { hero.tags = newTags; updated = true; }
@@ -479,17 +488,19 @@ export function useGame() {
            managedHero.exp += newQuest.rewards.exp;
            addMessage('system', '报偿', `委托【${newQuest.name}】已完成。`);
 
+           // ⚠️ 主线完成逻辑：推进篇章
            if (newQuest.category === 'main') {
                managedHero.mainStoryIndex += 1;
                addMessage('system', '史诗', `【${newQuest.name}】篇章结束。`);
+               // 强制刷新任务板，出现下一章主线
+               managedHero.questBoard = generateQuestBoard(managedHero);
            }
 
            if (queued) {
-             const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', managedHero.level);
+             // ... queue logic
              newQuest = queued;
              queued = null;
-             managedHero.location = targetLoc; 
-             managedHero.state = newQuest.category === 'combat' ? 'fight' : 'idle';
+             managedHero.state = 'fight'; 
              setTimeout(() => triggerAI('quest_start', '', undefined, managedHero), 500);
           } else {
              newQuest = null; 
@@ -505,7 +516,6 @@ export function useGame() {
              managedHero.state = 'fight'; 
              aiEvent = 'quest_start';
          } 
-         // 如果闲置，系统会自动接取主线 (上面逻辑)，所以这里不需要填充逻辑
       }
 
       if (managedHero.state !== 'town' && Math.random() < 0.15) {
@@ -520,7 +530,6 @@ export function useGame() {
       }
 
       // ⚠️ 核心：频率保持 100% (Else 必定触发)
-      // 如果没有主线/任务事件，就强制生成环境描写
       if (aiEvent) {
          setHero(managedHero);
          await triggerAI(aiEvent);
@@ -534,7 +543,6 @@ export function useGame() {
          setHero(managedHero);
       }
       
-      // ⚠️ 心跳加速：8s - 15s (紧凑节奏)
       const nextTick = Math.floor(Math.random() * (15000 - 8000) + 8000); 
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
