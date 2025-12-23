@@ -5,7 +5,7 @@ import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Foot
 import { ItemType, Quality, QuestRank } from '@/app/lib/constants';
 
 export default function Home() {
-  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest, useItem } = useGame();
+  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'equip' | 'messages' | 'tavern'>('logs');
@@ -70,7 +70,6 @@ export default function Home() {
     );
   }
 
-  // ⚠️ 计算任务进度百分比
   const questPercent = hero.currentQuest 
     ? Math.min(100, Math.floor((hero.currentQuest.progress / hero.currentQuest.total) * 100)) 
     : 0;
@@ -109,14 +108,11 @@ export default function Home() {
          <div className="flex justify-between text-[10px] text-stone-500 mb-1">
             <span className="flex items-center gap-1 font-bold text-stone-700 truncate max-w-[200px]">
               <Target size={10} className="text-stone-800 shrink-0"/> 
-              {/* ⚠️ 空闲时显示文案 */}
               {hero.currentQuest ? hero.currentQuest.name : "闲云野鹤，暂无俗事"}
             </span>
-            {/* ⚠️ 空闲时不显示进度 */}
             <span className="font-mono">{hero.currentQuest ? `${questPercent}%` : ""}</span>
          </div>
          <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden mb-1">
-           {/* ⚠️ 空闲时隐藏进度条 */}
            <div className={`h-full transition-all duration-700 rounded-full ${hero.currentQuest ? 'bg-amber-600' : 'bg-transparent'}`} style={{ width: `${questPercent}%` }} />
          </div>
          {hero.queuedQuest && (
@@ -221,9 +217,13 @@ export default function Home() {
 
   const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
 
+  // ⚠️ 核心修改：移除手动使用按钮，增加自动化提示
   const BagView = () => (
     <div className="p-4 h-full overflow-y-auto">
-      <h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3>
+      <div className="flex justify-between items-center mb-4 px-2">
+        <h3 className="font-bold text-stone-800">行囊 ({hero.inventory.length}/20)</h3>
+        <span className="text-[10px] text-stone-400 italic">物品将由角色自动使用</span>
+      </div>
       <div className="space-y-2">
         {hero.inventory.map((item,i)=> (
           <div key={i} className="bg-white border border-stone-100 p-3 rounded flex justify-between items-center">
@@ -233,14 +233,6 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] bg-stone-50 px-1 rounded text-stone-400">价{item.price}</span>
-              {(item.type === 'consumable' || item.type === 'book') && (
-                <button 
-                  onClick={() => useItem(item.id)}
-                  className="bg-stone-800 text-white text-[10px] px-2 py-1 rounded hover:bg-stone-700 active:scale-95"
-                >
-                  {item.type === 'book' ? '研读' : '服用'}
-                </button>
-              )}
             </div>
           </div>
         ))}
@@ -248,14 +240,13 @@ export default function Home() {
     </div>
   );
 
-  const EquipView = () => { const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; return (<div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className={`text-sm ${getQualityColor(item.quality)}`}>{item.name}</div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>);};
+  const EquipView = () => { const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; return (<div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className={`text-sm ${getQualityColor(item.quality)}`}>{item.name} <span className="text-[10px] text-stone-400 ml-1">(强度 {item.power})</span></div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>);};
   const MessagesView = () => { 
     const rumors = hero.messages.filter(m => m.type === 'rumor'); 
     const systems = hero.messages.filter(m => m.type === 'system'); 
     return (<div className="p-4 h-full overflow-y-auto space-y-6"><div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><MessageSquare size={16}/> 江湖风声</h3>{rumors.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无风声</div> : <div className="space-y-3">{rumors.map((msg)=><div key={msg.id} className="bg-amber-50 border border-amber-100 p-3 rounded-lg shadow-sm"><div className="flex justify-between items-start mb-1"><div className="font-bold text-amber-900 text-sm">{msg.title}</div><div className="text-[10px] text-amber-400">{msg.time}</div></div><div className="text-xs text-amber-800 leading-relaxed text-justify">{msg.content}</div></div>)}</div>}</div><div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><Info size={16}/> 系统记录</h3>{systems.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无记录</div> : <div className="bg-white border border-stone-100 rounded-lg overflow-hidden">{systems.map((msg,i)=><div key={msg.id} className={`p-3 border-b border-stone-50 last:border-0 ${i%2===0?'bg-white':'bg-stone-50/50'}`}><div className="flex justify-between mb-1"><span className="font-bold text-stone-700 text-xs">{msg.title}</span><span className="text-[10px] text-stone-400">{msg.time}</span></div><div className="text-xs text-stone-500">{msg.content}</div></div>)}</div>}</div></div>);
   };
 
-  // ⚠️ 悬赏榜移到这里
   const TavernView = () => {
     const refreshTimeLeft = Math.max(0, 6 * 60 * 60 * 1000 - (Date.now() - (hero.lastQuestRefresh || 0)));
     const hours = Math.floor(refreshTimeLeft / (1000 * 60 * 60));

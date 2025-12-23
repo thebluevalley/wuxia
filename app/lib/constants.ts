@@ -10,7 +10,9 @@ export type Item = {
   minLevel: number;
   count: number;
   price: number;
-  effect?: string | number; 
+  effect?: string | number; // 效果 (回血量/技能名)
+  // ⚠️ 新增：装备强度 (用于自动比对)
+  power?: number; 
 };
 
 export type Equipment = {
@@ -33,7 +35,6 @@ export type Quest = {
   rank: QuestRank;
   desc: string; 
   progress: number; 
-  // ⚠️ total 不再固定，随难度变化
   total: number;
   reqLevel: number;
   isAuto?: boolean;
@@ -208,6 +209,7 @@ export const QUEST_SOURCES = {
   search: ["寻找失传的《易筋经》残卷"], hunt: ["讨伐黑风寨"], challenge: ["挑战华山"], train: ["修炼"], life: ["打杂"]
 };
 
+// ⚠️ 核心新增：为装备添加 power 值，用于自动比对
 export const LOOT_TABLE: Partial<Item>[] = [
   // --- 消耗品 ---
   { name: "半个冷馒头", type: 'consumable', desc: "干硬难咽，聊胜于无。", price: 1, minLevel: 1, quality: 'common', effect: 10 }, 
@@ -229,32 +231,32 @@ export const LOOT_TABLE: Partial<Item>[] = [
   { name: "《独孤九剑总决》", type: 'book', desc: "破尽天下武功。", price: 6000, minLevel: 60, quality: 'legendary', effect: "独孤九剑" },
   { name: "《凌波微步图》", type: 'book', desc: "依卦象而行，令敌人无可奈何。", price: 4000, minLevel: 45, quality: 'epic', effect: "凌波微步" },
 
-  // --- 武器 ---
-  { name: "生锈的铁剑", type: 'weapon', desc: "勉强能砍东西。", price: 10, minLevel: 1, quality: 'common' },
-  { name: "哨棒", type: 'weapon', desc: "结实的木棒。", price: 5, minLevel: 1, quality: 'common' },
-  { name: "精钢剑", type: 'weapon', desc: "百炼精钢打造。", price: 150, minLevel: 10, quality: 'common' },
-  { name: "百炼钢刀", type: 'weapon', desc: "刀背厚实，利于劈砍。", price: 180, minLevel: 12, quality: 'rare' },
-  { name: "判官笔", type: 'weapon', desc: "精铁所制，专点穴道。", price: 300, minLevel: 20, quality: 'rare' },
-  { name: "玄铁重剑(仿)", type: 'weapon', desc: "重剑无锋，大巧不工。", price: 1000, minLevel: 40, quality: 'epic' },
-  { name: "倚天剑", type: 'weapon', desc: "安得倚天抽宝剑，跨海斩长鲸。", price: 5000, minLevel: 60, quality: 'legendary' },
-  { name: "屠龙刀", type: 'weapon', desc: "武林至尊，宝刀屠龙。", price: 5500, minLevel: 65, quality: 'legendary' },
-  { name: "打狗棒", type: 'weapon', desc: "通体碧绿，坚韧无比。", price: 4500, minLevel: 55, quality: 'epic' },
+  // --- 武器 (power: 攻击力参考) ---
+  { name: "生锈的铁剑", type: 'weapon', desc: "勉强能砍东西。", price: 10, minLevel: 1, quality: 'common', power: 5 },
+  { name: "哨棒", type: 'weapon', desc: "结实的木棒。", price: 5, minLevel: 1, quality: 'common', power: 3 },
+  { name: "精钢剑", type: 'weapon', desc: "百炼精钢打造。", price: 150, minLevel: 10, quality: 'common', power: 20 },
+  { name: "百炼钢刀", type: 'weapon', desc: "刀背厚实，利于劈砍。", price: 180, minLevel: 12, quality: 'rare', power: 35 },
+  { name: "判官笔", type: 'weapon', desc: "精铁所制，专点穴道。", price: 300, minLevel: 20, quality: 'rare', power: 50 },
+  { name: "玄铁重剑(仿)", type: 'weapon', desc: "重剑无锋，大巧不工。", price: 1000, minLevel: 40, quality: 'epic', power: 120 },
+  { name: "倚天剑", type: 'weapon', desc: "安得倚天抽宝剑，跨海斩长鲸。", price: 5000, minLevel: 60, quality: 'legendary', power: 300 },
+  { name: "屠龙刀", type: 'weapon', desc: "武林至尊，宝刀屠龙。", price: 5500, minLevel: 65, quality: 'legendary', power: 320 },
+  { name: "打狗棒", type: 'weapon', desc: "通体碧绿，坚韧无比。", price: 4500, minLevel: 55, quality: 'epic', power: 250 },
 
-  // --- 防具 ---
-  { name: "粗布头巾", type: 'head', desc: "遮风挡雨。", price: 5, minLevel: 1, quality: 'common' },
-  { name: "麻布衣", type: 'body', desc: "寻常百姓的衣物。", price: 10, minLevel: 1, quality: 'common' },
-  { name: "草鞋", type: 'feet', desc: "走久了脚会磨泡。", price: 2, minLevel: 1, quality: 'common' },
-  { name: "皮甲", type: 'body', desc: "硬皮硝制，有一定防御力。", price: 80, minLevel: 10, quality: 'common' },
-  { name: "虎皮裙", type: 'legs', desc: "看起来很威风。", price: 150, minLevel: 15, quality: 'rare' },
-  { name: "神行太保靴", type: 'feet', desc: "穿上后健步如飞。", price: 300, minLevel: 20, quality: 'rare' },
-  { name: "金丝软甲", type: 'body', desc: "刀枪不入，轻便贴身。", price: 4000, minLevel: 55, quality: 'legendary' },
-  { name: "软猬甲", type: 'body', desc: "桃花岛至宝，满布倒刺。", price: 4200, minLevel: 58, quality: 'legendary' },
+  // --- 防具 (power: 防御力参考) ---
+  { name: "粗布头巾", type: 'head', desc: "遮风挡雨。", price: 5, minLevel: 1, quality: 'common', power: 2 },
+  { name: "麻布衣", type: 'body', desc: "寻常百姓的衣物。", price: 10, minLevel: 1, quality: 'common', power: 5 },
+  { name: "草鞋", type: 'feet', desc: "走久了脚会磨泡。", price: 2, minLevel: 1, quality: 'common', power: 1 },
+  { name: "皮甲", type: 'body', desc: "硬皮硝制，有一定防御力。", price: 80, minLevel: 10, quality: 'common', power: 15 },
+  { name: "虎皮裙", type: 'legs', desc: "看起来很威风。", price: 150, minLevel: 15, quality: 'rare', power: 20 },
+  { name: "神行太保靴", type: 'feet', desc: "穿上后健步如飞。", price: 300, minLevel: 20, quality: 'rare', power: 25 },
+  { name: "金丝软甲", type: 'body', desc: "刀枪不入，轻便贴身。", price: 4000, minLevel: 55, quality: 'legendary', power: 150 },
+  { name: "软猬甲", type: 'body', desc: "桃花岛至宝，满布倒刺。", price: 4200, minLevel: 58, quality: 'legendary', power: 160 },
 
-  // --- 饰品 ---
-  { name: "平安符", type: 'accessory', desc: "庙里求来的，保平安。", price: 20, minLevel: 1, quality: 'common' },
-  { name: "精铁护腕", type: 'accessory', desc: "保护手腕，增加臂力。", price: 100, minLevel: 10, quality: 'rare' },
-  { name: "温玉佩", type: 'accessory', desc: "冬暖夏凉，凝神静气。", price: 500, minLevel: 30, quality: 'epic' },
-  { name: "通灵宝玉", type: 'accessory', desc: "似乎蕴含着某种灵性。", price: 2000, minLevel: 50, quality: 'legendary' },
+  // --- 饰品 (power: 综合属性参考) ---
+  { name: "平安符", type: 'accessory', desc: "庙里求来的，保平安。", price: 20, minLevel: 1, quality: 'common', power: 5 },
+  { name: "精铁护腕", type: 'accessory', desc: "保护手腕，增加臂力。", price: 100, minLevel: 10, quality: 'rare', power: 15 },
+  { name: "温玉佩", type: 'accessory', desc: "冬暖夏凉，凝神静气。", price: 500, minLevel: 30, quality: 'epic', power: 40 },
+  { name: "通灵宝玉", type: 'accessory', desc: "似乎蕴含着某种灵性。", price: 2000, minLevel: 50, quality: 'legendary', power: 100 },
 ];
 
 export const STATIC_LOGS = {
