@@ -356,7 +356,7 @@ export function useGame() {
       }
     });
     
-    // Books & Potions logic omitted for space, keep original logic
+    // Books & Potions
     const books = hero.inventory.filter(i => i.type === 'book');
     books.forEach(book => {
        const skillName = String(book.effect);
@@ -451,7 +451,7 @@ export function useGame() {
           }
       }
       
-      // ⚠️ 2. 任务刷新逻辑
+      // ⚠️ 2. 刷新 (1小时)
       if (Date.now() - (managedHero.lastQuestRefresh || 0) > QUEST_REFRESH_INTERVAL) {
          managedHero.questBoard = generateQuestBoard(managedHero);
          managedHero.lastQuestRefresh = Date.now();
@@ -483,10 +483,10 @@ export function useGame() {
            }
 
            if (queued) {
-             // ⚠️ 修复：排队任务位置逻辑
              let targetLoc = getLocationByQuest('life', managedHero.level);
+             // ⚠️ 修复：使用可选链 ?. 避免 TS 错误
              if (queued.category === 'main') {
-                 const saga = MAIN_SAGA.find(s => s.title === queued.script.title);
+                 const saga = MAIN_SAGA.find(s => s.title === queued?.script.title);
                  if (saga) targetLoc = saga.location;
              }
 
@@ -506,7 +506,7 @@ export function useGame() {
          if (queued) {
              let targetLoc = getLocationByQuest('life', managedHero.level);
              if (queued.category === 'main') {
-                 const saga = MAIN_SAGA.find(s => s.title === queued.script.title);
+                 const saga = MAIN_SAGA.find(s => s.title === queued?.script.title);
                  if (saga) targetLoc = saga.location;
              }
              newQuest = queued; queued = null;
