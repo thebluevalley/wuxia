@@ -5,7 +5,8 @@ import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Foot
 import { ItemType, Quality, QuestRank } from '@/app/lib/constants';
 
 export default function Home() {
-  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest, useItem } = useGame();
+  // ⚠️ 核心修复：这里不再解构 useItem
+  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'equip' | 'messages' | 'tavern'>('logs');
@@ -132,11 +133,9 @@ export default function Home() {
       <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
         {hero.logs.map((log) => (
           <div key={log.id} className="animate-in fade-in slide-in-from-bottom-2 duration-700 flex gap-2 items-baseline">
-            {/* ⚠️ 弱化时间戳 */}
             <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
-            {/* ⚠️ 优化正文：去粗体，增加行间距，仅用颜色区分 */}
             <span className={`text-[14px] leading-7 text-justify ${
-              log.type === 'highlight' ? 'text-amber-800' : // 深琥珀色，不加粗
+              log.type === 'highlight' ? 'text-amber-800' : 
               log.type === 'system' ? 'text-stone-400 text-xs italic' : 
               'text-stone-800'
             }`}>
@@ -284,6 +283,7 @@ export default function Home() {
                        </div>
                        <div className="flex gap-0.5 text-stone-300">{[...Array(quest.rank)].map((_, i) => <Star key={i} size={8} fill="currentColor"/>)}</div>
                     </div>
+                    {/* ⚠️ 使用 quest.desc */}
                     <div className="text-[10px] text-stone-400 mb-2">{quest.desc}</div>
                     <div className="flex justify-between items-center border-t border-stone-50 pt-2">
                        <div className="text-[10px] text-stone-500 font-mono flex items-center gap-2">
