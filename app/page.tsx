@@ -5,7 +5,6 @@ import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Foot
 import { ItemType, Quality, QuestRank } from '@/app/lib/constants';
 
 export default function Home() {
-  // ⚠️ 核心修复：这里不再解构 useItem
   const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
@@ -135,9 +134,9 @@ export default function Home() {
           <div key={log.id} className="animate-in fade-in slide-in-from-bottom-2 duration-700 flex gap-2 items-baseline">
             <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
             <span className={`text-[14px] leading-7 text-justify ${
-              log.type === 'highlight' ? 'text-amber-800' : 
+              log.type === 'highlight' ? 'text-amber-900' : // 重点事件用深琥珀色
               log.type === 'system' ? 'text-stone-400 text-xs italic' : 
-              'text-stone-800'
+              'text-black' // ⚠️ 剧情正文改为纯黑色，增强对比度
             }`}>
               {log.text}
             </span>
@@ -283,7 +282,6 @@ export default function Home() {
                        </div>
                        <div className="flex gap-0.5 text-stone-300">{[...Array(quest.rank)].map((_, i) => <Star key={i} size={8} fill="currentColor"/>)}</div>
                     </div>
-                    {/* ⚠️ 使用 quest.desc */}
                     <div className="text-[10px] text-stone-400 mb-2">{quest.desc}</div>
                     <div className="flex justify-between items-center border-t border-stone-50 pt-2">
                        <div className="text-[10px] text-stone-500 font-mono flex items-center gap-2">
