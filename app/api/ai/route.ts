@@ -1,6 +1,6 @@
 import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
-import { FLAVOR_TEXTS } from "@/app/lib/constants";
+import { FLAVOR_TEXTS, WORLD_ARCHIVE } from "@/app/lib/constants";
 
 export async function POST(req: Request) {
   const apiKey = process.env.GROQ_API_KEY;
@@ -11,19 +11,35 @@ export async function POST(req: Request) {
     const groq = new Groq({ apiKey });
 
     const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
-    const actionFlavor = FLAVOR_TEXTS.action[Math.floor(Math.random() * FLAVOR_TEXTS.action.length)];
+    // 随机抽取一个典故，增加历史厚重感
+    const loreSnippet = WORLD_ARCHIVE[Math.floor(Math.random() * WORLD_ARCHIVE.length)];
 
-    const stage = context.storyStage || "初出茅庐";
+    const stage = context.storyStage || "微尘";
     const tags = context.tags ? context.tags.join(", ") : "无";
     
-    let tone = "witty and fast-paced";
-    if (stage.includes("宗师")) tone = "philosophical and solemn";
-    else if (stage.includes("名动")) tone = "heroic and intense";
+    // 设定基调：生活流与史诗感的结合
+    let toneInstruction = "";
+    if (stage === "微尘") {
+        toneInstruction = "Tone: Down-to-earth, Vibrant, Humorous. Focus on small struggles and joys of common people.";
+    } else if (stage === "棋子") {
+        toneInstruction = "Tone: Intriguing, Complex. The hero sees the dark web of Jianghu connections.";
+    } else if (stage === "破局者") {
+        toneInstruction = "Tone: Determined, Heroic. The hero challenges the status quo.";
+    } else if (stage === "国士" || stage === "传说") {
+        toneInstruction = "Tone: Epic, Melancholic, Grand. The hero bears the fate of the nation.";
+    }
+
+    const isLong = Math.random() > 0.6;
+    const lengthInstruction = isLong 
+        ? "Write a rich paragraph (60 words)." 
+        : "Write a witty, short sentence (under 15 words).";
 
     const baseInstruction = `
-      You are a Dungeon Master for a Wuxia RPG. Write in CHINESE.
-      Tone: ${tone}.
-      Style: Show, Don't Tell. Use imagery.
+      You are a Master Storyteller (Jin Yong style). Write in CHINESE.
+      ${toneInstruction}
+      Style: Show, Don't Tell. Mix everyday life details with grand historical context.
+      Length: ${lengthInstruction}
+      Use this Lore Snippet if relevant: "${loreSnippet}" (but don't force it).
       
       Hero: ${context.name} (${stage}).
       Hero Tags: [${tags}].
@@ -35,50 +51,57 @@ export async function POST(req: Request) {
     
     switch (eventType) {
       case 'generate_description':
-        // ⚠️ 侧写生成 Prompt
-        prompt = `
-          Based on the tags [${tags}], describe the hero's current appearance and aura in one flavorful sentence.
-          Example: "他背着一口锈剑，满身酒气，眼神中却透着一股不寻常的锐利。"
-          Do NOT list the tags directly. Weave them into the description.
-        `;
+        prompt = `Based on tags [${tags}] and stage [${stage}], describe the hero's current vibe. Is he a tired traveler or a shining hero?`;
         break;
 
       case 'start_game':
-        prompt = `${baseInstruction} Write an opening scene. Describe the hero standing in ${context.location}. Reflect the hero's tags in their appearance or demeanor. 80 words.`;
+        prompt = `${baseInstruction} Write an opening scene. The hero stands in ${context.location}. Describe the bustling life around them.`;
         break;
       
       case 'quest_start':
         prompt = `${baseInstruction} 
-        Event: Hero accepts the quest "${context.questScript?.title}".
+        Event: Quest Start "${context.questScript?.title}".
         Details: ${context.questScript?.description}.
-        Action: Describe the hero setting off. If the hero has tags like "Drunk" or "Injured", mention it subtly.`;
+        Action: The hero sets off. Keep it lively.`;
+        break;
+
+      case 'quest_journey':
+        prompt = `${baseInstruction} 
+        Event: A moment on the road.
+        Action: Describe a scene (e.g., sharing food with a stranger, seeing a beautiful sunset, or a sign of the looming war).
+        Mandatory: Use flavor text "${envFlavor}".`;
+        break;
+
+      case 'idle_event':
+        prompt = `${baseInstruction} 
+        Event: Wandering in ${context.location}.
+        Action: A slice-of-life moment (eating, drinking, observing people). Reflect the hero's tags [${tags}].`;
         break;
 
       case 'quest_climax':
         prompt = `${baseInstruction} 
-        Event: The Climax of "${context.questScript?.title}".
-        Antagonist: ${context.questScript?.antagonist}.
+        Event: Climax vs ${context.questScript?.antagonist}.
         Twist: ${context.questScript?.twist}.
-        Action: Describe the confrontation. If the hero has tags like "Ruthless" or "Scholar", affect how they fight.`;
+        Action: A confrontation. Focus on the dialogue or the meaning behind the fight, not just violence.`;
         break;
 
       case 'quest_end':
         prompt = `${baseInstruction} 
-        Event: Conclusion of "${context.questScript?.title}".
+        Event: Conclusion.
         Objective: ${context.questScript?.objective}.
-        Action: Describe the aftermath.`;
+        Action: The task is done. How does the hero feel? Relieved? Hungry?`;
         break;
         
       case 'recruit_companion':
-        prompt = `${baseInstruction} Hero meets a new companion. Describe their first interaction.`;
+        prompt = `${baseInstruction} Hero meets a new companion. They bond over a shared interest (wine, food, justice).`;
         break;
         
       case 'god_action':
-        prompt = `${baseInstruction} A supernatural event occurs. Describe it with awe.`;
+        prompt = `${baseInstruction} A moment of serendipity or destiny.`;
         break;
         
       case 'generate_rumor':
-        prompt = `Write a mysterious Wuxia rumor. Format: "【Title】Content". Short and intriguing.`;
+        prompt = `Write a rumor about the Jianghu or the War. Format: "【Title】Content". Short, engaging.`;
         break;
 
       default:
@@ -88,8 +111,8 @@ export async function POST(req: Request) {
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 0.8, 
-      max_tokens: 200,
+      temperature: 0.9, 
+      max_tokens: 300,
     });
 
     const text = completion.choices[0]?.message?.content || "";
