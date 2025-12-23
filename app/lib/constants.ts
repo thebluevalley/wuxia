@@ -1,4 +1,3 @@
-// --- 基础类型 ---
 export type ItemType = 'weapon' | 'head' | 'body' | 'legs' | 'feet' | 'accessory' | 'misc' | 'consumable' | 'book';
 export type Quality = 'common' | 'rare' | 'epic' | 'legendary';
 
@@ -24,7 +23,6 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-// ⚠️ 势力体系
 export type Faction = 'throne' | 'sect' | 'underworld' | 'cult' | 'neutral';
 export const FACTIONS: Record<Faction, string> = {
   throne: "朝廷六扇门",
@@ -34,12 +32,9 @@ export const FACTIONS: Record<Faction, string> = {
   neutral: "市井江湖"
 };
 
-// ⚠️ 任务相关定义
 export type QuestCategory = 'combat' | 'life';
 export type QuestRank = 1 | 2 | 3 | 4 | 5;
 export type QuestStage = 'start' | 'road' | 'climax' | 'end'; 
-
-// ⚠️ 补回丢失的 QuestType，用于地图定位逻辑
 export type QuestType = 'search' | 'hunt' | 'challenge' | 'train' | 'life';
 
 export type Quest = { 
@@ -56,6 +51,9 @@ export type Quest = {
     antagonist: string;
     twist: string;
   };
+
+  // ⚠️ 核心修复：确保顶层包含 desc 字段
+  desc: string;
 
   stage: QuestStage;
   progress: number; 
@@ -94,16 +92,12 @@ export type HeroState = {
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
   stamina: number; maxStamina: number;
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
-  
   reputation: Record<Faction, number>;
-
   currentQuest: Quest | null;
   queuedQuest: Quest | null;
   questBoard: Quest[];
   lastQuestRefresh: number;
-  
   narrativeHistory: string;
-
   location: string; 
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   logs: LogEntry[]; messages: Message[]; majorEvents: string[];
@@ -114,8 +108,6 @@ export type HeroState = {
 };
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
-
-// --- 静态数据 ---
 
 export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "避世"];
 export const NPC_NAMES_MALE = ["啸天", "无忌", "一刀", "寻欢", "留香", "不败", "求败", "铁手", "无情", "冷血", "小宝", "大侠", "三少", "风", "云", "雷", "电", "靖", "康", "峰", "平", "冲", "过", "伯光", "志平"];
@@ -201,7 +193,6 @@ export const FLAVOR_TEXTS = {
   object: ["锈迹斑斑的铁剑", "半块玉佩", "染血的书信", "酒旗", "孤灯", "寒鸦"]
 };
 
-// 剧本库
 export const QUEST_SCRIPTS = {
   "初出茅庐": [
     { title: "偷鸡贼的末路", desc: "王大妈的鸡丢了，据说后山有野狗出没。", obj: "找回丢失的老母鸡", antagonist: "成精的野狗", twist: "野狗嘴里叼着的竟是一块官银", faction: 'neutral' },
@@ -216,14 +207,12 @@ export const QUEST_SCRIPTS = {
   ]
 };
 
-// ⚠️ 确保这个被导出
 export const WORLD_LORE = `
 背景：王朝末年，乱世江湖。
 势力：听雨楼(情报)、铸剑山庄(神兵)、隐元会(杀手)、丐帮(天下第一帮)。
 体系：内练一口气，外练筋骨皮。武学分外功、内功、轻功。
 `;
 
-// 兼容旧代码
 export const QUEST_SOURCES = {
   search: ["寻找失传的《易筋经》残卷"], hunt: ["讨伐黑风寨"], challenge: ["挑战华山"], train: ["修炼"], life: ["打杂"]
 };
