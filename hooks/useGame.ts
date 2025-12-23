@@ -10,7 +10,7 @@ const REFRESH_INTERVAL = 3 * 60 * 60 * 1000;
 const QUEST_REFRESH_INTERVAL = 6 * 60 * 60 * 1000; 
 
 // --- 辅助函数 ---
-
+// (保留所有辅助函数逻辑不变)
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "私生子";
@@ -134,6 +134,7 @@ export function useGame() {
 
   useEffect(() => { heroRef.current = hero; }, [hero]);
 
+  // Login ... (Same as before)
   const login = async (name: string, password: string) => {
     setLoading(true); setError(null);
     const initialStage = "私生子";
@@ -148,7 +149,6 @@ export function useGame() {
       stamina: 120, maxStamina: 120,
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 200, 
       alignment: 0, location: "临冬城", state: 'idle', 
-      // ⚠️ 初始日志
       logs: [{ id: "init", text: "北境的寒风凛冽，你裹紧了破旧的斗篷，望着灰暗的天空，心中知道——凛冬将至。", type: "highlight", time: "00:00" }], 
       messages: [], majorEvents: [`${new Date().toLocaleDateString()}：${name} 踏入维斯特洛。`],
       inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
@@ -173,7 +173,6 @@ export function useGame() {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
         if (!mergedData.equipmentDescription) mergedData.equipmentDescription = "衣着朴素。";
-        // ⚠️ 确保老用户也有日志显示
         if (!mergedData.logs || mergedData.logs.length === 0) {
             mergedData.logs = [{ id: "init_resume", text: "你从沉睡中醒来，周围的一切既熟悉又陌生。战乱的硝烟似乎从未散去。", type: "highlight", time: "08:00" }];
         }
@@ -196,20 +195,16 @@ export function useGame() {
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
   }, [hero]);
 
-  // ⚠️ 日志系统 (Story Only)
   const addLog = (text: string, type: LogEntry['type'] = 'highlight') => {
-    // ⚠️ 核心修复：显式指定类型为 highlight (或 LogEntry['type'] 联合类型)
     const finalType: LogEntry['type'] = 'highlight'; 
     setHero(prev => {
       if (!prev) return null;
       const newHistory = (prev.narrativeHistory + " " + text).slice(-500);
       const newLog: LogEntry = { id: Date.now().toString(), text, type: finalType, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}) };
-      // ⚠️ 倒序插入
       return { ...prev, logs: [newLog, ...prev.logs].slice(0, 50), narrativeHistory: newHistory };
     });
   };
 
-  // ⚠️ 消息系统 (System Mechanics)
   const addMessage = (type: 'rumor' | 'system', title: string, content: string) => {
     setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; });
   };
@@ -289,10 +284,7 @@ export function useGame() {
         }
         return true;
       }
-    } catch (e) { 
-        console.error(e); 
-        addLog("风雪太大了，你看不清前方的路，只能暂时在原地休整。", "highlight");
-    }
+    } catch (e) { console.error(e); addLog("风雪太大了，你看不清前方的路，只能暂时在原地休整。", "highlight"); }
     return false;
   };
 
@@ -471,22 +463,24 @@ export function useGame() {
          }
       }
 
+      // ⚠️ 核心修改：大幅提高事件触发概率 (95%)
       if (aiEvent) {
          setHero(managedHero);
          await triggerAI(aiEvent);
-      } else if (!aiEvent && managedHero.currentQuest && managedHero.currentQuest.stage === 'road' && Math.random() < 0.7) { 
+      } else if (!aiEvent && managedHero.currentQuest && managedHero.currentQuest.stage === 'road' && Math.random() < 0.95) { 
          setHero(managedHero);
          await triggerAI('quest_journey');
-      } else if (!aiEvent && !managedHero.currentQuest && Math.random() < 0.6) { 
+      } else if (!aiEvent && !managedHero.currentQuest && Math.random() < 0.95) { 
          setHero(managedHero);
          await triggerAI('idle_event');
-      } else if (Math.random() < 0.1) {
+      } else if (Math.random() < 0.2) {
          await triggerAI('generate_rumor');
       } else {
          setHero(managedHero);
       }
       
-      const nextTick = Math.floor(Math.random() * (20000 - 8000) + 8000); 
+      // ⚠️ 心跳时间：15s - 25s (给足阅读时间)
+      const nextTick = Math.floor(Math.random() * (25000 - 15000) + 15000); 
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
     timerRef.current = setTimeout(gameLoop, 2000);
