@@ -65,7 +65,7 @@ const TypewriterText = memo(({ text, className }: { text: string, className?: st
     if (text !== lastTextRef.current) {
       hasAnimatedRef.current = false;
       lastTextRef.current = text;
-      setDisplayedText('');
+      setDisplayedText(''); 
     }
 
     if (hasAnimatedRef.current) {
@@ -82,9 +82,9 @@ const TypewriterText = memo(({ text, className }: { text: string, className?: st
         index++;
       } else {
         clearInterval(timer);
-        hasAnimatedRef.current = true;
+        hasAnimatedRef.current = true; 
       }
-    }, 60); 
+    }, 50); 
 
     return () => clearInterval(timer);
   }, [text]);
@@ -97,6 +97,9 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
   const questPercent = hero.currentQuest 
     ? Math.min(100, Math.floor((hero.currentQuest.progress / hero.currentQuest.total) * 100)) 
     : 0;
+  
+  // 判断是否为主线
+  const isMainQuest = hero.currentQuest?.category === 'main';
 
   return (
     <header className="p-4 pb-2 flex-none z-10 bg-[#fcf9f2]/90 backdrop-blur-sm border-b border-stone-200">
@@ -128,24 +131,48 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
            </div>
         </div>
       </div>
-      <div className="bg-white border border-stone-200 rounded p-2 shadow-sm flex flex-col gap-1 mb-2">
-         <div className="flex justify-between text-[10px] text-stone-500 mb-1">
-            <span className="flex items-center gap-1 font-bold text-stone-700 truncate max-w-[200px]">
-              <Target size={10} className="text-stone-800 shrink-0"/> 
-              {hero.currentQuest ? hero.currentQuest.name : "暂无事务"}
-            </span>
-            <span className="font-mono">{hero.currentQuest ? `${questPercent}%` : ""}</span>
-         </div>
-         <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden mb-1">
-           <div className={`h-full transition-all duration-700 rounded-full ${hero.currentQuest ? 'bg-amber-600' : 'bg-transparent'}`} style={{ width: `${questPercent}%` }} />
-         </div>
-         {hero.queuedQuest && (
-           <div className="text-[9px] text-stone-400 flex items-center gap-1 border-t border-stone-50 pt-1">
+      
+      {/* ⚠️ 核心：主线任务显示区 */}
+      {isMainQuest ? (
+        <div className="bg-gradient-to-r from-amber-50 via-[#fcf9f2] to-white border-l-4 border-amber-700 p-3 shadow-sm rounded-r mb-3 animate-in slide-in-from-top duration-700">
+           <div className="flex justify-between items-center mb-1">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-amber-900 tracking-wide font-serif">
+                <Crown size={14} fill="currentColor" className="text-amber-600"/> 
+                史诗篇章：{hero.currentQuest?.name.replace('【主线】', '')}
+              </span>
+              <span className="text-[10px] font-mono text-amber-900/60">{questPercent}%</span>
+           </div>
+           <div className="h-1.5 w-full bg-amber-100 rounded-full overflow-hidden mb-2">
+             <div className="h-full bg-amber-600 transition-all duration-1000 rounded-full" style={{ width: `${questPercent}%` }} />
+           </div>
+           {hero.currentQuest?.script?.npc && (
+             <div className="text-[10px] text-amber-800/80 font-serif italic border-t border-amber-100 pt-1 mt-1 flex items-center gap-1">
+               <User size={10}/> 关键人物: {hero.currentQuest.script.npc}
+             </div>
+           )}
+        </div>
+      ) : (
+        /* 普通/无任务显示 */
+        <div className="bg-white border border-stone-200 rounded p-2 shadow-sm flex flex-col gap-1 mb-2">
+           <div className="flex justify-between text-[10px] text-stone-500 mb-1">
+              <span className="flex items-center gap-1 font-bold text-stone-700 truncate max-w-[200px]">
+                <Target size={10} className="text-stone-800 shrink-0"/> 
+                {hero.currentQuest ? hero.currentQuest.name : "暂无事务"}
+              </span>
+              <span className="font-mono">{hero.currentQuest ? `${questPercent}%` : ""}</span>
+           </div>
+           <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden mb-1">
+             <div className={`h-full transition-all duration-700 rounded-full ${hero.currentQuest ? 'bg-stone-600' : 'bg-transparent'}`} style={{ width: `${questPercent}%` }} />
+           </div>
+        </div>
+      )}
+
+      {hero.queuedQuest && (
+           <div className="text-[9px] text-stone-400 flex items-center gap-1 border-t border-stone-50 pt-1 mt-1">
              <Clock size={8}/> 待办: {hero.queuedQuest.name}
            </div>
-         )}
-      </div>
-      <div className="space-y-1">
+      )}
+      <div className="space-y-1 mt-2">
         <div className="h-[2px] w-full bg-stone-200 rounded-full"><div className="h-full bg-stone-800 transition-all duration-500 rounded-full" style={{ width: `${(hero.hp / hero.maxHp) * 100}%` }} /></div>
       </div>
     </header>
@@ -156,7 +183,7 @@ Header.displayName = 'Header';
 const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type: 'bless'|'punish') => void }) => {
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex-1 overflow-y-auto p-5 space-y-8 scroll-smooth">
+      <div className="flex-1 overflow-y-auto p-5 space-y-8 scroll-smooth pb-20">
         {hero.logs.map((log, index) => {
           const isLatest = index === 0; 
           const isNarrative = log.type === 'highlight';
@@ -198,6 +225,7 @@ const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type:
 });
 LogsView.displayName = 'LogsView';
 
+// ... (EquipSlot, AttributeRow, HeroView, BagView, MessagesView 保持不变) ...
 const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
     <div className="flex flex-col items-center bg-white p-2 rounded border border-stone-100">
        <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${item ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-300'}`}>{icon}</div>
@@ -331,16 +359,15 @@ const MessagesView = memo(({ hero }: { hero: HeroState }) => {
 MessagesView.displayName = 'MessagesView';
 
 const TavernView = memo(({ hero, hireCompanion, acceptQuest }: { hero: HeroState, hireCompanion: (id: string) => void, acceptQuest: (id: string) => void }) => {
-    const refreshTimeLeft = Math.max(0, 6 * 60 * 60 * 1000 - (Date.now() - (hero.lastQuestRefresh || 0)));
-    const hours = Math.floor(refreshTimeLeft / (1000 * 60 * 60));
-    const mins = Math.floor((refreshTimeLeft % (1000 * 60 * 60)) / (1000 * 60));
+    const refreshTimeLeft = Math.max(0, 60 * 60 * 1000 - (Date.now() - (hero.lastQuestRefresh || 0)));
+    const mins = Math.floor(refreshTimeLeft / (1000 * 60));
 
     return (
     <div className="p-4 h-full overflow-y-auto">
        <div className="mb-8">
            <div className="flex justify-between items-center mb-3 px-1">
               <h3 className="font-bold text-stone-800 flex items-center gap-2"><Scroll size={16}/> 告示板</h3>
-              <div className="text-[10px] text-stone-400 flex items-center gap-1"><Clock size={10}/> 刷新: {hours}小时{mins}分</div>
+              <div className="text-[10px] text-stone-400 flex items-center gap-1"><Clock size={10}/> 刷新: {mins}分</div>
            </div>
            <div className="space-y-2">
               {hero.questBoard.map((quest) => (
@@ -348,7 +375,6 @@ const TavernView = memo(({ hero, hireCompanion, acceptQuest }: { hero: HeroState
                     <div className="flex justify-between items-start mb-1">
                        <div className="flex items-center gap-2">
                           <span className="text-stone-600 text-sm">
-                            {/* ⚠️ 修复：适配 main / side 分类 */}
                             {quest.category === 'main' ? <Crown size={14} className="text-amber-600"/> : <Scroll size={14}/>}
                           </span>
                           <span className={`text-sm ${quest.category === 'main' ? 'font-bold text-amber-800' : 'text-stone-700'}`}>
@@ -390,13 +416,11 @@ const TavernView = memo(({ hero, hireCompanion, acceptQuest }: { hero: HeroState
              </div>
           ))}
        </div>
-       <div className="text-center text-[10px] text-stone-300 mt-8 mb-4">每3小时有新客到访。</div>
+       <div className="text-center text-[10px] text-stone-300 mt-8 mb-4">每1小时有新客到访。</div>
     </div>
   );
 });
 TavernView.displayName = 'TavernView';
-
-// --- 主组件 ---
 
 export default function Home() {
   const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
