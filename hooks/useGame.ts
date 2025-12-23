@@ -6,7 +6,6 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
   : null;
 
-// 缩短刷新间隔，防止长时间无响应
 const REFRESH_INTERVAL = 3 * 60 * 60 * 1000; 
 const QUEST_REFRESH_INTERVAL = 6 * 60 * 60 * 1000; 
 
@@ -14,34 +13,35 @@ const QUEST_REFRESH_INTERVAL = 6 * 60 * 60 * 1000;
 
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
-  return stage ? stage.name : "微尘";
+  return stage ? stage.name : "私生子";
 };
 
 const calculateTags = (hero: HeroState): string[] => {
   const tags: Set<string> = new Set();
   const { hp, maxHp, stamina, gold, attributes, actionCounts, inventory, equipment, level, companion, stats } = hero;
 
-  if (hp < maxHp * 0.1) tags.add("命悬一线");
+  if (hp < maxHp * 0.1) tags.add("濒死");
   else if (hp < maxHp * 0.3) tags.add("重伤");
   
   if (stamina < 20) tags.add("精疲力竭");
-  else if (stamina > 100) tags.add("龙精虎猛");
+  else if (stamina > 100) tags.add("精力充沛");
 
-  if (gold > 50000) tags.add("富可敌国");
-  else if (gold < 50) tags.add("穷困潦倒");
+  if (gold > 50000) tags.add("兰尼斯特之富");
+  else if (gold < 50) tags.add("穷困");
 
-  if (actionCounts.kills > 100) tags.add("杀人如麻");
+  if (actionCounts.kills > 100) tags.add("屠夫");
   if (actionCounts.drinking > 20) tags.add("酒鬼");
 
-  if (attributes.strength > 20) tags.add("天生神力");
-  if (attributes.intelligence > 20) tags.add("多智近妖");
+  if (attributes.strength > 20) tags.add("魔山之力");
+  if (attributes.intelligence > 20) tags.add("小恶魔之智");
 
   const weaponName = equipment.weapon?.name || "";
-  if (weaponName.includes("剑")) tags.add("剑客");
-  else if (weaponName.includes("刀")) tags.add("刀客");
-  else if (!equipment.weapon) tags.add("拳师");
+  if (weaponName.includes("剑")) tags.add("剑士");
+  else if (weaponName.includes("锤")) tags.add("战士");
+  else if (weaponName.includes("匕首")) tags.add("刺客");
+  else if (!equipment.weapon) tags.add("赤手空拳");
   
-  if (stats.arenaWins > 50) tags.add("武林神话");
+  if (stats.arenaWins > 50) tags.add("竞技场之王");
 
   return Array.from(tags).slice(0, 10);
 };
@@ -75,7 +75,7 @@ const generateQuestBoard = (level: number, stageName: string): Quest[] => {
 };
 
 const generateFillerQuest = (level: number, stageName: string): Quest => {
-  return { id: 'auto_' + Date.now(), name: "闲逛", category: 'life', rank: 1, faction: 'neutral', script: { title: "闲逛", description: "无事发生", objective: "消磨时间", antagonist: "无", twist: "无" }, desc: "日常琐事...", progress: 0, total: 200, reqLevel: 1, stage: 'start', isAuto: true, staminaCost: 5, rewards: { gold: level * 5 + 10, exp: level * 10 + 20 } };
+  return { id: 'auto_' + Date.now(), name: "巡逻", category: 'life', rank: 1, faction: 'neutral', script: { title: "巡逻", description: "日常事务", objective: "消磨时间", antagonist: "无", twist: "无" }, desc: "在领地内巡视...", progress: 0, total: 200, reqLevel: 1, stage: 'start', isAuto: true, staminaCost: 5, rewards: { gold: level * 5 + 10, exp: level * 10 + 20 } };
 };
 
 const getLocationByQuest = (questType: QuestType, level: number): string => {
@@ -84,8 +84,9 @@ const getLocationByQuest = (questType: QuestType, level: number): string => {
   return pool[Math.floor(Math.random() * pool.length)].name;
 };
 
-const getInitialSkills = (): Skill[] => [{ name: "太祖长拳", type: 'attack', level: 1, exp: 0, maxExp: 100, desc: "江湖流传最广的入门拳法" }];
-const getInitialLifeSkills = (): Skill[] => [{ name: "包扎", type: 'medical', level: 1, exp: 0, maxExp: 100, desc: "简单的伤口处理" }];
+// ⚠️ 核心修复：SkillType 适配 (attack -> combat, medical -> survival)
+const getInitialSkills = (): Skill[] => [{ name: "基础剑术", type: 'combat', level: 1, exp: 0, maxExp: 100, desc: "维斯特洛通用的防身剑术" }];
+const getInitialLifeSkills = (): Skill[] => [{ name: "伤口处理", type: 'survival', level: 1, exp: 0, maxExp: 100, desc: "在乱世中活下去的必备技能" }];
 
 const generateVisitors = (): Companion[] => {
   const visitors: Companion[] = [];
@@ -104,7 +105,7 @@ const generateVisitors = (): Companion[] => {
     const trait = NPC_TRAITS[Math.floor(Math.random() * NPC_TRAITS.length)];
     const priceMap = { common: 200, rare: 1000, epic: 5000, legendary: 20000 };
     const buffVal = { common: 5, rare: 15, epic: 30, legendary: 80 };
-    visitors.push({ id: Date.now() + i + Math.random().toString(), name: `${firstName}${lastName}`, gender, title: template.job, archetype: template.job, personality: trait, desc: template.desc, quality: tier, price: priceMap[tier], buff: { type: template.buff as any, val: buffVal[tier] } });
+    visitors.push({ id: Date.now() + i + Math.random().toString(), name: `${firstName}·${lastName}`, gender, title: template.job, archetype: template.job, personality: trait, desc: template.desc, quality: tier, price: priceMap[tier], buff: { type: template.buff as any, val: buffVal[tier] } });
   });
   return visitors;
 };
@@ -136,19 +137,19 @@ export function useGame() {
 
   const login = async (name: string, password: string) => {
     setLoading(true); setError(null);
-    const initialStage = "微尘";
+    const initialStage = "私生子";
     const initialBoard = generateQuestBoard(1, initialStage);
 
     const newHero: HeroState = {
       name, level: 1, gender: Math.random() > 0.5 ? '男' : '女', age: 16, 
       personality: PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)], 
-      title: initialStage, motto: "莫欺少年穷", godPower: 100, unlockedFeatures: [], 
+      title: initialStage, motto: "凡人皆有一死", godPower: 100, unlockedFeatures: [], 
       pet: null, storyStage: initialStage,
       attributes: { constitution: 10, strength: 10, dexterity: 10, intelligence: 10, luck: 10 },
       stamina: 120, maxStamina: 120,
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 200, 
-      alignment: 0, location: "牛家村", state: 'idle', 
-      logs: [], messages: [], majorEvents: [`${new Date().toLocaleDateString()}：${name} 踏入江湖。`],
+      alignment: 0, location: "临冬城", state: 'idle', 
+      logs: [], messages: [], majorEvents: [`${new Date().toLocaleDateString()}：${name} 踏入维斯特洛。`],
       inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
       stats: { kills: 0, days: 1, arenaWins: 0 },
@@ -156,11 +157,11 @@ export function useGame() {
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0,
       reputation: { alliance: 0, freedom: 0, court: 0, sword: 0, healer: 0, cult: 0, invader: 0, hidden: 0, neutral: 0 },
-      narrativeHistory: "初入江湖，一切未卜。",
-      tags: ["初出茅庐"], 
+      narrativeHistory: "凛冬将至。",
+      tags: ["私生子"], 
       actionCounts: { kills: 0, retreats: 0, gambles: 0, charity: 0, betrayals: 0, shopping: 0, drinking: 0 },
-      description: "初入江湖，默默无闻。",
-      equipmentDescription: "一身布衣，手无寸铁。" 
+      description: "一个默默无闻的私生子。",
+      equipmentDescription: "一身布衣。" 
     };
 
     if (!supabase) { setHero(newHero); setLoading(false); setTimeout(() => triggerAI('start_game', undefined, undefined, newHero), 500); return; }
@@ -170,7 +171,7 @@ export function useGame() {
       if (user) {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
-        if (!mergedData.equipmentDescription) mergedData.equipmentDescription = "衣着朴素，风尘仆仆。";
+        if (!mergedData.equipmentDescription) mergedData.equipmentDescription = "衣着朴素。";
         
         setHero(mergedData);
         setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
@@ -210,24 +211,24 @@ export function useGame() {
     const quest = hero.questBoard.find(q => q.id === questId);
     if (!quest) return;
     if (hero.level < quest.reqLevel) { addLog(`【接取失败】此任务凶险，建议达到 Lv.${quest.reqLevel} 再尝试。`, 'system'); return; }
-    if (hero.stamina < quest.staminaCost) { addLog(`【精力不足】身体疲惫，需休息恢复。(需要 ${quest.staminaCost} 精力)`, 'system'); return; }
+    if (hero.stamina < quest.staminaCost) { addLog(`【体力不足】需要休息恢复。(需要 ${quest.staminaCost} 体力)`, 'system'); return; }
     if (hero.queuedQuest) { addLog(`【接取失败】你已经预约了下一个任务，请先完成。`, 'system'); return; }
 
     const newBoard = hero.questBoard.filter(q => q.id !== questId); 
     setHero(prev => prev ? { ...prev, stamina: prev.stamina - quest.staminaCost, queuedQuest: quest, questBoard: newBoard } : null);
-    addLog(`【揭榜】已消耗精力接下委托：${quest.name}，将在当前事务完成后执行。`, 'highlight');
+    addLog(`【誓言】已接受委托：${quest.name}。`, 'highlight');
   };
 
   const hireCompanion = (visitorId: string) => {
     if (!hero) return;
     const visitor = hero.tavern.visitors.find(v => v.id === visitorId);
     if (!visitor) return;
-    if (hero.gold < visitor.price) { addLog("囊中羞涩，请不起这位大侠。", "system"); return; }
+    if (hero.gold < visitor.price) { addLog("囊中羞涩，无法支付雇佣金。", "system"); return; }
     setHero(prev => {
       if (!prev) return null;
       return { ...prev, gold: prev.gold - visitor.price, companion: visitor, companionExpiry: Date.now() + 24 * 60 * 60 * 1000, tavern: { ...prev.tavern, visitors: prev.tavern.visitors.filter(v => v.id !== visitorId) } };
     });
-    addLog(`豪掷 ${visitor.price} 文，成功邀请【${visitor.name}】结伴同行！`, "highlight");
+    addLog(`支付 ${visitor.price} 金龙，与【${visitor.name}】结盟！`, "highlight");
     triggerAI("recruit_companion", "", "recruit", { ...hero, companion: visitor });
   };
 
@@ -235,7 +236,7 @@ export function useGame() {
     const currentHero = explicitHero || hero;
     if (!currentHero) return false;
     const showCompanion = Math.random() > 0.7;
-    const companionInfo = (showCompanion && currentHero.companion) ? `伙伴:${currentHero.companion.title} ${currentHero.companion.name} (性别:${currentHero.companion.gender}, 性格:${currentHero.companion.personality})` : "独行 (暂不描写伙伴)";
+    const companionInfo = (showCompanion && currentHero.companion) ? `伙伴:${currentHero.companion.title} ${currentHero.companion.name} (性别:${currentHero.companion.gender}, 性格:${currentHero.companion.personality})` : "独行";
     try {
       const bestSkill = currentHero.martialArts.sort((a,b) => b.level - a.level)[0];
       const context = { 
@@ -247,7 +248,7 @@ export function useGame() {
         questInfo: currentHero.currentQuest ? `[${currentHero.currentQuest.category}] ${currentHero.currentQuest.name}` : "无任务，游历中", 
         petInfo: currentHero.pet ? `灵宠:${currentHero.pet.type}` : "无", 
         companionInfo: companionInfo, 
-        skillInfo: `擅长${bestSkill?.name || '乱拳'}(Lv.${bestSkill?.level || 1})`, 
+        skillInfo: `擅长${bestSkill?.name || '乱舞'}(Lv.${bestSkill?.level || 1})`, 
         narrativeHistory: currentHero.narrativeHistory,
         recentLogs: recentLogsRef.current, 
         lastLogLen: recentLogsRef.current[0]?.length || 0,
@@ -268,12 +269,11 @@ export function useGame() {
         }
 
         if (eventType === 'generate_rumor') {
-           let title = "江湖风声"; let content = data.text;
+           let title = "风声"; let content = data.text;
            if (data.text.includes("：")) { const parts = data.text.split("："); title = parts[0]; content = parts.slice(1).join("："); }
            addMessage('rumor', title, content);
         } else {
            const fullText = suffix ? `${data.text} ${suffix}` : data.text;
-           // ⚠️ 关键修正：确保剧情事件类型为 'highlight'，以便触发打字机效果
            const logType = ['god_action','start_game','resume_game','recruit_companion','quest_start','quest_climax','quest_end','quest_journey','idle_event'].includes(eventType) ? 'highlight' : 'normal';
            addLog(fullText, logType);
         }
@@ -285,14 +285,14 @@ export function useGame() {
 
   const godAction = async (type: 'bless' | 'punish') => {
     if (!hero) return;
-    if (hero.godPower < 25) { addLog("【神力不足】请等待神力自然恢复。", "system"); return; }
+    if (hero.godPower < 25) { addLog("【命运值不足】等待命运的转轮。", "system"); return; }
     if (type === 'bless') { 
       setHero(h => h ? {...h, hp: h.maxHp, godPower: h.godPower - 25} : null); 
-      addLog("【天降甘霖】一道金光笼罩全身，伤势尽愈！(HP恢复)", "highlight");
+      addLog("【旧神眷顾】伤势尽愈！(HP恢复)", "highlight");
       triggerAI('god_action', ''); 
     } else { 
       setHero(h => h ? {...h, hp: Math.max(1, h.hp - 20), exp: h.exp + 50, godPower: h.godPower - 25} : null); 
-      addLog("【天降雷罚】一道惊雷劈下，虽受皮肉之苦，却觉内力精进！(经验+50)", "highlight");
+      addLog("【严酷试炼】虽受皮肉之苦，却觉意志更坚！(经验+50)", "highlight");
       triggerAI('god_action', ''); 
     }
   };
@@ -329,7 +329,7 @@ export function useGame() {
             hero.equipment[slotKey] = item;
             const idx = hero.inventory.findIndex(i => i.id === item.id);
             if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
-            logs.push(`【换装】装备了更强的 ${item.name} (强度 ${equipPower})`);
+            logs.push(`【装备】换上了 ${item.name} (强度 ${equipPower})`);
             updated = true;
             equipChanged = true;
           }
@@ -343,10 +343,11 @@ export function useGame() {
        const existingSkill = hero.martialArts.find(s => s.name === skillName);
        if (existingSkill) {
           existingSkill.exp += 100;
-          logs.push(`【研读】自动研读 ${book.name}，${skillName}熟练度提升！`);
+          logs.push(`【研读】阅读 ${book.name}，${skillName}熟练度提升！`);
        } else {
-          hero.martialArts.push({ name: skillName, type: 'attack', level: 1, exp: 0, maxExp: 100, desc: "新习得的武学" });
-          logs.push(`【顿悟】自动研读 ${book.name}，习得【${skillName}】！`);
+          // ⚠️ 核心修复：类型改为 combat
+          hero.martialArts.push({ name: skillName, type: 'combat', level: 1, exp: 0, maxExp: 100, desc: "通过书籍习得的技能" });
+          logs.push(`【学习】阅读 ${book.name}，习得【${skillName}】！`);
        }
        const idx = hero.inventory.findIndex(i => i.id === book.id);
        if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
@@ -358,7 +359,7 @@ export function useGame() {
        if (potion) {
           const heal = Number(potion.effect) || 0;
           hero.hp = Math.min(hero.maxHp, hero.hp + heal);
-          logs.push(`【自救】重伤之际服下 ${potion.name}，气血恢复 ${heal}。`);
+          logs.push(`【治疗】使用了 ${potion.name}，恢复 ${heal} 生命。`);
           const idx = hero.inventory.findIndex(i => i.id === potion.id);
           if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
           updated = true;
@@ -370,7 +371,7 @@ export function useGame() {
        if (food) {
           const regen = Number(food.effect) || 0;
           hero.stamina = Math.min(hero.maxStamina, hero.stamina + regen);
-          logs.push(`【补给】体力不支服下 ${food.name}，精力恢复 ${regen}。`);
+          logs.push(`【补给】使用了 ${food.name}，恢复 ${regen} 体力。`);
           const idx = hero.inventory.findIndex(i => i.id === food.id);
           if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
           hero.actionCounts.drinking++; 
@@ -393,7 +394,7 @@ export function useGame() {
       if (!currentHero) return;
 
       const { hero: managedHero, logs: autoLogs, tagsChanged } = autoManageInventory(currentHero);
-      if (autoLogs.length > 0) { setHero(managedHero); autoLogs.forEach(l => addLog(l, 'system')); } // 系统日志用 'system'
+      if (autoLogs.length > 0) { setHero(managedHero); autoLogs.forEach(l => addLog(l, 'system')); }
       const activeHero = managedHero;
 
       if (tagsChanged) {
@@ -401,7 +402,7 @@ export function useGame() {
       }
 
       if (activeHero.companion && Date.now() > activeHero.companionExpiry) {
-         addLog(`【离别】${activeHero.companion.name} 拱手道别：“青山不改，绿水长流！”`, "system");
+         addLog(`【离别】${activeHero.companion.name} 离开了队伍。`, "system");
          setHero(h => h ? { ...h, companion: null } : null);
       }
       if (Date.now() - activeHero.tavern.lastRefresh > REFRESH_INTERVAL) { 
@@ -411,7 +412,7 @@ export function useGame() {
       if (Date.now() - (activeHero.lastQuestRefresh || 0) > QUEST_REFRESH_INTERVAL) {
          const newBoard = generateQuestBoard(activeHero.level, activeHero.storyStage);
          setHero(h => h ? { ...h, questBoard: newBoard, lastQuestRefresh: Date.now() } : null);
-         addMessage('system', '悬赏更新', '悬赏榜已刷新。');
+         addMessage('system', '悬赏更新', '告示板已刷新。');
       }
 
       let newState = activeHero.state;
@@ -531,12 +532,11 @@ export function useGame() {
         return finalH;
       });
 
-      // ⚠️ 核心调整：频率提高 (8s - 20s)，并大幅增加事件概率
       if (aiEvent) {
          await triggerAI(aiEvent, logSuffix);
-      } else if (!aiEvent && newQuest && newQuest.stage === 'road' && Math.random() < 0.7) { // 概率提升到 0.7
+      } else if (!aiEvent && newQuest && newQuest.stage === 'road' && Math.random() < 0.7) { 
          await triggerAI('quest_journey', logSuffix);
-      } else if (!aiEvent && !newQuest && Math.random() < 0.6) { // 概率提升到 0.6
+      } else if (!aiEvent && !newQuest && Math.random() < 0.6) { 
          await triggerAI('idle_event', logSuffix);
       } else if (Math.random() < 0.1) {
          await triggerAI('generate_rumor');
@@ -544,7 +544,6 @@ export function useGame() {
          addLog(logSuffix, 'system');
       }
       
-      // ⚠️ 缩短心跳
       const nextTick = Math.floor(Math.random() * (20000 - 8000) + 8000); 
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
