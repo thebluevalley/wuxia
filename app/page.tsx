@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, memo } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank, SkillType, HeroState } from '@/app/lib/constants';
 
-// --- 全局辅助函数 (移出组件以复用，防止未定义错误) ---
+// --- 全局辅助函数 (必须在组件外部定义) ---
 
 const getQualityColor = (q: Quality) => {
   switch (q) {
@@ -54,7 +54,7 @@ const getSkillLabel = (type: SkillType) => {
   }
 };
 
-// --- 核心组件：防重播打字机 ---
+// --- 组件 ---
 
 const TypewriterText = memo(({ text, className }: { text: string, className?: string }) => {
   const [displayedText, setDisplayedText] = useState(text);
@@ -62,20 +62,17 @@ const TypewriterText = memo(({ text, className }: { text: string, className?: st
   const lastTextRef = useRef(text);
 
   useEffect(() => {
-    // 1. 如果文本内容变了，说明是新的一句话 -> 重置状态，开始打字
     if (text !== lastTextRef.current) {
       hasAnimatedRef.current = false;
       lastTextRef.current = text;
-      setDisplayedText(''); 
+      setDisplayedText('');
     }
 
-    // 2. 如果已经动画过（且文本没变），直接显示全文，不再打字
     if (hasAnimatedRef.current) {
       setDisplayedText(text);
       return;
     }
 
-    // 3. 执行打字逻辑
     let index = 0;
     setDisplayedText(''); 
     
@@ -85,9 +82,9 @@ const TypewriterText = memo(({ text, className }: { text: string, className?: st
         index++;
       } else {
         clearInterval(timer);
-        hasAnimatedRef.current = true; // 标记完成
+        hasAnimatedRef.current = true;
       }
-    }, 60); // 60ms 速度，适中
+    }, 60); 
 
     return () => clearInterval(timer);
   }, [text]);
@@ -95,8 +92,6 @@ const TypewriterText = memo(({ text, className }: { text: string, className?: st
   return <span className={className}>{displayedText}</span>;
 });
 TypewriterText.displayName = 'TypewriterText';
-
-// --- 子视图组件 (Memoized) ---
 
 const Header = memo(({ hero }: { hero: HeroState }) => {
   const questPercent = hero.currentQuest 
@@ -163,7 +158,6 @@ const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type:
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-8 scroll-smooth">
         {hero.logs.map((log, index) => {
-          // 仅最新的一条，且必须是 highlight 才打字
           const isLatest = index === 0; 
           const isNarrative = log.type === 'highlight';
 
@@ -426,7 +420,6 @@ export default function Home() {
     <div className="flex flex-col h-[100dvh] bg-[#fcf9f2] text-stone-800 font-serif max-w-md mx-auto shadow-2xl relative">
       <Header hero={hero} />
       <main className="flex-1 overflow-hidden bg-[#fcf9f2]">
-        {/* ⚠️ 核心修复：使用 CSS hidden，保持组件活性，防止打字机重置 */}
         <div className={activeTab === 'logs' ? 'block h-full' : 'hidden'}><LogsView hero={hero} godAction={godAction} /></div>
         <div className={activeTab === 'hero' ? 'block h-full' : 'hidden'}><HeroView hero={hero} /></div>
         <div className={activeTab === 'bag' ? 'block h-full' : 'hidden'}><BagView hero={hero} /></div>

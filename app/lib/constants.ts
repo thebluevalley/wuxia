@@ -26,10 +26,10 @@ export type Equipment = {
 
 export type Faction = 'stark' | 'lannister' | 'targaryen' | 'baratheon' | 'watch' | 'wildling' | 'citadel' | 'neutral' | 'faith';
 
-// 任务类型：新增 'main' (主线)
 export type QuestCategory = 'main' | 'side'; 
 export type QuestRank = 1 | 2 | 3 | 4 | 5;
 export type QuestStage = 'start' | 'road' | 'climax' | 'end'; 
+export type QuestType = 'search' | 'hunt' | 'challenge' | 'train' | 'life';
 
 export type Quest = { 
   id: string;
@@ -43,7 +43,7 @@ export type Quest = {
     objective: string;
     antagonist: string;
     twist: string;
-    npc?: string; // 关键任务发布人
+    npc?: string; 
   };
   desc: string; 
   stage: QuestStage;
@@ -51,6 +51,7 @@ export type Quest = {
   total: number;
   reqLevel: number;
   staminaCost: number; 
+  isAuto?: boolean; // 兼容旧逻辑
   rewards: { gold: number; exp: number; item?: Item; };
 };
 
@@ -79,21 +80,16 @@ export type HeroState = {
   name: string; level: number; gender: '男' | '女'; age: number; personality: string; title: string; motto: string;
   godPower: number; 
   unlockedFeatures: string[]; storyStage: string;
-  
-  // ⚠️ 核心：主线进度索引
   mainStoryIndex: number; 
-
   pet: Pet | null;
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
   stamina: number; maxStamina: number;
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
   reputation: Record<Faction, number>;
-  
   tags: string[]; 
   actionCounts: { kills: number; retreats: number; gambles: number; charity: number; betrayals: number; shopping: number; drinking: number; }; 
   description: string; 
   equipmentDescription: string; 
-
   currentQuest: Quest | null;
   queuedQuest: Quest | null;
   questBoard: Quest[];
@@ -110,8 +106,20 @@ export type HeroState = {
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
-// ⚠️ 核心设定：主线史诗 (Main Saga)
-// 这里的每一个任务都是原著的一个关键节点
+// ⚠️ 补回缺失的常量 FLAVOR_TEXTS
+export const FLAVOR_TEXTS = {
+  environment: ["凛冬的寒风呼啸", "君临城的腐臭味", "学士塔的乌鸦叫声", "铁王座的阴影", "狭海的咸湿海风", "北境的皑皑白雪"],
+  action: ["擦拭瓦雷利亚钢剑", "喝了一口酸涩的红酒", "把玩着金龙币", "在神木林中祈祷", "低声密谋", "裹紧了毛皮斗篷"],
+  object: ["龙晶匕首", "学士的项链", "无面者的硬币", "族谱", "半个洋葱", "染血的白袍"]
+};
+
+// ⚠️ 补回缺失的常量 QUEST_SCRIPTS (用于兼容旧逻辑)
+export const QUEST_SCRIPTS = {
+  "default": [
+    { title: "巡逻", desc: "日常巡逻。", obj: "巡逻", antagonist: "无", twist: "无" }
+  ]
+};
+
 export const MAIN_SAGA = [
   {
     title: "序章：凛冬将至",
@@ -195,7 +203,6 @@ export const MAIN_SAGA = [
   }
 ];
 
-// ⚠️ 支线任务池 (Side Quests) - 填充世界
 export const SIDE_QUESTS = {
   "临冬城": [
     { title: "清理狼林", desc: "狼林里的强盗最近越来越猖狂了。", obj: "剿匪", antagonist: "强盗首领" },
@@ -223,6 +230,9 @@ export const WORLD_ARCHIVE = [
   "【兰尼斯特有债必偿】：这不仅是关于金钱，更是关于复仇。",
   "【龙之母】：在狭海对岸，最后的真龙孵化了三颗龙蛋。"
 ];
+
+// ⚠️ 补回缺失的常量 WORLD_LORE
+export const WORLD_LORE = "维斯特洛大陆，七国纷争，凛冬将至。";
 
 export const NPC_ARCHETYPES = {
   common: [
