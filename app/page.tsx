@@ -1,14 +1,13 @@
 'use client';
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock } from 'lucide-react';
+import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
 import { ItemType, Quality, QuestRank } from '@/app/lib/constants';
 
 export default function Home() {
-  const { hero, login, godAction, loading, error, clearError, refreshTavern, hireCompanion, acceptQuest } = useGame();
+  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
-  // ⚠️ 移除 'quests' tab
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'equip' | 'messages' | 'tavern'>('logs');
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -89,12 +88,21 @@ export default function Home() {
              <div className="w-4 h-4 rounded-full border border-amber-900 flex items-center justify-center text-[10px]">文</div>
              {hero.gold}
            </div>
-           <div className="flex items-center gap-1 text-amber-900 font-bold text-xs"><Zap size={12} fill="currentColor"/> {Math.floor(hero.godPower)}%</div>
-           <div className="w-16 h-1.5 bg-stone-200 rounded-full overflow-hidden"><div className="h-full bg-amber-900 transition-all duration-500" style={{width: `${hero.godPower}%`}}></div></div>
+           
+           {/* ⚠️ 新增：精力值显示 */}
+           <div className="flex items-center gap-2">
+             <div className="flex flex-col items-end">
+               <div className="flex items-center gap-1 text-emerald-800 font-bold text-[10px]"><Battery size={10}/> {Math.floor(hero.stamina)}</div>
+               <div className="w-12 h-1 bg-stone-200 rounded-full overflow-hidden"><div className="h-full bg-emerald-500" style={{width: `${(hero.stamina / hero.maxStamina) * 100}%`}}></div></div>
+             </div>
+             <div className="flex flex-col items-end">
+               <div className="flex items-center gap-1 text-amber-900 font-bold text-[10px]"><Zap size={10}/> {Math.floor(hero.godPower)}</div>
+               <div className="w-12 h-1 bg-stone-200 rounded-full overflow-hidden"><div className="h-full bg-amber-500" style={{width: `${hero.godPower}%`}}></div></div>
+             </div>
+           </div>
         </div>
       </div>
       <div className="bg-white border border-stone-200 rounded p-2 shadow-sm flex flex-col gap-1 mb-2">
-         {/* ⚠️ 顶部状态栏：显示当前任务 + 预约任务 */}
          <div className="flex justify-between text-[10px] text-stone-500 mb-1">
             <span className="flex items-center gap-1 font-bold text-stone-700 truncate max-w-[200px]">
               <Target size={10} className="text-stone-800 shrink-0"/> 
@@ -171,7 +179,7 @@ export default function Home() {
                  {getJobIcon(hero.companion.archetype)}
               </div>
               <div className="flex-1 min-w-0">
-                 <div className={`font-bold truncate ${getQualityColor(hero.companion.quality)}`}>{hero.companion.title} <span className="text-xs font-normal text-stone-500">| {hero.companion.name}</span></div>
+                 <div className={`font-bold truncate ${getQualityColor(hero.companion.quality)}`}>{hero.companion.title} <span className="text-xs font-normal text-stone-500">| {hero.companion.name} ({hero.companion.gender})</span></div>
                  <div className="text-xs text-stone-500 mb-2 truncate">性格：{hero.companion.personality}</div>
                  <div className="text-[10px] text-stone-400 bg-stone-50 p-2 rounded leading-relaxed italic">"{hero.companion.desc}"</div>
                  <div className="mt-2 text-[10px] text-amber-700 flex items-center gap-1"><Info size={10}/> 羁绊剩余: {Math.max(0, Math.floor((hero.companionExpiry - Date.now()) / (1000 * 60 * 60)))} 小时</div>
@@ -210,7 +218,6 @@ export default function Home() {
   const BagView = () => (<div className="p-4 h-full overflow-y-auto"><h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3><div className="space-y-2">{hero.inventory.map((item,i)=><div key={i} className="bg-white border border-stone-100 p-3 rounded flex justify-between"><span className={`text-sm ${getQualityColor(item.quality)}`}>{item.name}</span><div className="text-right"><span className="text-xs text-stone-400 block">x{item.count}</span><span className="text-[10px] bg-stone-100 px-1 rounded text-stone-500">价{item.price}</span></div></div>)}</div></div>);
   const EquipView = () => { const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; return (<div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className={`text-sm ${getQualityColor(item.quality)}`}>{item.name}</div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>);};
   
-  // ⚠️ 合并后的告示板 (含悬赏榜)
   const MessagesView = () => { 
     const rumors = hero.messages.filter(m => m.type === 'rumor'); 
     const systems = hero.messages.filter(m => m.type === 'system'); 
@@ -220,13 +227,11 @@ export default function Home() {
 
     return (
       <div className="p-4 h-full overflow-y-auto space-y-6">
-        {/* ⚠️ 悬赏榜区域 */}
         <div>
            <div className="flex justify-between items-center mb-3 px-1">
               <h3 className="font-bold text-stone-800 flex items-center gap-2"><Scroll size={16}/> 悬赏榜</h3>
               <div className="text-[10px] text-stone-400 flex items-center gap-1"><Clock size={10}/> 刷新: {hours}小时{mins}分</div>
            </div>
-           
            <div className="space-y-2">
               {hero.questBoard.map((quest) => (
                  <div key={quest.id} className="bg-white border border-stone-200 p-3 rounded-lg shadow-sm relative overflow-hidden group">
@@ -235,86 +240,50 @@ export default function Home() {
                           <span className="text-stone-600 text-sm">{quest.category === 'combat' ? <Sword size={14}/> : <Beer size={14}/>}</span>
                           <span className="font-bold text-stone-700 text-sm">{quest.name}</span>
                        </div>
-                       {/* ⚠️ 任务星级 (黑白风格) */}
-                       <div className="flex gap-0.5 text-stone-300">
-                          {[...Array(quest.rank)].map((_, i) => <Star key={i} size={8} fill="currentColor"/>)}
-                       </div>
+                       <div className="flex gap-0.5 text-stone-300">{[...Array(quest.rank)].map((_, i) => <Star key={i} size={8} fill="currentColor"/>)}</div>
                     </div>
                     <div className="text-[10px] text-stone-400 mb-2">{quest.desc}</div>
                     <div className="flex justify-between items-center border-t border-stone-50 pt-2">
-                       <div className="text-[10px] text-stone-500 font-mono">赏{quest.rewards.gold}文 / 验{quest.rewards.exp}</div>
-                       <button 
-                         onClick={() => acceptQuest(quest.id)}
-                         disabled={!!hero.queuedQuest}
-                         className={`px-3 py-1 rounded text-[10px] font-bold transition-colors ${hero.queuedQuest ? 'bg-stone-100 text-stone-300' : 'bg-stone-800 text-white hover:bg-stone-700 active:scale-95'}`}
-                       >
-                          {hero.queuedQuest ? '队列已满' : '预约'}
-                       </button>
+                       <div className="text-[10px] text-stone-500 font-mono flex items-center gap-2">
+                         <span>赏{quest.rewards.gold} / 验{quest.rewards.exp}</span>
+                         <span className="text-emerald-600 flex items-center gap-0.5"><Battery size={8}/> -{quest.staminaCost}</span>
+                       </div>
+                       <button onClick={() => acceptQuest(quest.id)} disabled={!!hero.queuedQuest} className={`px-3 py-1 rounded text-[10px] font-bold transition-colors ${hero.queuedQuest ? 'bg-stone-100 text-stone-300' : 'bg-stone-800 text-white hover:bg-stone-700 active:scale-95'}`}>{hero.queuedQuest ? '队列已满' : '预约'}</button>
                     </div>
                  </div>
               ))}
               {hero.questBoard.length === 0 && <div className="text-center text-[10px] text-stone-300 py-4 italic">暂无悬赏，静待刷新...</div>}
            </div>
         </div>
-
-        {/* 消息区域 */}
         <div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><MessageSquare size={16}/> 江湖风声</h3>{rumors.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无风声</div> : <div className="space-y-3">{rumors.map((msg)=><div key={msg.id} className="bg-amber-50 border border-amber-100 p-3 rounded-lg shadow-sm"><div className="flex justify-between items-start mb-1"><div className="font-bold text-amber-900 text-sm">{msg.title}</div><div className="text-[10px] text-amber-400">{msg.time}</div></div><div className="text-xs text-amber-800 leading-relaxed text-justify">{msg.content}</div></div>)}</div>}</div>
         <div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><Info size={16}/> 系统记录</h3>{systems.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无记录</div> : <div className="bg-white border border-stone-100 rounded-lg overflow-hidden">{systems.map((msg,i)=><div key={msg.id} className={`p-3 border-b border-stone-50 last:border-0 ${i%2===0?'bg-white':'bg-stone-50/50'}`}><div className="flex justify-between mb-1"><span className="font-bold text-stone-700 text-xs">{msg.title}</span><span className="text-[10px] text-stone-400">{msg.time}</span></div><div className="text-xs text-stone-500">{msg.content}</div></div>)}</div>}</div>
       </div>
     );
   };
 
+  // ⚠️ 移除手动刷新按钮
   const TavernView = () => (
     <div className="p-4 h-full overflow-y-auto">
        <div className="flex justify-between items-center mb-6 px-1">
-          <div>
-             <h3 className="font-bold text-stone-800 flex items-center gap-2 text-xl"><Beer size={20}/> 悦来客栈</h3>
-             <div className="text-[10px] text-stone-400">三教九流，皆聚于此</div>
-          </div>
-          <button 
-            onClick={() => refreshTavern(true)}
-            className="flex items-center gap-1 text-[10px] bg-stone-100 hover:bg-stone-200 px-3 py-1.5 rounded-full text-stone-600 transition-colors"
-          >
-            <RefreshCw size={10}/> 换一批 (50文)
-          </button>
+          <div><h3 className="font-bold text-stone-800 flex items-center gap-2 text-xl"><Beer size={20}/> 悦来客栈</h3><div className="text-[10px] text-stone-400">三教九流，皆聚于此</div></div>
        </div>
-
        <div className="space-y-4">
           {hero.tavern.visitors.map((visitor) => (
              <div key={visitor.id} className={`bg-white border p-4 rounded-xl shadow-sm relative overflow-hidden group transition-all hover:shadow-md ${getQualityBadgeClass(visitor.quality).replace('bg-', 'border-').replace('text-', 'hover:border-')}`}>
-                <div className={`absolute top-0 right-0 px-2 py-1 text-[9px] font-bold rounded-bl-lg border-b border-l ${getQualityBadgeClass(visitor.quality)}`}>
-                   {visitor.quality.toUpperCase()}
-                </div>
-                
+                <div className={`absolute top-0 right-0 px-2 py-1 text-[9px] font-bold rounded-bl-lg border-b border-l ${getQualityBadgeClass(visitor.quality)}`}>{visitor.quality.toUpperCase()}</div>
                 <div className="flex gap-4 mt-2">
-                   <div className="w-12 h-12 rounded-full bg-stone-50 flex items-center justify-center border border-stone-100 shrink-0">
-                      {getJobIcon(visitor.archetype)}
-                   </div>
+                   <div className="w-12 h-12 rounded-full bg-stone-50 flex items-center justify-center border border-stone-100 shrink-0">{getJobIcon(visitor.archetype)}</div>
                    <div className="flex-1">
                       <div className={`text-sm ${getQualityColor(visitor.quality)}`}>{visitor.title}</div>
-                      <div className="text-xs text-stone-500 mb-1">{visitor.name} <span className="font-serif italic text-stone-400">| {visitor.personality}</span></div>
+                      <div className="text-xs text-stone-500 mb-1">{visitor.name} <span className="font-serif italic text-stone-400">| {visitor.personality} ({visitor.gender})</span></div>
                       <div className="text-[10px] text-stone-400 mb-3 line-clamp-2">{visitor.desc}</div>
-                      
-                      <div className="flex justify-between items-center">
-                         <div className="text-[10px] text-stone-400">
-                            加成: <span className="text-stone-700 font-bold">{visitor.buff.type.toUpperCase()} +{visitor.buff.val}</span>
-                         </div>
-                         <button 
-                           onClick={() => hireCompanion(visitor.id)}
-                           disabled={!!hero.companion}
-                           className={`px-4 py-1.5 rounded text-xs font-bold active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${hero.companion ? 'bg-stone-200 text-stone-500' : 'bg-stone-800 text-white hover:bg-stone-700'}`}
-                         >
-                            {hero.companion ? '已有伙伴' : `招募 (${visitor.price}文)`}
-                         </button>
-                      </div>
+                      <div className="flex justify-between items-center"><div className="text-[10px] text-stone-400">加成: <span className="text-stone-700 font-bold">{visitor.buff.type.toUpperCase()} +{visitor.buff.val}</span></div><button onClick={() => hireCompanion(visitor.id)} disabled={!!hero.companion} className={`px-4 py-1.5 rounded text-xs font-bold active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${hero.companion ? 'bg-stone-200 text-stone-500' : 'bg-stone-800 text-white hover:bg-stone-700'}`}>{hero.companion ? '已有伙伴' : `招募 (${visitor.price}文)`}</button></div>
                    </div>
                 </div>
              </div>
           ))}
        </div>
-       <div className="text-center text-[10px] text-stone-300 mt-8 mb-4">
-          每天只能邀请一位伙伴同行，持续24小时。
-       </div>
+       <div className="text-center text-[10px] text-stone-300 mt-8 mb-4">每3小时有新客到访，每天只能邀请一位伙伴同行。</div>
     </div>
   );
 
@@ -329,8 +298,6 @@ export default function Home() {
         {activeTab === 'messages' && <MessagesView />}
         {activeTab === 'tavern' && <TavernView />}
       </main>
-      
-      {/* ⚠️ 移除底部悬赏按钮 */}
       <nav className="h-16 bg-white border-t border-stone-200 flex justify-around items-center px-1 flex-none z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
          <button onClick={() => setActiveTab('logs')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'logs' ? 'text-stone-800' : 'text-stone-400'}`}><ScrollText size={18} strokeWidth={activeTab === 'logs' ? 2.5 : 2} /><span className="text-[9px] font-bold">江湖</span></button>
          <button onClick={() => setActiveTab('hero')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'hero' ? 'text-stone-800' : 'text-stone-400'}`}><User size={18} strokeWidth={activeTab === 'hero' ? 2.5 : 2} /><span className="text-[9px] font-bold">侠客</span></button>

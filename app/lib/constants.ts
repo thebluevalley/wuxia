@@ -34,7 +34,9 @@ export type Quest = {
   progress: number; 
   total: number;
   reqLevel: number;
-  isAuto?: boolean; // ⚠️ 标记是否为自动生成的挂机任务
+  isAuto?: boolean;
+  // ⚠️ 新增：精力消耗
+  staminaCost: number; 
   rewards: {
     gold: number;
     exp: number;
@@ -51,6 +53,8 @@ export type Message = { id: string; type: MessageType; title: string; content: s
 export type Companion = {
   id: string;
   name: string;
+  // ⚠️ 新增：性别
+  gender: '男' | '女'; 
   title: string;
   archetype: string;
   personality: string;
@@ -67,13 +71,14 @@ export type HeroState = {
   godPower: number; unlockedFeatures: string[]; storyStage: string;
   pet: Pet | null;
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
+  // ⚠️ 新增：精力值
+  stamina: number; maxStamina: number;
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
   
-  // ⚠️ 任务系统升级
-  currentQuest: Quest | null; 
-  queuedQuest: Quest | null;  // 预约队列
+  currentQuest: Quest | null;
+  queuedQuest: Quest | null;
   questBoard: Quest[];
-  lastQuestRefresh: number;   // 上次刷新时间戳
+  lastQuestRefresh: number;
   
   location: string; 
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
@@ -88,14 +93,16 @@ export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' 
 
 export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "避世"];
 
-export const NPC_NAMES_FIRST = ["独孤", "西门", "欧阳", "诸葛", "慕容", "李", "王", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴", "徐", "孙", "马", "朱", "胡", "林", "郭", "何", "高", "罗", "郑", "梁", "谢", "宋", "唐", "许", "韩", "冯", "邓", "曹", "彭", "曾", "萧", "田", "董"];
-export const NPC_NAMES_LAST = ["一刀", "无忌", "吹雪", "寻欢", "留香", "不败", "求败", "铁手", "无情", "追命", "冷血", "小宝", "大侠", "三少", "四娘", "无缺", "灵珊", "盈盈", "语嫣", "莫愁", "过", "靖", "康", "峰", "誉", "竹", "梅", "兰", "菊", "风", "云", "霜", "雪", "雷", "电"];
+// ⚠️ 拆分男女名字库
+export const NPC_NAMES_MALE = ["啸天", "无忌", "一刀", "寻欢", "留香", "不败", "求败", "铁手", "无情", "冷血", "小宝", "大侠", "三少", "风", "云", "雷", "电", "靖", "康", "峰", "平", "冲", "过", "伯光", "志平"];
+export const NPC_NAMES_FEMALE = ["语嫣", "灵珊", "盈盈", "莫愁", "芷若", "敏", "蓉", "念慈", "双", "素素", "药师", "凤凰", "不悔", "襄", "芙", "龙女", "铁心", "无双", "红药", "师师"];
+export const NPC_NAMES_LAST = ["独孤", "西门", "欧阳", "诸葛", "慕容", "李", "王", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴", "徐", "孙", "马", "朱", "胡", "林", "郭", "何", "高", "罗", "郑", "梁", "谢", "宋", "唐", "许", "韩", "冯", "邓", "曹", "彭", "曾", "萧", "田", "董"];
 
 export const NPC_ARCHETYPES = {
   common: [
     { job: "店小二", buff: "luck", desc: "消息灵通，跑腿勤快。" },
     { job: "落魄书生", buff: "exp", desc: "虽手无缚鸡之力，但满腹经纶。" },
-    { job: "卖花女", buff: "heal", desc: "笑容甜美，令人忘忧。" },
+    { job: "卖花女", buff: "heal", desc: "笑容甜美，令人忘忧。" }, // 这种通常固定女性，生成时处理
     { job: "泼皮", buff: "attack", desc: "市井无赖，打架全靠一股狠劲。" }
   ],
   rare: [
@@ -106,13 +113,13 @@ export const NPC_ARCHETYPES = {
   ],
   epic: [
     { job: "独臂刀客", buff: "attack", desc: "刀法刚猛，力劈华山。" },
-    { job: "峨眉女侠", buff: "attack", desc: "剑法轻灵，身法飘逸。" },
-    { job: "少林武僧", buff: "defense", desc: "金钟罩铁布衫，刀枪不入。" },
+    { job: "峨眉女侠", buff: "attack", desc: "剑法轻灵，身法飘逸。" }, // 固定女性
+    { job: "少林武僧", buff: "defense", desc: "金钟罩铁布衫，刀枪不入。" }, // 固定男性
     { job: "丐帮长老", buff: "exp", desc: "通晓天下秘闻。" }
   ],
   legendary: [
     { job: "扫地僧", buff: "exp", desc: "深不可测，一花一世界。" },
-    { job: "魔教圣女", buff: "attack", desc: "行事乖张，武功诡异。" },
+    { job: "魔教圣女", buff: "attack", desc: "行事乖张，武功诡异。" }, // 固定女性
     { job: "剑圣", buff: "attack", desc: "人剑合一，万剑归宗。" }
   ]
 };
