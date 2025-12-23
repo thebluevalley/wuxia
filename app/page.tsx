@@ -23,8 +23,7 @@ const TypewriterText = ({ text, className }: { text: string, className?: string 
     return () => clearInterval(timer);
   }, [text]);
 
-  // 增加 animate-in fade-in 效果，让字迹显现更柔和
-  return <span className={`${className} animate-in fade-in duration-300`}>{displayedText}</span>;
+  return <span className={`${className} animate-in fade-in duration-500`}>{displayedText}</span>;
 };
 
 export default function Home() {
@@ -33,9 +32,6 @@ export default function Home() {
   const [inputPassword, setInputPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'messages' | 'tavern'>('logs');
   
-  // ⚠️ 移除自动滚动，因为现在是倒序（最新在最上）
-  // const bottomRef = useRef<HTMLDivElement>(null);
-
   const getQualityColor = (q: Quality) => {
     switch (q) {
       case 'legendary': return 'text-orange-900 font-bold';
@@ -162,30 +158,29 @@ export default function Home() {
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
         {hero.logs.map((log, index) => {
-          // ⚠️ 核心调整：仅最新的 (index === 0, 因为我们是倒序数组) 且为 highlight 的日志使用打字机
+          // ⚠️ 核心调整：仅最新的 (index === 0) 且为 highlight 的日志使用打字机
+          // 且只有 highlight 类型的日志才会显示在主界面
           const isLatest = index === 0; 
           const isNarrative = log.type === 'highlight';
 
+          if (!isNarrative) return null; // 过滤非剧情日志
+
           return (
-            <div key={log.id} className="flex gap-2 items-baseline mb-4"> {/* 增加间距 */}
+            <div key={log.id} className="flex gap-2 items-baseline mb-4">
               <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
-              {isLatest && isNarrative ? (
+              {isLatest ? (
                  <TypewriterText 
                    text={log.text} 
-                   className="text-[15px] leading-8 text-justify font-medium text-black" // 黑色，字号微调
+                   className="text-[15px] leading-8 text-justify font-medium text-black" 
                  />
               ) : (
-                 <span className={`text-[15px] leading-8 text-justify font-medium ${
-                     log.type === 'highlight' ? 'text-black' : 
-                     'text-stone-500 text-xs' // 系统日志变灰变小
-                   }`}>
+                 <span className="text-[15px] leading-8 text-justify font-medium text-black opacity-80">
                    {log.text}
                  </span>
               )}
             </div>
           );
         })}
-        {/* 底部不需要留白了，因为最新的在最上面 */}
       </div>
       <div className="p-4 bg-gradient-to-t from-[#fcf9f2] via-[#fcf9f2] to-transparent">
          <div className="flex justify-between gap-4">
@@ -227,7 +222,6 @@ export default function Home() {
            <div className="text-center flex-1"><div className="text-xs text-stone-400">命名日</div><div className="font-bold text-stone-700">{hero.age}</div></div>
         </div>
         
-        {/* 侧写 */}
         <div className="mb-4 bg-stone-50 p-3 rounded border border-stone-100 relative">
            <div className="absolute top-2 right-2 text-stone-300 opacity-20"><ScrollText size={48}/></div>
            <div className="text-xs font-bold text-stone-700 mb-2 flex items-center gap-1"><Info size={12}/> 风评</div>
@@ -236,7 +230,6 @@ export default function Home() {
            </div>
         </div>
 
-        {/* 装备外观 */}
         <div className="mb-4 bg-stone-50 p-3 rounded border border-stone-100 relative">
            <div className="absolute top-2 right-2 text-stone-300 opacity-20"><Shield size={48}/></div>
            <div className="text-xs font-bold text-stone-700 mb-2 flex items-center gap-1"><Shirt size={12}/> 穿戴</div>
