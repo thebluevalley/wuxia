@@ -36,13 +36,18 @@ const generateQuestBoard = (level: number, stageName: string): Quest[] => {
     const multiplier = rank * 1.5;
     
     const staminaCost = rank * 10;
+    
+    // ⚠️ 任务总进度随难度增加 (1星300 -> 5星1500)
+    // 假设每 tick 进度 +10，1星需30 tick = 60秒，5星需300秒(5分钟)
+    const totalProgress = rank * 300; 
 
     quests.push({
       id: Date.now() + i + Math.random().toString(),
       name: `[${rank}星] ${name}`,
       category, rank,
       desc: isCombat ? "悬赏委托，凶险异常。" : "诚聘高人，报酬丰厚。",
-      progress: 0, total: 100,
+      progress: 0, 
+      total: totalProgress,
       reqLevel: Math.max(1, level - 2 + Math.floor(Math.random() * 5)),
       isAuto: false,
       staminaCost,
@@ -65,7 +70,8 @@ const generateFillerQuest = (level: number, stageName: string): Quest => {
     category: isCombat ? 'combat' : 'life',
     rank: 1,
     desc: "日常琐事...",
-    progress: 0, total: 100,
+    progress: 0, 
+    total: 200, // 挂机任务固定较短 (约40秒)
     reqLevel: 1,
     isAuto: true,
     staminaCost: 5, 
@@ -160,7 +166,6 @@ export function useGame() {
     setLoading(true); setError(null);
     const initialStage = "初出茅庐";
     
-    // 初始状态：不给任务，让其留白
     const initialBoard = generateQuestBoard(1, initialStage);
 
     const newHero: HeroState = {
@@ -177,7 +182,7 @@ export function useGame() {
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
       stats: { kills: 0, days: 1, arenaWins: 0 },
       
-      currentQuest: null, // ⚠️ 初始留白
+      currentQuest: null, 
       queuedQuest: null, 
       questBoard: initialBoard,
       lastQuestRefresh: Date.now(), 
@@ -229,7 +234,6 @@ export function useGame() {
     setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; });
   };
 
-  // ⚠️ 核心新增：使用物品逻辑
   const useItem = (itemId: string) => {
     if (!heroRef.current) return;
     const hero = heroRef.current;
@@ -243,7 +247,6 @@ export function useGame() {
 
     if (item.type === 'consumable') {
        const effectVal = Number(item.effect) || 0;
-       // 简单判断：如果描述里有“精力”就回精力，否则默认回血
        if (item.desc.includes("精力") || item.desc.includes("补气")) {
           updatedHero.stamina = Math.min(updatedHero.maxStamina, updatedHero.stamina + effectVal);
           msg = `服下 ${item.name}，精力恢复 ${effectVal} 点。`;
@@ -255,15 +258,14 @@ export function useGame() {
        const skillName = String(item.effect);
        const existingSkill = hero.martialArts.find(s => s.name === skillName);
        if (existingSkill) {
-          existingSkill.exp += 100; // 已学会，加熟练度
+          existingSkill.exp += 100;
           msg = `研读 ${item.name}，【${skillName}】熟练度提升！`;
        } else {
-          // 新技能，简单起见默认它是 'attack' 类型，实际应查表
           updatedHero.martialArts = [...updatedHero.martialArts, { name: skillName, type: 'attack', level: 1, exp: 0, maxExp: 100, desc: "新习得的武学" }];
           msg = `研读 ${item.name}，习得【${skillName}】！`;
        }
     } else {
-       consume = false; // 装备等不可直接使用
+       consume = false; 
     }
 
     if (consume) {
@@ -436,14 +438,14 @@ export function useGame() {
         if (newQuest.category === 'combat') newQuestProgress += Math.floor(currentHero.attributes.strength / 5);
         else newQuestProgress += Math.floor(currentHero.attributes.luck / 5);
 
-        if (newQuestProgress >= 100) {
+        // ⚠️ 修复：判定完成不再是固定 100，而是对比 quest.total
+        if (newQuestProgress >= newQuest.total) {
           goldChange += newQuest.rewards.gold;
           expChange += newQuest.rewards.exp;
           setHero(h => h ? { ...h, attributes: {...h.attributes, intelligence: h.attributes.intelligence + 1} } : null);
           addLog(`【达成】完成 ${newQuest.name}`, 'highlight');
           addMessage('system', '任务完成', `完成【${newQuest.name}】，赏金 ${newQuest.rewards.gold}，经验 ${newQuest.rewards.exp}。`);
           
-          // ⚠️ 任务完成后的逻辑分支
           if (queued) {
              const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', currentHero.level);
              newQuest = queued;
@@ -452,10 +454,9 @@ export function useGame() {
              newState = newQuest.category === 'combat' ? 'fight' : 'idle';
              addLog(`【新程】开始执行预约委托：${newQuest.name}`, 'highlight');
           } else {
-             // ⚠️ 留白机制：70% 概率不接新任务，直接置空进入闲逛状态
              if (Math.random() < 0.7) {
                newQuest = null; 
-               newState = 'idle'; // 强制进入闲逛
+               newState = 'idle'; 
                addLog("【闲暇】暂无要事，在附近游山玩水，稍作休整。", 'system');
              } else {
                const filler = generateFillerQuest(currentHero.level, currentHero.storyStage);
@@ -468,11 +469,8 @@ export function useGame() {
           isQuestUpdate = true;
         }
       } else {
-         // ⚠️ 如果当前无任务（留白中），尝试接新的自动任务
-         // 20% 概率结束留白
          if (Math.random() < 0.2) {
             newQuest = generateFillerQuest(currentHero.level, currentHero.storyStage);
-            // 恢复一点体力
             setHero(h => h ? { ...h, stamina: Math.min(h.maxStamina, h.stamina + 5) } : null);
             addLog(`【启程】休息片刻，决定去${newQuest.name}。`, 'system');
          }
@@ -528,7 +526,7 @@ export function useGame() {
            const loot = rollLoot(finalH.level, luck);
            if (loot) {
              const item = { ...loot, id: Date.now().toString(), count: 1 } as Item;
-             if (item.type === 'consumable' || item.type === 'book') { // 书也可以堆叠
+             if (item.type === 'consumable' || item.type === 'book') { 
                 const idx = finalH.inventory.findIndex(i => i.name === item.name); if(idx>=0) finalH.inventory[idx].count++; else finalH.inventory.push(item);
              } else {
                 const idx = finalH.inventory.findIndex(i => i.name === item.name); if(idx>=0) finalH.inventory[idx].count++; else finalH.inventory.push(item);
@@ -563,6 +561,5 @@ export function useGame() {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [hero?.name]);
 
-  // ⚠️ 导出 useItem
   return { hero, login, godAction, loading, error, clearError: () => setError(null), hireCompanion, acceptQuest, useItem };
 }

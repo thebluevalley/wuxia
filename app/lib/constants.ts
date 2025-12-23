@@ -10,7 +10,6 @@ export type Item = {
   minLevel: number;
   count: number;
   price: number;
-  // ⚠️ 新增：物品效果（数值 或 技能名）
   effect?: string | number; 
 };
 
@@ -34,6 +33,7 @@ export type Quest = {
   rank: QuestRank;
   desc: string; 
   progress: number; 
+  // ⚠️ total 不再固定，随难度变化
   total: number;
   reqLevel: number;
   isAuto?: boolean;
@@ -208,19 +208,18 @@ export const QUEST_SOURCES = {
   search: ["寻找失传的《易筋经》残卷"], hunt: ["讨伐黑风寨"], challenge: ["挑战华山"], train: ["修炼"], life: ["打杂"]
 };
 
-// ⚠️ 核心新增：海量物品库 (含秘籍和药水)
 export const LOOT_TABLE: Partial<Item>[] = [
   // --- 消耗品 ---
-  { name: "半个冷馒头", type: 'consumable', desc: "干硬难咽，聊胜于无。", price: 1, minLevel: 1, quality: 'common', effect: 10 }, // +HP
+  { name: "半个冷馒头", type: 'consumable', desc: "干硬难咽，聊胜于无。", price: 1, minLevel: 1, quality: 'common', effect: 10 }, 
   { name: "女儿红", type: 'consumable', desc: "陈年好酒，回血并增加豪气。", price: 20, minLevel: 10, quality: 'common', effect: 50 },
   { name: "金疮药", type: 'consumable', desc: "江湖常备跌打药。", price: 50, minLevel: 15, quality: 'common', effect: 100 },
-  { name: "大力丸", type: 'consumable', desc: "街头卖艺人的秘方，据说能补气。", price: 30, minLevel: 5, quality: 'common', effect: 20 }, // 补精力
+  { name: "大力丸", type: 'consumable', desc: "街头卖艺人的秘方，据说能补气。", price: 30, minLevel: 5, quality: 'common', effect: 20 }, 
   { name: "九花玉露丸", type: 'consumable', desc: "桃花岛秘药，清香袭人。", price: 300, minLevel: 30, quality: 'rare', effect: 300 },
   { name: "黑玉断续膏", type: 'consumable', desc: "西域灵药，可续断骨。", price: 500, minLevel: 40, quality: 'rare', effect: 500 },
   { name: "天山雪莲", type: 'consumable', desc: "生于绝壁，不仅回血还能精进修为。", price: 1000, minLevel: 50, quality: 'epic', effect: 1000 },
   { name: "大还丹", type: 'consumable', desc: "少林圣药，起死回生，增加一甲子功力。", price: 2000, minLevel: 60, quality: 'epic', effect: 2000 },
 
-  // --- 武功秘籍 (Effect = 对应 Skill Name) ---
+  // --- 武功秘籍 ---
   { name: "《长拳图解》", type: 'book', desc: "太祖长拳的入门图谱。", price: 50, minLevel: 1, quality: 'common', effect: "太祖长拳" },
   { name: "《吐纳心法》", type: 'book', desc: "道家基础呼吸法门。", price: 100, minLevel: 5, quality: 'common', effect: "吐纳法" },
   { name: "《草上飞秘籍》", type: 'book', desc: "轻功入门，身轻如燕。", price: 200, minLevel: 10, quality: 'common', effect: "草上飞" },
