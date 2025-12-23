@@ -5,9 +5,9 @@ export type Item = {
   id: string;
   name: string;
   desc: string;
-  quality: Quality; // 稀有度
+  quality: Quality;
   type: ItemType;
-  minLevel: number; // 最低穿戴/掉落等级
+  minLevel: number;
   count: number;
   price: number;
 };
@@ -22,13 +22,25 @@ export type Equipment = {
 };
 
 export type QuestType = 'search' | 'hunt' | 'challenge' | 'train' | 'life';
+export type Quest = { name: string; type: QuestType; desc: string; progress: number; total: number; };
 
-export type Quest = {
+export type SkillType = 'attack' | 'inner' | 'speed' | 'medical' | 'trade';
+export type Skill = { name: string; type: SkillType; level: number; exp: number; maxExp: number; desc: string; };
+
+export type MessageType = 'rumor' | 'system';
+export type Message = { id: string; type: MessageType; title: string; content: string; time: string; isRead: boolean; };
+
+// 伙伴定义
+export type Companion = {
+  id: string;
   name: string;
-  type: QuestType;
+  title: string;
+  archetype: string;
+  personality: string;
   desc: string;
-  progress: number;
-  total: number;
+  price: number;
+  quality: Quality;
+  buff: { type: 'attack' | 'defense' | 'heal' | 'luck' | 'exp'; val: number; };
 };
 
 export type Pet = {
@@ -38,26 +50,7 @@ export type Pet = {
   desc: string;
 };
 
-export type SkillType = 'attack' | 'inner' | 'speed' | 'medical' | 'trade';
-export type Skill = {
-  name: string;
-  type: SkillType;
-  level: number;
-  exp: number;
-  maxExp: number;
-  desc: string;
-};
-
-export type MessageType = 'rumor' | 'system';
-export type Message = {
-  id: string;
-  type: MessageType;
-  title: string;
-  content: string;
-  time: string;
-  isRead: boolean;
-};
-
+// ⚠️ 核心修复：HeroState 必须包含 pet, companion, tavern
 export type HeroState = {
   name: string;
   level: number;
@@ -68,40 +61,80 @@ export type HeroState = {
   motto: string;
   godPower: number;
   unlockedFeatures: string[];
+  storyStage: string;
+  
+  // 关键字段：宠物
   pet: Pet | null;
-  storyStage: string; 
 
-  attributes: { 
-    constitution: number; strength: number; dexterity: number; intelligence: number; luck: number;
-  };
-
+  attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
   hp: number; maxHp: number;
   exp: number; maxExp: number;
   gold: number;
   alignment: number;
+  
   currentQuest: Quest;
   location: string;
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   
   logs: LogEntry[];
   messages: Message[];
-  majorEvents: string[]; 
+  majorEvents: string[];
   
   inventory: Item[];
   equipment: Equipment;
   martialArts: Skill[];
   lifeSkills: Skill[];
   stats: { kills: number; days: number; arenaWins: number; };
+  
+  // 关键字段：酒馆
+  tavern: {
+    visitors: Companion[];
+    lastRefresh: number;
+  };
+  // 关键字段：伙伴
+  companion: Companion | null;
+  companionExpiry: number;
 };
 
-export type LogEntry = {
-  id: string;
-  text: string;
-  type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai';
-  time: string;
-};
+export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
 export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "社恐"];
+
+// ⚠️ 必须包含这些 NPC 相关的导出
+export const NPC_NAMES_FIRST = ["独孤", "西门", "欧阳", "诸葛", "慕容", "李", "王", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴", "徐", "孙", "马", "朱", "胡", "林", "郭", "何", "高", "罗", "郑", "梁", "谢", "宋", "唐", "许", "韩", "冯", "邓", "曹", "彭", "曾", "萧", "田", "董"];
+export const NPC_NAMES_LAST = ["一刀", "无忌", "吹雪", "寻欢", "留香", "不败", "求败", "铁手", "无情", "追命", "冷血", "小宝", "大侠", "三少", "四娘", "无缺", "灵珊", "盈盈", "语嫣", "莫愁", "过", "靖", "康", "峰", "誉", "竹", "梅", "兰", "菊", "风", "云", "霜", "雪", "雷", "电"];
+
+export const NPC_ARCHETYPES = {
+  common: [
+    { job: "店小二", buff: "luck", desc: "消息灵通，跑腿勤快。" },
+    { job: "落魄书生", buff: "exp", desc: "虽然手无缚鸡之力，但满腹经纶。" },
+    { job: "卖花女", buff: "heal", desc: "笑容甜美，能让人忘却疲惫。" },
+    { job: "地痞", buff: "attack", desc: "打架全靠一股狠劲。" }
+  ],
+  rare: [
+    { job: "游方郎中", buff: "heal", desc: "医术精湛，悬壶济世。" },
+    { job: "镖师", buff: "defense", desc: "走南闯北，经验丰富。" },
+    { job: "算命先生", buff: "luck", desc: "铁口直断，趋吉避凶。" },
+    { job: "猎户", buff: "attack", desc: "擅长追踪和设伏。" }
+  ],
+  epic: [
+    { job: "独臂刀客", buff: "attack", desc: "刀法刚猛，力劈华山。" },
+    { job: "峨眉女侠", buff: "attack", desc: "剑法轻灵，身法飘逸。" },
+    { job: "少林武僧", buff: "defense", desc: "金钟罩铁布衫，刀枪不入。" },
+    { job: "丐帮长老", buff: "exp", desc: "眼线遍布天下，通晓江湖秘闻。" }
+  ],
+  legendary: [
+    { job: "隐世扫地僧", buff: "exp", desc: "深不可测，一花一世界。" },
+    { job: "魔教圣女", buff: "attack", desc: "行事乖张，武功诡异。" },
+    { job: "剑圣", buff: "attack", desc: "人剑合一，万剑归宗。" }
+  ]
+};
+
+export const NPC_TRAITS = [
+  "嗜酒如命", "贪财好色", "刚正不阿", "沉默寡言", "话痨", 
+  "阴阳怪气", "胆小如鼠", "豪气干云", "多愁善感", "洁癖", 
+  "路痴", "毒舌", "中二病", "社恐", "吃货"
+];
 
 export const SKILL_LIBRARY = {
   attack: ["太祖长拳", "落英神剑掌", "降龙十八掌", "独孤九剑", "打狗棒法", "六脉神剑", "弹指神通", "黯然销魂掌"],
@@ -154,41 +187,30 @@ export const QUEST_SOURCES = {
   life:   ["帮隔壁王大妈寻找走失的鸭子", "去集市摆摊卖艺赚盘缠", "帮村长修补漏雨的屋顶", "为心上人描眉画画", "在酒馆打听江湖传闻"]
 };
 
-// ⚠️ 升级：分级掉落表 (minLevel, quality)
 export const LOOT_TABLE: Partial<Item>[] = [
-  // Lv 1+ (Common)
   { name: "半个冷馒头", type: 'consumable', desc: "回血 +10", price: 1, minLevel: 1, quality: 'common' },
   { name: "生锈的铁剑", type: 'weapon', desc: "攻击 +1", price: 10, minLevel: 1, quality: 'common' },
   { name: "粗布头巾", type: 'head', desc: "防御 +1", price: 5, minLevel: 1, quality: 'common' },
   { name: "麻布裤", type: 'legs', desc: "防御 +1", price: 5, minLevel: 1, quality: 'common' },
   { name: "草鞋", type: 'feet', desc: "身法 +1", price: 2, minLevel: 1, quality: 'common' },
-  
-  // Lv 10+ (Common/Rare)
   { name: "女儿红", type: 'consumable', desc: "回血 +50，增加豪气", price: 20, minLevel: 10, quality: 'common' },
   { name: "百炼钢刀", type: 'weapon', desc: "攻击 +10", price: 150, minLevel: 10, quality: 'rare' },
   { name: "精铁护腕", type: 'accessory', desc: "臂力 +2", price: 100, minLevel: 10, quality: 'rare' },
   { name: "皮甲", type: 'body', desc: "防御 +10", price: 80, minLevel: 10, quality: 'common' },
-  
-  // Lv 20+ (Rare)
   { name: "金疮药", type: 'consumable', desc: "回血 +100", price: 50, minLevel: 20, quality: 'common' },
   { name: "神行太保靴", type: 'feet', desc: "身法 +15", price: 300, minLevel: 20, quality: 'rare' },
   { name: "金丝软甲(残)", type: 'body', desc: "防御 +30", price: 500, minLevel: 25, quality: 'rare' },
   { name: "平安符", type: 'accessory', desc: "福源 +5", price: 200, minLevel: 15, quality: 'common' },
-
-  // Lv 40+ (Epic)
   { name: "黑玉断续膏", type: 'consumable', desc: "回血 +500", price: 200, minLevel: 40, quality: 'rare' },
   { name: "九花玉露丸", type: 'consumable', desc: "回血 +300, 内力大增", price: 300, minLevel: 35, quality: 'rare' },
   { name: "玄铁重剑(仿)", type: 'weapon', desc: "攻击 +80", price: 1000, minLevel: 40, quality: 'epic' },
   { name: "武功秘籍残卷", type: 'book', desc: "记载着一招半式", price: 500, minLevel: 30, quality: 'rare' },
-
-  // Lv 60+ (Legendary)
   { name: "大还丹", type: 'consumable', desc: "起死回生", price: 1000, minLevel: 60, quality: 'epic' },
   { name: "倚天剑", type: 'weapon', desc: "武林至尊，攻击 +200", price: 5000, minLevel: 60, quality: 'legendary' },
   { name: "屠龙刀", type: 'weapon', desc: "号令天下，攻击 +220", price: 5500, minLevel: 65, quality: 'legendary' },
   { name: "软猬甲", type: 'body', desc: "刀枪不入，反弹伤害", price: 4000, minLevel: 55, quality: 'legendary' },
 ];
 
-// ⚠️ 升级：更有代入感的静态日志 (拒绝鸡肋)
 export const STATIC_LOGS = {
   idle: [
     "风中隐约传来兵刃相交之声，令我不由得握紧了剑柄。",
