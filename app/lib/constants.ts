@@ -24,18 +24,17 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-// ⚠️ 核心修复：补全所有用到的势力 Key (包括 hidden)
 export type Faction = 'alliance' | 'freedom' | 'court' | 'sword' | 'healer' | 'cult' | 'invader' | 'hidden' | 'neutral';
 export const FACTIONS: Record<Faction, string> = {
-  alliance: "长生盟 (江南财阀)",
-  freedom: "自在门 (绿林豪客)",
-  court: "锦衣卫 (皇权鹰犬)",
-  sword: "东海剑阁 (隐世剑修)",
-  healer: "药王谷 (悬壶济世)",
-  cult: "拜火教 (西域异端)",
-  invader: "北莽 (草原铁骑)",
-  hidden: "悲酥清风 (杀手组织)",
-  neutral: "市井百态"
+  alliance: "长生盟",
+  freedom: "自在门",
+  court: "锦衣卫",
+  sword: "东海剑阁",
+  healer: "药王谷",
+  cult: "拜火教",
+  invader: "北莽",
+  hidden: "悲酥清风",
+  neutral: "市井"
 };
 
 export type QuestCategory = 'combat' | 'life';
@@ -97,7 +96,16 @@ export type HeroState = {
   reputation: Record<Faction, number>;
   
   tags: string[]; 
-  actionCounts: Record<string, number>; 
+  // ⚠️ 隐性计数器：用于分析玩家性格
+  actionCounts: {
+    kills: number;        // 杀敌数
+    retreats: number;     // 逃跑/撤退数
+    gambles: number;      // 赌博/冒险次数
+    charity: number;      // 施舍/助人次数
+    betrayals: number;    // 背叛/行恶次数
+    shopping: number;     // 购物次数
+    drinking: number;     // 饮酒次数
+  }; 
   description: string; 
 
   currentQuest: Quest | null;
@@ -109,26 +117,26 @@ export type HeroState = {
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   logs: LogEntry[]; messages: Message[]; majorEvents: string[];
   inventory: Item[]; equipment: Equipment; martialArts: Skill[]; lifeSkills: Skill[];
-  stats: { kills: number; days: number; arenaWins: number; };
+  stats: { kills: number; days: number; arenaWins: number; }; // 基础统计
   tavern: { visitors: Companion[]; lastRefresh: number; };
   companion: Companion | null; companionExpiry: number;
 };
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
-// --- 典故系统 (World Archive) ---
+// --- 典故系统 ---
 export const WORLD_ARCHIVE = [
   "【天机榜】：百晓生所著，记录天下兵器。排名第一的'天问剑'已失踪六十年。",
-  "【胭脂泪】：三十年前，魔教圣女爱上了少林方丈，最终在断肠崖自尽。至今每逢雨夜，崖下仍有哭声。",
+  "【胭脂泪】：三十年前，魔教圣女爱上了少林方丈，最终在断肠崖自尽。",
   "【北拒狼烟】：大将军李牧之死守孤城十三年，城破之日，满城百姓无一人投降。",
-  "【药王试毒】：为了研制解药，药王谷谷主以身试毒，变成了一个半人半鬼的怪物，被锁在谷底。",
+  "【药王试毒】：为了研制解药，药王谷谷主以身试毒，变成了一个半人半鬼的怪物。",
   "【剑阁闭门】：东海剑阁宣布封岛五十年，传闻是在参悟'无剑之境'。",
-  "【长生之谜】：据说皇宫深处藏着半张残卷，记载了长生不老的秘密，但也诅咒了每一个拥有它的皇帝。",
+  "【长生之谜】：据说皇宫深处藏着半张残卷，记载了长生不老的秘密。",
   "【酒神咒】：喝得越醉，剑法越强。这是失传已久的'醉仙望月步'的心法。",
-  "【红尘客栈】：江湖中唯一不能动手的地方。老板娘风情万种，但没人见过她出手的样子，因为见过的都死了。"
+  "【红尘客栈】：江湖中唯一不能动手的地方。老板娘风情万种，但没人见过她出手。"
 ];
 
-export const PERSONALITIES = ["侠义", "乐天", "狂放", "儒雅", "贪财", "痴情", "机灵", "中庸", "逍遥"];
+export const PERSONALITIES = ["侠义", "乐天", "狂放", "儒雅", "贪财", "痴情", "机灵", "中庸", "逍遥", "阴狠", "慈悲"];
 export const NPC_NAMES_MALE = ["苏", "萧", "叶", "顾", "沈", "陆", "江", "楚", "独孤", "西门", "诸葛", "慕容", "李", "王", "张", "刘", "陈"];
 export const NPC_NAMES_FEMALE = ["灵儿", "语嫣", "婉清", "盈盈", "莫愁", "芷若", "敏", "蓉", "念慈", "素素", "红药", "师师"];
 export const NPC_NAMES_LAST = ["无忌", "一刀", "留香", "不败", "寻欢", "风", "云", "雷", "电", "靖", "康", "峰", "平", "冲"];
@@ -213,11 +221,11 @@ export const FLAVOR_TEXTS = {
 
 export const QUEST_SCRIPTS = {
   "微尘": [
-    { title: "那碗阳春面", desc: "这世道，一碗热面能救一条命。但那个小乞丐盯着你的面很久了。", obj: "分享食物", antagonist: "冷漠的店小二", twist: "小乞丐吃完面，在桌上画了一张藏宝图，那是前朝皇宫的密道。", faction: 'neutral' },
-    { title: "替死鬼", desc: "长生盟的少爷杀了人，管家给你十两银子，让你去顶罪。", obj: "抉择", antagonist: "长生盟管家", twist: "在牢里，你遇到了被关押二十年的“前任武林盟主”。", faction: 'alliance' }
+    { title: "那碗阳春面", desc: "这世道，一碗热面能救一条命。", obj: "分享食物", antagonist: "冷漠的店小二", twist: "小乞丐吃完面，在桌上画了一张前朝皇宫的密道图。", faction: 'neutral' },
+    { title: "替死鬼", desc: "长生盟的少爷杀了人，管家让你去顶罪。", obj: "抉择", antagonist: "长生盟管家", twist: "在牢里，你遇到了被关押二十年的“前任武林盟主”。", faction: 'alliance' }
   ],
   "棋子": [
-    { title: "押运生辰纲", desc: "锦衣卫委托你押送给当朝太师的寿礼。", obj: "护送镖车", antagonist: "自在门劫匪", twist: "箱子里装的不是金银，而是从民间搜刮的三千童男童女。", faction: 'court' },
+    { title: "押运生辰纲", desc: "锦衣卫委托你押送给当朝太师的寿礼。", obj: "护送镖车", antagonist: "自在门劫匪", twist: "箱子里装的不是金银，而是三千童男童女。", faction: 'court' },
     { title: "刺杀清官", desc: "悲酥清风下单，要买扬州知府的人头。", obj: "执行刺杀", antagonist: "知府的护卫", twist: "知府是唯一在开仓放粮的好官，买凶的人是粮商。", faction: 'hidden' }
   ],
   "破局者": [
@@ -233,9 +241,8 @@ export const QUEST_SCRIPTS = {
 };
 
 export const WORLD_LORE = `
-背景：王朝末年，内忧外患。北莽扣关，朝廷腐败，长生盟垄断江湖资源。
-核心冲突：救国还是救己？守规矩还是破规矩？
-基调：既有“落霞与孤鹜齐飞”的诗意，也有“白骨露于野”的残酷。
+背景：王朝末年，内忧外患。北莽扣关，朝廷腐败。
+核心：从微尘到国士的成长之路。
 `;
 
 export const QUEST_SOURCES = {
@@ -243,7 +250,6 @@ export const QUEST_SOURCES = {
 };
 
 export const LOOT_TABLE: Partial<Item>[] = [
-  // ... (保留之前的物品，可继续增加特色物品)
   { name: "女儿红(二十年)", type: 'consumable', desc: "埋在地下二十年的好酒，喝一口少一口。", price: 100, minLevel: 20, quality: 'rare', effect: 200 },
   { name: "叫花鸡", type: 'consumable', desc: "荷叶包着的美味，香飘十里。", price: 50, minLevel: 10, quality: 'common', effect: 80 },
   { name: "《广陵散》残谱", type: 'book', desc: "嵇康绝响，曲意高古。", price: 2000, minLevel: 40, quality: 'epic', effect: "音波功" },
