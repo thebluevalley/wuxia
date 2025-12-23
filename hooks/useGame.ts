@@ -9,7 +9,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 3 * 60 * 60 * 1000; 
 const QUEST_REFRESH_INTERVAL = 6 * 60 * 60 * 1000; 
 
-// --- 辅助函数 ---
+// --- Helper Functions ---
 
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
@@ -128,7 +128,7 @@ const rollLoot = (level: number, luck: number): Partial<Item> | null => {
     return pool[Math.floor(Math.random() * pool.length)];
 };
 
-// --- 主 Hook ---
+// --- Main Hook ---
 
 export function useGame() {
   const [hero, setHero] = useState<HeroState | null>(null);
@@ -278,17 +278,15 @@ export function useGame() {
     }
   };
 
-  // ⚠️ 核心新增：自动管理行囊算法
   const autoManageInventory = (currentHero: HeroState): { hero: HeroState, logs: string[] } => {
     let hero = { ...currentHero };
     const logs: string[] = [];
     let updated = false;
 
-    // 1. 自动装备逻辑
+    // 1. Auto Equip
     hero.inventory.forEach(item => {
       const equipPower = item.power || 0;
       if (equipPower > 0) {
-        // 映射物品类型到装备槽
         let slotKey: keyof Equipment | null = null;
         if (item.type === 'weapon') slotKey = 'weapon';
         else if (item.type === 'head') slotKey = 'head';
@@ -300,22 +298,11 @@ export function useGame() {
         if (slotKey) {
           const currentEquip = hero.equipment[slotKey];
           const currentPower = currentEquip?.power || 0;
-          
           if (equipPower > currentPower) {
-            // 换装！
-            // 把旧装备（如果有）放回背包
-            if (currentEquip) {
-              hero.inventory.push(currentEquip);
-            }
-            // 装备新装备
+            if (currentEquip) hero.inventory.push(currentEquip);
             hero.equipment[slotKey] = item;
-            // 从背包移除新装备 (通过 filter 移除一个实例)
             const idx = hero.inventory.findIndex(i => i.id === item.id);
-            if (idx > -1) {
-               if (hero.inventory[idx].count > 1) hero.inventory[idx].count--;
-               else hero.inventory.splice(idx, 1);
-            }
-            
+            if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
             logs.push(`【换装】装备了更强的 ${item.name} (强度 ${equipPower})`);
             updated = true;
           }
@@ -323,7 +310,7 @@ export function useGame() {
       }
     });
 
-    // 2. 自动学习秘籍
+    // 2. Auto Learn
     const books = hero.inventory.filter(i => i.type === 'book');
     books.forEach(book => {
        const skillName = String(book.effect);
@@ -335,45 +322,33 @@ export function useGame() {
           hero.martialArts.push({ name: skillName, type: 'attack', level: 1, exp: 0, maxExp: 100, desc: "新习得的武学" });
           logs.push(`【顿悟】自动研读 ${book.name}，习得【${skillName}】！`);
        }
-       // 消耗书籍
        const idx = hero.inventory.findIndex(i => i.id === book.id);
-       if (idx > -1) {
-          if (hero.inventory[idx].count > 1) hero.inventory[idx].count--;
-          else hero.inventory.splice(idx, 1);
-       }
+       if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
        updated = true;
     });
 
-    // 3. 自动吃药 (血量低)
+    // 3. Auto Heal
     if (hero.hp < hero.maxHp * 0.5) {
        const potion = hero.inventory.find(i => i.type === 'consumable' && !i.desc.includes("精力"));
        if (potion) {
           const heal = Number(potion.effect) || 0;
           hero.hp = Math.min(hero.maxHp, hero.hp + heal);
           logs.push(`【自救】重伤之际服下 ${potion.name}，气血恢复 ${heal}。`);
-          
           const idx = hero.inventory.findIndex(i => i.id === potion.id);
-          if (idx > -1) {
-             if (hero.inventory[idx].count > 1) hero.inventory[idx].count--;
-             else hero.inventory.splice(idx, 1);
-          }
+          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
           updated = true;
        }
     }
 
-    // 4. 自动补给 (精力低)
+    // 4. Auto Stamina
     if (hero.stamina < hero.maxStamina * 0.2) {
        const food = hero.inventory.find(i => i.type === 'consumable' && (i.desc.includes("精力") || i.desc.includes("补气")));
        if (food) {
           const regen = Number(food.effect) || 0;
           hero.stamina = Math.min(hero.maxStamina, hero.stamina + regen);
           logs.push(`【补给】体力不支服下 ${food.name}，精力恢复 ${regen}。`);
-          
           const idx = hero.inventory.findIndex(i => i.id === food.id);
-          if (idx > -1) {
-             if (hero.inventory[idx].count > 1) hero.inventory[idx].count--;
-             else hero.inventory.splice(idx, 1);
-          }
+          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
           updated = true;
        }
     }
@@ -388,36 +363,27 @@ export function useGame() {
       const currentHero = heroRef.current;
       if (!currentHero) return;
 
-      // ⚠️ 1. 执行自动整理行囊
+      // 1. Inventory Management
       const { hero: managedHero, logs: autoLogs } = autoManageInventory(currentHero);
-      // 如果有变动，立即应用并显示日志
       if (autoLogs.length > 0) {
          setHero(managedHero); 
          autoLogs.forEach(l => addLog(l, 'highlight'));
-         // 这里的 return 可能会打断后续逻辑，最好是继续用 managedHero 执行后续
       }
-      
-      const activeHero = managedHero; // 使用整理后的数据继续
+      const activeHero = managedHero;
 
-      setHero(h => h ? { 
-        ...h, 
-        godPower: Math.min(100, h.godPower + 5),
-        stamina: Math.min(h.maxStamina, h.stamina + (Math.random() < 0.2 ? 1 : 0)) 
-      } : null);
-      
+      // 2. Refresh Logic
       if (activeHero.companion && Date.now() > activeHero.companionExpiry) {
          addLog(`【离别】${activeHero.companion.name} 拱手道别：“青山不改，绿水长流！”`, "system");
          setHero(h => h ? { ...h, companion: null } : null);
       }
-
       if (Date.now() - activeHero.tavern.lastRefresh > REFRESH_INTERVAL) { refreshTavernInternal(); }
-
       if (Date.now() - (activeHero.lastQuestRefresh || 0) > QUEST_REFRESH_INTERVAL) {
          const newBoard = generateQuestBoard(activeHero.level, activeHero.storyStage);
          setHero(h => h ? { ...h, questBoard: newBoard, lastQuestRefresh: Date.now() } : null);
          addMessage('system', '悬赏更新', '悬赏榜已刷新。');
       }
 
+      // 3. Pre-calculate State Changes
       let newState = activeHero.state;
       let newLocation = activeHero.location;
       let newQuest = activeHero.currentQuest;
@@ -425,8 +391,10 @@ export function useGame() {
       let newQuestProgress = newQuest ? newQuest.progress : 0;
       let goldChange = 0;
       let expChange = 0;
-      let isQuestUpdate = false; 
-
+      let lootItem: Item | null = null;
+      let logSuffix = "";
+      
+      // Quest Progression
       if (newQuest) {
         newQuestProgress += 5 + Math.floor(Math.random() * 5); 
         if (newQuest.category === 'combat') newQuestProgress += Math.floor(activeHero.attributes.strength / 5);
@@ -435,7 +403,7 @@ export function useGame() {
         if (newQuestProgress >= newQuest.total) {
           goldChange += newQuest.rewards.gold;
           expChange += newQuest.rewards.exp;
-          setHero(h => h ? { ...h, attributes: {...h.attributes, intelligence: h.attributes.intelligence + 1} } : null);
+          // Completed
           addLog(`【达成】完成 ${newQuest.name}`, 'highlight');
           addMessage('system', '任务完成', `完成【${newQuest.name}】，赏金 ${newQuest.rewards.gold}，经验 ${newQuest.rewards.exp}。`);
           
@@ -453,37 +421,72 @@ export function useGame() {
                addLog("【闲暇】暂无要事，在附近游山玩水，稍作休整。", 'system');
              } else {
                const filler = generateFillerQuest(activeHero.level, activeHero.storyStage);
-               setHero(h => h ? { ...h, stamina: Math.max(0, h.stamina - filler.staminaCost) } : null);
+               // Stamina cost for filler handled in update
                newQuest = filler;
                addLog(`【日常】顺手做些杂事：${filler.name}`, 'system');
              }
           }
-        } else {
-          isQuestUpdate = true;
         }
       } else {
          if (Math.random() < 0.2) {
             newQuest = generateFillerQuest(activeHero.level, activeHero.storyStage);
-            setHero(h => h ? { ...h, stamina: Math.min(h.maxStamina, h.stamina + 5) } : null);
             addLog(`【启程】休息片刻，决定去${newQuest.name}。`, 'system');
          }
       }
 
+      // Random Loot
+      if (activeHero.state !== 'town' && Math.random() < 0.15) {
+         const luck = activeHero.attributes.luck + (activeHero.companion?.buff.type === 'luck' ? activeHero.companion.buff.val : 0);
+         const loot = rollLoot(activeHero.level, luck);
+         if (loot) {
+            lootItem = { ...loot, id: Date.now().toString(), count: 1 } as Item;
+            if (Math.random() < 0.5) logSuffix = `(获得: ${lootItem.name})`;
+         }
+      }
+
+      // State Transitions
       if (activeHero.level >= 10 && activeHero.state === 'idle' && Math.random() < 0.15) newState = 'arena';
       else if (activeHero.inventory.length >= 15 && activeHero.state !== 'town') newState = 'town';
 
+      // 4. Apply Updates
       setHero(h => {
         if(!h) return null;
-        const companion = h.companion;
-        if (companion) { if (companion.buff.type === 'exp') expChange += companion.buff.val; }
-
+        
         let finalH = { 
-            ...h, state: newState, location: newLocation, storyStage: getStoryStage(h.level),
+            ...h, 
+            state: newState, 
+            location: newLocation, 
+            storyStage: getStoryStage(h.level),
             currentQuest: newQuest ? { ...newQuest, progress: newQuestProgress } : null,
             queuedQuest: queued, 
-            gold: h.gold + goldChange, exp: h.exp + expChange
+            gold: h.gold + goldChange, 
+            exp: h.exp + expChange,
+            stamina: Math.min(h.maxStamina, h.stamina + (h.state === 'idle' ? 1 : 0.5)),
+            godPower: Math.min(100, h.godPower + 5)
         };
 
+        // Apply Loot
+        if (lootItem) {
+           const idx = finalH.inventory.findIndex(i => i.name === lootItem!.name);
+           if (idx >= 0) finalH.inventory[idx].count++; 
+           else finalH.inventory.push(lootItem);
+        }
+
+        // Town Logic (Auto Sell)
+        if (finalH.state === 'town') {
+           const sellValue = finalH.inventory.reduce((acc, i) => acc + (i.price * i.count), 0);
+           if (sellValue > 0) {
+              finalH.gold += sellValue;
+              finalH.inventory = [];
+           }
+           if (finalH.gold > 50 && finalH.hp < finalH.maxHp) {
+              finalH.gold -= 20;
+              finalH.hp = finalH.maxHp;
+           }
+           finalH.state = 'idle'; 
+        }
+
+        // Combat Exp
         if (finalH.state === 'fight' || finalH.state === 'arena') {
            const gainExp = 10 + Math.floor(h.level * 1.5);
            finalH.exp += gainExp;
@@ -493,60 +496,35 @@ export function useGame() {
              skill.exp += (finalH.attributes.intelligence * 0.5) + 5;
              if (skill.exp >= skill.maxExp) {
                skill.level++; skill.exp = 0; skill.maxExp = Math.floor(skill.maxExp * 1.2);
-               addMessage('system', '武学精进', `【${skill.name}】突破到 ${skill.level} 层！`);
              }
            }
            if (finalH.state === 'arena') {
-              let winRate = 0.4;
-              if (companion?.buff.type === 'attack') winRate += 0.2;
-              if (Math.random() < winRate) {
-                 finalH.stats.arenaWins++; finalH.gold += 100;
-                 addLog("【胜】险胜强敌！(声望+1)", "highlight");
-              } else {
-                 finalH.hp = Math.floor(finalH.hp * 0.6); addLog("【败】技不如人。(生命-40%)", "bad");
-              }
+              if (Math.random() < 0.4) { finalH.stats.arenaWins++; finalH.gold += 100; }
+              else { finalH.hp = Math.floor(finalH.hp * 0.6); }
               finalH.state = 'idle';
            }
         }
-        else if (finalH.state === 'town') {
-           const sellValue = finalH.inventory.reduce((acc, i) => acc + (i.price * i.count), 0);
-           if (sellValue > 0) { finalH.gold += sellValue; finalH.inventory = []; addLog(`变卖行囊获利 ${sellValue} 文。`, 'system'); }
-           if (finalH.gold > 50 && finalH.hp < finalH.maxHp) { finalH.gold -= 20; finalH.hp = finalH.maxHp; addLog("医馆疗伤。", 'system'); }
-           finalH.state = 'idle';
-        }
-        else if (Math.random() < 0.15) { 
-           const luck = finalH.attributes.luck + (companion?.buff.type === 'luck' ? companion.buff.val : 0);
-           const loot = rollLoot(finalH.level, luck);
-           if (loot) {
-             const item = { ...loot, id: Date.now().toString(), count: 1 } as Item;
-             if (item.type === 'consumable' || item.type === 'book') { 
-                const idx = finalH.inventory.findIndex(i => i.name === item.name); if(idx>=0) finalH.inventory[idx].count++; else finalH.inventory.push(item);
-             } else {
-                const idx = finalH.inventory.findIndex(i => i.name === item.name); if(idx>=0) finalH.inventory[idx].count++; else finalH.inventory.push(item);
-             }
-             if (Math.random() < 0.5) suffix = `(获得: ${item.name})`;
-           }
-        }
 
+        // Level Up
         if (finalH.exp >= finalH.maxExp) {
            finalH.level++; finalH.exp = 0; finalH.maxExp = Math.floor(finalH.maxExp * 1.5); finalH.maxHp += 30; finalH.hp = finalH.maxHp;
            finalH.majorEvents.unshift(`${new Date().toLocaleTimeString()} 突破至 Lv.${finalH.level}`);
-           addMessage('system', '境界提升', `恭喜！突破至 Lv.${finalH.level}！`);
-           addLog(`【境界突破】气冲斗牛，晋升 Lv.${finalH.level}！`, 'highlight');
         }
         return finalH;
       });
 
+      // 5. Trigger AI & Logs
       const dice = Math.random();
       if (dice < 0.05) await triggerAI('generate_rumor');
-      else if (isQuestUpdate && dice < 0.5) await triggerAI('quest_update', suffix); 
-      else if (dice < 0.8) await triggerAI('auto', suffix);
+      else if (isQuestUpdate && dice < 0.5) await triggerAI('quest_update', logSuffix); 
+      else if (dice < 0.8) await triggerAI('auto', logSuffix);
       else {
          let list = STATIC_LOGS.idle;
          if (newState === 'fight') list = STATIC_LOGS.fight; else if (newState === 'town') list = STATIC_LOGS.town; else if (newState === 'arena') list = STATIC_LOGS.arena;
          let text = list[Math.floor(Math.random() * list.length)];
-         if (!recentLogsRef.current.includes(text)) addLog(text + (suffix ? ` ${suffix}` : ''), 'system');
+         if (!recentLogsRef.current.includes(text)) addLog(text + (logSuffix ? ` ${logSuffix}` : ''), 'system');
       }
+      
       const nextTick = Math.floor(Math.random() * (120000 - 30000) + 30000); 
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
