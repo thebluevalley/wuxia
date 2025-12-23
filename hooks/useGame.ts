@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QUEST_TEMPLATES, QuestType, PERSONALITIES, PET_TEMPLATES, ARENA_OPPONENTS, MAP_LOCATIONS, WORLD_MAP, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_MALE, NPC_NAMES_FEMALE, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, Quest, QuestRank } from '@/app/lib/constants';
+import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QUEST_SCRIPTS, QuestType, PERSONALITIES, PET_TEMPLATES, ARENA_OPPONENTS, MAP_LOCATIONS, WORLD_MAP, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_MALE, NPC_NAMES_FEMALE, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, Quest, QuestRank, Faction } from '@/app/lib/constants';
 
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL 
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
@@ -16,16 +16,15 @@ const getStoryStage = (level: number) => {
   return stage ? stage.name : "初出茅庐";
 };
 
+// ⚠️ 核心修改：基于剧本生成任务
 const generateQuestBoard = (level: number, stageName: string): Quest[] => {
   const quests: Quest[] = [];
   // @ts-ignore
-  const templates = QUEST_TEMPLATES[stageName] || QUEST_TEMPLATES["初出茅庐"];
+  const scripts = QUEST_SCRIPTS[stageName] || QUEST_SCRIPTS["default"];
 
   for (let i = 0; i < 3; i++) {
     const isCombat = Math.random() > 0.4;
-    const category = isCombat ? 'combat' : 'life';
-    const pool = isCombat ? templates.combat : templates.life;
-    const name = pool[Math.floor(Math.random() * pool.length)];
+    const template = scripts[Math.floor(Math.random() * scripts.length)];
     
     const rand = Math.random();
     let rank: QuestRank = 1;
@@ -39,11 +38,22 @@ const generateQuestBoard = (level: number, stageName: string): Quest[] => {
 
     quests.push({
       id: Date.now() + i + Math.random().toString(),
-      name: `[${rank}星] ${name}`,
-      category, rank,
-      desc: isCombat ? "悬赏委托，凶险异常。" : "诚聘高人，报酬丰厚。",
+      name: `[${rank}星] ${template.title}`,
+      category: isCombat ? 'combat' : 'life',
+      rank,
+      faction: template.faction as Faction,
+      // ⚠️ 注入剧本
+      script: {
+        title: template.title,
+        description: template.desc,
+        objective: template.obj,
+        antagonist: template.antagonist,
+        twist: template.twist
+      },
+      desc: template.desc, // 显示用
       progress: 0, 
       total: totalProgress,
+      stage: 'start', // 初始阶段
       reqLevel: Math.max(1, level - 2 + Math.floor(Math.random() * 5)),
       isAuto: false,
       staminaCost,
@@ -54,23 +64,16 @@ const generateQuestBoard = (level: number, stageName: string): Quest[] => {
 };
 
 const generateFillerQuest = (level: number, stageName: string): Quest => {
-  // @ts-ignore
-  const templates = QUEST_TEMPLATES[stageName] || QUEST_TEMPLATES["初出茅庐"];
-  const isCombat = Math.random() > 0.5;
-  const pool = isCombat ? templates.combat : templates.life;
-  const name = pool[Math.floor(Math.random() * pool.length)];
-  
+  // 简单的挂机任务
   return {
     id: 'auto_' + Date.now(),
-    name: name,
-    category: isCombat ? 'combat' : 'life',
+    name: "闲逛",
+    category: 'life',
     rank: 1,
+    faction: 'neutral',
+    script: { title: "闲逛", description: "无事发生", objective: "消磨时间", antagonist: "无", twist: "无" },
     desc: "日常琐事...",
-    progress: 0, 
-    total: 200, 
-    reqLevel: 1,
-    isAuto: true,
-    staminaCost: 5, 
+    progress: 0, total: 200, reqLevel: 1, stage: 'start', isAuto: true, staminaCost: 5, 
     rewards: { gold: level * 5 + 10, exp: level * 10 + 20 }
   };
 };
@@ -128,7 +131,7 @@ const rollLoot = (level: number, luck: number): Partial<Item> | null => {
     return pool[Math.floor(Math.random() * pool.length)];
 };
 
-// --- 主 Hook ---
+// --- Main Hook ---
 
 export function useGame() {
   const [hero, setHero] = useState<HeroState | null>(null);
@@ -161,7 +164,9 @@ export function useGame() {
       stats: { kills: 0, days: 1, arenaWins: 0 },
       currentQuest: null, queuedQuest: null, questBoard: initialBoard, lastQuestRefresh: Date.now(), 
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
-      companion: null, companionExpiry: 0
+      companion: null, companionExpiry: 0,
+      reputation: { throne: 0, sect: 0, underworld: 0, cult: 0, neutral: 0 },
+      narrativeHistory: "初入江湖，一切未卜。" // 初始化记忆
     };
 
     if (!supabase) { setHero(newHero); setLoading(false); setTimeout(() => triggerAI('start_game', undefined, undefined, newHero), 500); return; }
@@ -175,6 +180,7 @@ export function useGame() {
         if (!mergedData.questBoard) mergedData.questBoard = generateQuestBoard(mergedData.level, mergedData.storyStage);
         if (!mergedData.lastQuestRefresh) mergedData.lastQuestRefresh = Date.now();
         if (mergedData.stamina === undefined) { mergedData.stamina = 120; mergedData.maxStamina = 120; }
+        if (!mergedData.narrativeHistory) mergedData.narrativeHistory = "江湖路远，重新启程。";
         setHero(mergedData);
         setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
       } else {
@@ -194,11 +200,13 @@ export function useGame() {
   }, [hero]);
 
   const addLog = (text: string, type: LogEntry['type'] = 'normal') => {
-    recentLogsRef.current = [text, ...recentLogsRef.current].slice(0, 3);
+    recentLogsRef.current = [text, ...recentLogsRef.current].slice(0, 3); // 减少日志显示数量
     setHero(prev => {
       if (!prev) return null;
+      // 记忆链更新：将最新日志追加到历史，保持一定长度
+      const newHistory = (prev.narrativeHistory + " " + text).slice(-500);
       const newLog = { id: Date.now().toString(), text, type, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}) };
-      return { ...prev, logs: [...prev.logs, newLog].slice(-50) };
+      return { ...prev, logs: [...prev.logs, newLog].slice(-50), narrativeHistory: newHistory };
     });
   };
 
@@ -245,7 +253,22 @@ export function useGame() {
     const companionInfo = (showCompanion && currentHero.companion) ? `伙伴:${currentHero.companion.title} ${currentHero.companion.name} (性别:${currentHero.companion.gender}, 性格:${currentHero.companion.personality})` : "独行 (暂不描写伙伴)";
     try {
       const bestSkill = currentHero.martialArts.sort((a,b) => b.level - a.level)[0];
-      const context = { ...currentHero, storyStage: getStoryStage(currentHero.level), worldLore: WORLD_LORE, questInfo: currentHero.currentQuest ? `[${currentHero.currentQuest.category}] ${currentHero.currentQuest.name} (${currentHero.currentQuest.progress}%)` : "无任务，游历中", petInfo: currentHero.pet ? `灵宠:${currentHero.pet.type}` : "无", companionInfo: companionInfo, skillInfo: `擅长${bestSkill?.name || '乱拳'}(Lv.${bestSkill?.level || 1})`, recentLogs: recentLogsRef.current, lastLogLen: recentLogsRef.current[0]?.length || 0 };
+      const context = { 
+        ...currentHero, 
+        storyStage: getStoryStage(currentHero.level), 
+        worldLore: WORLD_LORE, 
+        // ⚠️ 传递剧本信息
+        questScript: currentHero.currentQuest?.script,
+        questStage: currentHero.currentQuest?.stage,
+        questInfo: currentHero.currentQuest ? `[${currentHero.currentQuest.category}] ${currentHero.currentQuest.name}` : "无任务，游历中", 
+        petInfo: currentHero.pet ? `灵宠:${currentHero.pet.type}` : "无", 
+        companionInfo: companionInfo, 
+        skillInfo: `擅长${bestSkill?.name || '乱拳'}(Lv.${bestSkill?.level || 1})`, 
+        // ⚠️ 传递记忆链
+        narrativeHistory: currentHero.narrativeHistory,
+        recentLogs: recentLogsRef.current, 
+        lastLogLen: recentLogsRef.current[0]?.length || 0 
+      };
       const res = await fetch('/api/ai', { method: 'POST', body: JSON.stringify({ context, eventType, userAction: action }) });
       if (!res.ok) return false;
       const data = await res.json();
@@ -256,7 +279,7 @@ export function useGame() {
            addMessage('rumor', title, content);
         } else {
            const fullText = suffix ? `${data.text} ${suffix}` : data.text;
-           addLog(fullText, ['god_action','start_game','resume_game','recruit_companion'].includes(eventType) ? 'highlight' : 'normal');
+           addLog(fullText, ['god_action','start_game','resume_game','recruit_companion','quest_start','quest_climax','quest_end'].includes(eventType) ? 'highlight' : 'normal');
         }
         return true;
       }
@@ -283,7 +306,6 @@ export function useGame() {
     const logs: string[] = [];
     let updated = false;
 
-    // 1. Auto Equip
     hero.inventory.forEach(item => {
       const equipPower = item.power || 0;
       if (equipPower > 0) {
@@ -310,7 +332,6 @@ export function useGame() {
       }
     });
 
-    // 2. Auto Learn
     const books = hero.inventory.filter(i => i.type === 'book');
     books.forEach(book => {
        const skillName = String(book.effect);
@@ -327,7 +348,6 @@ export function useGame() {
        updated = true;
     });
 
-    // 3. Auto Heal
     if (hero.hp < hero.maxHp * 0.5) {
        const potion = hero.inventory.find(i => i.type === 'consumable' && !i.desc.includes("精力"));
        if (potion) {
@@ -340,7 +360,6 @@ export function useGame() {
        }
     }
 
-    // 4. Auto Stamina
     if (hero.stamina < hero.maxStamina * 0.2) {
        const food = hero.inventory.find(i => i.type === 'consumable' && (i.desc.includes("精力") || i.desc.includes("补气")));
        if (food) {
@@ -363,15 +382,10 @@ export function useGame() {
       const currentHero = heroRef.current;
       if (!currentHero) return;
 
-      // 1. Inventory Management
       const { hero: managedHero, logs: autoLogs } = autoManageInventory(currentHero);
-      if (autoLogs.length > 0) {
-         setHero(managedHero); 
-         autoLogs.forEach(l => addLog(l, 'highlight'));
-      }
+      if (autoLogs.length > 0) { setHero(managedHero); autoLogs.forEach(l => addLog(l, 'highlight')); }
       const activeHero = managedHero;
 
-      // 2. Refresh Logic
       if (activeHero.companion && Date.now() > activeHero.companionExpiry) {
          addLog(`【离别】${activeHero.companion.name} 拱手道别：“青山不改，绿水长流！”`, "system");
          setHero(h => h ? { ...h, companion: null } : null);
@@ -383,7 +397,6 @@ export function useGame() {
          addMessage('system', '悬赏更新', '悬赏榜已刷新。');
       }
 
-      // 3. Pre-calculate State Changes
       let newState = activeHero.state;
       let newLocation = activeHero.location;
       let newQuest = activeHero.currentQuest;
@@ -393,22 +406,32 @@ export function useGame() {
       let expChange = 0;
       let lootItem: Item | null = null;
       let logSuffix = "";
-      
-      // ⚠️ 核心修复：在这里声明 isQuestUpdate
-      let isQuestUpdate = false; 
-      
-      // Quest Progression
+      let aiEvent: string | null = null; // ⚠️ 记录触发的 AI 事件
+
+      // Quest Logic
       if (newQuest) {
+        // 1. Start Phase
+        if (newQuest.progress === 0 && newQuest.stage === 'start') {
+           newQuest.stage = 'road'; // 切换到赶路/中期
+           aiEvent = 'quest_start';
+        }
+
         newQuestProgress += 5 + Math.floor(Math.random() * 5); 
         if (newQuest.category === 'combat') newQuestProgress += Math.floor(activeHero.attributes.strength / 5);
         else newQuestProgress += Math.floor(activeHero.attributes.luck / 5);
 
+        // 2. Middle/Climax Phase (at 50%)
+        if (newQuestProgress >= newQuest.total * 0.5 && newQuest.stage === 'road') {
+           newQuest.stage = 'climax'; // 切换到高潮
+           aiEvent = 'quest_climax';
+        }
+
+        // 3. End Phase (at 100%)
         if (newQuestProgress >= newQuest.total) {
           goldChange += newQuest.rewards.gold;
           expChange += newQuest.rewards.exp;
-          // Completed
-          addLog(`【达成】完成 ${newQuest.name}`, 'highlight');
-          addMessage('system', '任务完成', `完成【${newQuest.name}】，赏金 ${newQuest.rewards.gold}，经验 ${newQuest.rewards.exp}。`);
+          
+          aiEvent = 'quest_end'; // 触发结算 AI
           
           if (queued) {
              const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', activeHero.level);
@@ -416,21 +439,17 @@ export function useGame() {
              queued = null;
              newLocation = targetLoc; 
              newState = newQuest.category === 'combat' ? 'fight' : 'idle';
-             addLog(`【新程】开始执行预约委托：${newQuest.name}`, 'highlight');
+             // ⚠️ 不再用 addLog 描述剧情，交给 AI
           } else {
              if (Math.random() < 0.7) {
                newQuest = null; 
                newState = 'idle'; 
-               addLog("【闲暇】暂无要事，在附近游山玩水，稍作休整。", 'system');
              } else {
                const filler = generateFillerQuest(activeHero.level, activeHero.storyStage);
-               // Stamina cost for filler handled in update
+               setHero(h => h ? { ...h, stamina: Math.max(0, h.stamina - filler.staminaCost) } : null);
                newQuest = filler;
-               addLog(`【日常】顺手做些杂事：${filler.name}`, 'system');
              }
           }
-        } else {
-          isQuestUpdate = true;
         }
       } else {
          if (Math.random() < 0.2) {
@@ -439,7 +458,7 @@ export function useGame() {
          }
       }
 
-      // Random Loot
+      // Random Loot & Combat
       if (activeHero.state !== 'town' && Math.random() < 0.15) {
          const luck = activeHero.attributes.luck + (activeHero.companion?.buff.type === 'luck' ? activeHero.companion.buff.val : 0);
          const loot = rollLoot(activeHero.level, luck);
@@ -448,15 +467,11 @@ export function useGame() {
             if (Math.random() < 0.5) logSuffix = `(获得: ${lootItem.name})`;
          }
       }
-
-      // State Transitions
       if (activeHero.level >= 10 && activeHero.state === 'idle' && Math.random() < 0.15) newState = 'arena';
       else if (activeHero.inventory.length >= 15 && activeHero.state !== 'town') newState = 'town';
 
-      // 4. Apply Updates
       setHero(h => {
         if(!h) return null;
-        
         let finalH = { 
             ...h, 
             state: newState, 
@@ -469,48 +484,29 @@ export function useGame() {
             stamina: Math.min(h.maxStamina, h.stamina + (h.state === 'idle' ? 1 : 0.5)),
             godPower: Math.min(100, h.godPower + 5)
         };
-
-        // Apply Loot
         if (lootItem) {
            const idx = finalH.inventory.findIndex(i => i.name === lootItem!.name);
-           if (idx >= 0) finalH.inventory[idx].count++; 
-           else finalH.inventory.push(lootItem);
+           if (idx >= 0) finalH.inventory[idx].count++; else finalH.inventory.push(lootItem);
         }
-
-        // Town Logic (Auto Sell)
         if (finalH.state === 'town') {
            const sellValue = finalH.inventory.reduce((acc, i) => acc + (i.price * i.count), 0);
-           if (sellValue > 0) {
-              finalH.gold += sellValue;
-              finalH.inventory = [];
-           }
-           if (finalH.gold > 50 && finalH.hp < finalH.maxHp) {
-              finalH.gold -= 20;
-              finalH.hp = finalH.maxHp;
-           }
+           if (sellValue > 0) { finalH.gold += sellValue; finalH.inventory = []; }
+           if (finalH.gold > 50 && finalH.hp < finalH.maxHp) { finalH.gold -= 20; finalH.hp = finalH.maxHp; }
            finalH.state = 'idle'; 
         }
-
-        // Combat Exp
         if (finalH.state === 'fight' || finalH.state === 'arena') {
            const gainExp = 10 + Math.floor(h.level * 1.5);
            finalH.exp += gainExp;
-           
            if (finalH.martialArts.length > 0) {
              const skill = finalH.martialArts[Math.floor(Math.random() * finalH.martialArts.length)];
              skill.exp += (finalH.attributes.intelligence * 0.5) + 5;
-             if (skill.exp >= skill.maxExp) {
-               skill.level++; skill.exp = 0; skill.maxExp = Math.floor(skill.maxExp * 1.2);
-             }
+             if (skill.exp >= skill.maxExp) { skill.level++; skill.exp = 0; skill.maxExp = Math.floor(skill.maxExp * 1.2); }
            }
            if (finalH.state === 'arena') {
-              if (Math.random() < 0.4) { finalH.stats.arenaWins++; finalH.gold += 100; }
-              else { finalH.hp = Math.floor(finalH.hp * 0.6); }
+              if (Math.random() < 0.4) { finalH.stats.arenaWins++; finalH.gold += 100; } else { finalH.hp = Math.floor(finalH.hp * 0.6); }
               finalH.state = 'idle';
            }
         }
-
-        // Level Up
         if (finalH.exp >= finalH.maxExp) {
            finalH.level++; finalH.exp = 0; finalH.maxExp = Math.floor(finalH.maxExp * 1.5); finalH.maxHp += 30; finalH.hp = finalH.maxHp;
            finalH.majorEvents.unshift(`${new Date().toLocaleTimeString()} 突破至 Lv.${finalH.level}`);
@@ -518,16 +514,18 @@ export function useGame() {
         return finalH;
       });
 
-      // 5. Trigger AI & Logs
-      const dice = Math.random();
-      if (dice < 0.05) await triggerAI('generate_rumor');
-      else if (isQuestUpdate && dice < 0.5) await triggerAI('quest_update', logSuffix); 
-      else if (dice < 0.8) await triggerAI('auto', logSuffix);
-      else {
-         let list = STATIC_LOGS.idle;
-         if (newState === 'fight') list = STATIC_LOGS.fight; else if (newState === 'town') list = STATIC_LOGS.town; else if (newState === 'arena') list = STATIC_LOGS.arena;
-         let text = list[Math.floor(Math.random() * list.length)];
-         if (!recentLogsRef.current.includes(text)) addLog(text + (logSuffix ? ` ${logSuffix}` : ''), 'system');
+      // 4. Trigger AI (Only for meaningful events, NOT random noise)
+      if (aiEvent) {
+         // ⚠️ 优先触发剧本节点
+         await triggerAI(aiEvent, logSuffix);
+      } else if (Math.random() < 0.05) {
+         // 极低概率触发传闻
+         await triggerAI('generate_rumor');
+      } 
+      // ⚠️ 彻底移除 'auto' 类型的随机生成，防止废话
+      // 如果没有剧本事件，且有掉落物，才显示系统日志
+      else if (logSuffix) {
+         addLog(logSuffix, 'system');
       }
       
       const nextTick = Math.floor(Math.random() * (120000 - 30000) + 30000); 
@@ -537,5 +535,5 @@ export function useGame() {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [hero?.name]);
 
-  return { hero, login, godAction, loading, error, clearError: () => setError(null), hireCompanion, acceptQuest };
+  return { hero, login, godAction, loading, error, clearError: () => setError(null), hireCompanion, acceptQuest, useItem };
 }

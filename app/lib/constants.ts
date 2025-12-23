@@ -1,3 +1,4 @@
+// --- 基础类型 ---
 export type ItemType = 'weapon' | 'head' | 'body' | 'legs' | 'feet' | 'accessory' | 'misc' | 'consumable' | 'book';
 export type Quality = 'common' | 'rare' | 'epic' | 'legendary';
 
@@ -10,9 +11,8 @@ export type Item = {
   minLevel: number;
   count: number;
   price: number;
-  effect?: string | number; // 效果 (回血量/技能名)
-  // ⚠️ 新增：装备强度 (用于自动比对)
-  power?: number; 
+  effect?: string | number;
+  power?: number;
 };
 
 export type Equipment = {
@@ -24,26 +24,44 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-export type QuestType = 'search' | 'hunt' | 'challenge' | 'train' | 'life';
+// ⚠️ 核心新增：势力体系
+export type Faction = 'throne' | 'sect' | 'underworld' | 'cult' | 'neutral';
+export const FACTIONS: Record<Faction, string> = {
+  throne: "朝廷六扇门",
+  sect: "名门正派",
+  underworld: "绿林好汉",
+  cult: "魔教异端",
+  neutral: "市井江湖"
+};
+
+// ⚠️ 核心新增：剧本结构
 export type QuestCategory = 'combat' | 'life';
 export type QuestRank = 1 | 2 | 3 | 4 | 5;
+export type QuestStage = 'start' | 'road' | 'climax' | 'end'; // 任务的四个叙事阶段
 
 export type Quest = { 
   id: string;
   name: string; 
   category: QuestCategory; 
   rank: QuestRank;
-  desc: string; 
+  faction: Faction; // 委托势力
+  
+  // 剧本上下文 (AI 依据此生成)
+  script: {
+    title: string;       // 剧本名，如《风雪山神庙》
+    description: string; // 悬赏榜显示的文案
+    objective: string;   // 核心目标
+    antagonist: string;  // 对立面 (人或环境)
+    twist: string;       // 转折点/高潮事件
+  };
+
+  stage: QuestStage; // 当前所处阶段
   progress: number; 
   total: number;
   reqLevel: number;
   isAuto?: boolean;
   staminaCost: number; 
-  rewards: {
-    gold: number;
-    exp: number;
-    item?: Item; 
-  };
+  rewards: { gold: number; exp: number; item?: Item; };
 };
 
 export type SkillType = 'attack' | 'inner' | 'speed' | 'medical' | 'trade';
@@ -75,11 +93,17 @@ export type HeroState = {
   stamina: number; maxStamina: number;
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
   
+  // 势力声望
+  reputation: Record<Faction, number>;
+
   currentQuest: Quest | null;
   queuedQuest: Quest | null;
   questBoard: Quest[];
   lastQuestRefresh: number;
   
+  // ⚠️ 记忆链：记录上一段剧情摘要，用于保持连贯性
+  narrativeHistory: string;
+
   location: string; 
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
   logs: LogEntry[]; messages: Message[]; majorEvents: string[];
@@ -91,8 +115,9 @@ export type HeroState = {
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
-export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "避世"];
+// --- 静态数据 ---
 
+export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "避世"];
 export const NPC_NAMES_MALE = ["啸天", "无忌", "一刀", "寻欢", "留香", "不败", "求败", "铁手", "无情", "冷血", "小宝", "大侠", "三少", "风", "云", "雷", "电", "靖", "康", "峰", "平", "冲", "过", "伯光", "志平"];
 export const NPC_NAMES_FEMALE = ["语嫣", "灵珊", "盈盈", "莫愁", "芷若", "敏", "蓉", "念慈", "双", "素素", "药师", "凤凰", "不悔", "襄", "芙", "龙女", "铁心", "无双", "红药", "师师"];
 export const NPC_NAMES_LAST = ["独孤", "西门", "欧阳", "诸葛", "慕容", "李", "王", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴", "徐", "孙", "马", "朱", "胡", "林", "郭", "何", "高", "罗", "郑", "梁", "谢", "宋", "唐", "许", "韩", "冯", "邓", "曹", "彭", "曾", "萧", "田", "董"];
@@ -144,8 +169,6 @@ export const PET_TEMPLATES = [
   { type: "大黄", desc: "忠诚的中华田园犬，眼神坚毅。" }
 ];
 
-export const ARENA_OPPONENTS = ["少林铜人", "峨眉师太", "全真道士", "丐帮长老", "魔教护法", "隐世扫地僧", "金兵百夫长", "东瀛浪人", "波斯圣女", "西域番僧"];
-
 export const MAP_LOCATIONS = {
   common: ["荒野古道", "龙门客栈", "风陵渡口", "乱葬岗", "悦来客栈"],
   search: ["楼兰废墟", "剑冢", "绝情谷底", "桃花岛", "大漠深处"],
@@ -172,46 +195,31 @@ export const STORY_STAGES = [
   { level: 100, name: "破碎虚空", desc: "羽化登仙，留下传说" }
 ];
 
-export const QUEST_TEMPLATES = {
-  "初出茅庐": {
-    combat: ["清理后山野狼", "教训村头恶霸", "驱赶偷鸡贼", "巡逻村口", "切磋武艺"],
-    life: ["帮王大妈找鸡", "替铁匠送货", "在酒馆打杂", "采集止血草", "抄写经书", "寻找走失孩童"]
-  },
-  "锋芒初露": {
-    combat: ["讨伐黑风寨", "追捕采花大盗", "护送扬州镖车", "挑战武馆教头", "清理运河水匪"],
-    life: ["探查古墓外围", "寻找失踪的信物", "调解帮派纠纷", "参加汴京诗会", "鉴定前朝宝物"]
-  },
-  "名动一方": {
-    combat: ["围攻光明顶前哨", "刺杀敌国探子", "镇压门派叛徒", "单挑十二连环坞", "夺取玄铁令"],
-    life: ["寻找传世名画", "破解珍珑棋局", "招募江湖门客", "经营商铺", "探访隐世高手"]
-  },
-  "开宗立派": {
-    combat: ["决战紫禁之巅", "清理魔教总坛", "抵御外族入侵", "争夺武林盟主", "探索绝情谷底"],
-    life: ["开坛讲道", "撰写武学秘籍", "建立分舵", "炼制长生丹", "参悟天道石碑"]
-  },
-  "一代宗师": {
-    combat: ["破碎虚空之战", "挑战上古神兽", "独战八大门派", "斩杀心魔", "逆天改命"],
-    life: ["游历红尘", "点化世人", "创造小世界", "寻找飞升契机", "归隐田园"]
-  },
-  "破碎虚空": {
-    combat: ["神魔大战", "修补天裂"],
-    life: ["重塑轮回", "俯瞰众生"]
-  }
+// ⚠️ 核心新增：风味文本库 (AI 强制使用，增加文学性)
+export const FLAVOR_TEXTS = {
+  environment: ["残阳如血", "枯藤老树", "大雪纷飞", "夜凉如水", "黄沙漫天", "竹林听雨", "断壁残垣"],
+  action: ["拔剑出鞘", "屏息凝神", "快马加鞭", "拂袖而去", "仰天长啸", "温酒斩将"],
+  object: ["锈迹斑斑的铁剑", "半块玉佩", "染血的书信", "酒旗", "孤灯", "寒鸦"]
 };
 
-export const WORLD_LORE = `
-背景：王朝末年，乱世江湖。
-势力：听雨楼(情报)、铸剑山庄(神兵)、隐元会(杀手)、丐帮(天下第一帮)。
-体系：内练一口气，外练筋骨皮。武学分外功、内功、轻功。
-`;
-
-export const QUEST_SOURCES = {
-  search: ["寻找失传的《易筋经》残卷"], hunt: ["讨伐黑风寨"], challenge: ["挑战华山"], train: ["修炼"], life: ["打杂"]
+// ⚠️ 核心新增：剧本模板 (不再是简单的字符串，而是结构化对象)
+export const QUEST_SCRIPTS = {
+  "初出茅庐": [
+    { title: "偷鸡贼的末路", desc: "王大妈的鸡丢了，据说后山有野狗出没。", obj: "找回丢失的老母鸡", antagonist: "成精的野狗", twist: "野狗嘴里叼着的竟是一块官银", faction: 'neutral' },
+    { title: "铁匠的委托", desc: "铁匠急需送一批农具去邻村。", obj: "护送板车", antagonist: "路霸", twist: "路霸竟是村长的儿子", faction: 'neutral' }
+  ],
+  "锋芒初露": [
+    { title: "黑风寨的秘密", desc: "官府悬赏黑风寨大当家的首级。", obj: "刺杀大当家", antagonist: "黑风寨主", twist: "大当家其实是朝廷的卧底", faction: 'throne' },
+    { title: "古墓惊魂", desc: "据说古墓中有前朝遗宝。", obj: "探索古墓", antagonist: "守墓机关", twist: "宝箱里只有一封情书", faction: 'sect' }
+  ],
+  // ... 其他境界的剧本可继续扩展
+  "default": [
+    { title: "江湖琐事", desc: "有人需要帮忙。", obj: "解决麻烦", antagonist: "未知的阻碍", twist: "事情并没有那么简单", faction: 'neutral' }
+  ]
 };
 
-// ⚠️ 核心新增：为装备添加 power 值，用于自动比对
 export const LOOT_TABLE: Partial<Item>[] = [
-  // --- 消耗品 ---
+  // ... (保持之前的物品列表不变，太长略去，请保留原有的物品定义) ...
   { name: "半个冷馒头", type: 'consumable', desc: "干硬难咽，聊胜于无。", price: 1, minLevel: 1, quality: 'common', effect: 10 }, 
   { name: "女儿红", type: 'consumable', desc: "陈年好酒，回血并增加豪气。", price: 20, minLevel: 10, quality: 'common', effect: 50 },
   { name: "金疮药", type: 'consumable', desc: "江湖常备跌打药。", price: 50, minLevel: 15, quality: 'common', effect: 100 },
@@ -220,8 +228,6 @@ export const LOOT_TABLE: Partial<Item>[] = [
   { name: "黑玉断续膏", type: 'consumable', desc: "西域灵药，可续断骨。", price: 500, minLevel: 40, quality: 'rare', effect: 500 },
   { name: "天山雪莲", type: 'consumable', desc: "生于绝壁，不仅回血还能精进修为。", price: 1000, minLevel: 50, quality: 'epic', effect: 1000 },
   { name: "大还丹", type: 'consumable', desc: "少林圣药，起死回生，增加一甲子功力。", price: 2000, minLevel: 60, quality: 'epic', effect: 2000 },
-
-  // --- 武功秘籍 ---
   { name: "《长拳图解》", type: 'book', desc: "太祖长拳的入门图谱。", price: 50, minLevel: 1, quality: 'common', effect: "太祖长拳" },
   { name: "《吐纳心法》", type: 'book', desc: "道家基础呼吸法门。", price: 100, minLevel: 5, quality: 'common', effect: "吐纳法" },
   { name: "《草上飞秘籍》", type: 'book', desc: "轻功入门，身轻如燕。", price: 200, minLevel: 10, quality: 'common', effect: "草上飞" },
@@ -230,8 +236,6 @@ export const LOOT_TABLE: Partial<Item>[] = [
   { name: "《易筋经》", type: 'book', desc: "少林至宝，改易筋骨。", price: 5000, minLevel: 50, quality: 'legendary', effect: "易筋经" },
   { name: "《独孤九剑总决》", type: 'book', desc: "破尽天下武功。", price: 6000, minLevel: 60, quality: 'legendary', effect: "独孤九剑" },
   { name: "《凌波微步图》", type: 'book', desc: "依卦象而行，令敌人无可奈何。", price: 4000, minLevel: 45, quality: 'epic', effect: "凌波微步" },
-
-  // --- 武器 (power: 攻击力参考) ---
   { name: "生锈的铁剑", type: 'weapon', desc: "勉强能砍东西。", price: 10, minLevel: 1, quality: 'common', power: 5 },
   { name: "哨棒", type: 'weapon', desc: "结实的木棒。", price: 5, minLevel: 1, quality: 'common', power: 3 },
   { name: "精钢剑", type: 'weapon', desc: "百炼精钢打造。", price: 150, minLevel: 10, quality: 'common', power: 20 },
@@ -241,8 +245,6 @@ export const LOOT_TABLE: Partial<Item>[] = [
   { name: "倚天剑", type: 'weapon', desc: "安得倚天抽宝剑，跨海斩长鲸。", price: 5000, minLevel: 60, quality: 'legendary', power: 300 },
   { name: "屠龙刀", type: 'weapon', desc: "武林至尊，宝刀屠龙。", price: 5500, minLevel: 65, quality: 'legendary', power: 320 },
   { name: "打狗棒", type: 'weapon', desc: "通体碧绿，坚韧无比。", price: 4500, minLevel: 55, quality: 'epic', power: 250 },
-
-  // --- 防具 (power: 防御力参考) ---
   { name: "粗布头巾", type: 'head', desc: "遮风挡雨。", price: 5, minLevel: 1, quality: 'common', power: 2 },
   { name: "麻布衣", type: 'body', desc: "寻常百姓的衣物。", price: 10, minLevel: 1, quality: 'common', power: 5 },
   { name: "草鞋", type: 'feet', desc: "走久了脚会磨泡。", price: 2, minLevel: 1, quality: 'common', power: 1 },
@@ -251,8 +253,6 @@ export const LOOT_TABLE: Partial<Item>[] = [
   { name: "神行太保靴", type: 'feet', desc: "穿上后健步如飞。", price: 300, minLevel: 20, quality: 'rare', power: 25 },
   { name: "金丝软甲", type: 'body', desc: "刀枪不入，轻便贴身。", price: 4000, minLevel: 55, quality: 'legendary', power: 150 },
   { name: "软猬甲", type: 'body', desc: "桃花岛至宝，满布倒刺。", price: 4200, minLevel: 58, quality: 'legendary', power: 160 },
-
-  // --- 饰品 (power: 综合属性参考) ---
   { name: "平安符", type: 'accessory', desc: "庙里求来的，保平安。", price: 20, minLevel: 1, quality: 'common', power: 5 },
   { name: "精铁护腕", type: 'accessory', desc: "保护手腕，增加臂力。", price: 100, minLevel: 10, quality: 'rare', power: 15 },
   { name: "温玉佩", type: 'accessory', desc: "冬暖夏凉，凝神静气。", price: 500, minLevel: 30, quality: 'epic', power: 40 },
