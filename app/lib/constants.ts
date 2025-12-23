@@ -116,7 +116,6 @@ export type HeroState = {
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
 // --- 典故系统 (World Archive) ---
-// 这是一个巨大的文本库，AI 会从中汲取灵感，让世界显得古老而深邃
 export const WORLD_ARCHIVE = [
   "【天机榜】：百晓生所著，记录天下兵器。排名第一的'天问剑'已失踪六十年。",
   "【胭脂泪】：三十年前，魔教圣女爱上了少林方丈，最终在断肠崖自尽。至今每逢雨夜，崖下仍有哭声。",
@@ -127,6 +126,9 @@ export const WORLD_ARCHIVE = [
   "【酒神咒】：喝得越醉，剑法越强。这是失传已久的'醉仙望月步'的心法。",
   "【红尘客栈】：江湖中唯一不能动手的地方。老板娘风情万种，但没人见过她出手的样子，因为见过的都死了。"
 ];
+
+// ⚠️ 核心修复：补回 PERSONALITIES
+export const PERSONALITIES = ["侠义", "乐天", "狂放", "儒雅", "贪财", "痴情", "机灵", "中庸", "逍遥"];
 
 export const NPC_NAMES_MALE = ["苏", "萧", "叶", "顾", "沈", "陆", "江", "楚", "独孤", "西门", "诸葛", "慕容", "李", "王", "张", "刘", "陈"];
 export const NPC_NAMES_FEMALE = ["灵儿", "语嫣", "婉清", "盈盈", "莫愁", "芷若", "敏", "蓉", "念慈", "素素", "红药", "师师"];
@@ -196,7 +198,6 @@ export const WORLD_MAP = [
   { name: "东海剑阁", type: "train", minLv: 80 }, { name: "侠客岛", type: "search", minLv: 85 }, { name: "剑冢", type: "search", minLv: 90 }, { name: "破碎虚空", type: "common", minLv: 99 }
 ];
 
-// ⚠️ 核心重构：四个成长阶段 (史诗感)
 export const STORY_STAGES = [
   { level: 1, name: "微尘", desc: "在这个巨大的时代里，你只是一粒微不足道的尘埃。" },
   { level: 15, name: "棋子", desc: "你开始有了一些利用价值，各大势力试图掌控你的命运。" },
@@ -211,7 +212,6 @@ export const FLAVOR_TEXTS = {
   object: ["半卷残书", "一串铜钱", "断裂的箭头", "胭脂盒", "发黄的信纸", "无主的孤坟"]
 };
 
-// ⚠️ 核心重构：巨著级剧本 (多重反转，人性深度)
 export const QUEST_SCRIPTS = {
   "微尘": [
     { title: "那碗阳春面", desc: "这世道，一碗热面能救一条命。但那个小乞丐盯着你的面很久了。", obj: "分享食物", antagonist: "冷漠的店小二", twist: "小乞丐吃完面，在桌上画了一张藏宝图，那是前朝皇宫的密道。", faction: 'neutral' },
@@ -244,10 +244,45 @@ export const QUEST_SOURCES = {
 };
 
 export const LOOT_TABLE: Partial<Item>[] = [
-  // ... (保留之前的物品，可继续增加特色物品)
   { name: "女儿红(二十年)", type: 'consumable', desc: "埋在地下二十年的好酒，喝一口少一口。", price: 100, minLevel: 20, quality: 'rare', effect: 200 },
   { name: "叫花鸡", type: 'consumable', desc: "荷叶包着的美味，香飘十里。", price: 50, minLevel: 10, quality: 'common', effect: 80 },
   { name: "《广陵散》残谱", type: 'book', desc: "嵇康绝响，曲意高古。", price: 2000, minLevel: 40, quality: 'epic', effect: "音波功" },
+  { name: "半个冷馒头", type: 'consumable', desc: "干硬难咽，聊胜于无。", price: 1, minLevel: 1, quality: 'common', effect: 10 }, 
+  { name: "金疮药", type: 'consumable', desc: "江湖常备跌打药。", price: 50, minLevel: 15, quality: 'common', effect: 100 },
+  { name: "清心丹", type: 'consumable', desc: "压制心魔，恢复神智。", price: 100, minLevel: 10, quality: 'rare', effect: 150 }, 
+  { name: "九花玉露丸", type: 'consumable', desc: "桃花岛秘药，清香袭人。", price: 300, minLevel: 30, quality: 'rare', effect: 300 },
+  { name: "黑玉断续膏", type: 'consumable', desc: "西域灵药，可续断骨。", price: 500, minLevel: 40, quality: 'rare', effect: 500 },
+  { name: "天山雪莲", type: 'consumable', desc: "生于绝壁，不仅回血还能精进修为。", price: 1000, minLevel: 50, quality: 'epic', effect: 1000 },
+  { name: "血菩提", type: 'consumable', desc: "生长在火麒麟洞内，传说能起死回生。", price: 2000, minLevel: 60, quality: 'epic', effect: 2000 },
+  { name: "《长拳图解》", type: 'book', desc: "太祖长拳的入门图谱。", price: 50, minLevel: 1, quality: 'common', effect: "太祖长拳" },
+  { name: "《吐纳心法》", type: 'book', desc: "道家基础呼吸法门。", price: 100, minLevel: 5, quality: 'common', effect: "吐纳法" },
+  { name: "《草上飞秘籍》", type: 'book', desc: "轻功入门，身轻如燕。", price: 200, minLevel: 10, quality: 'common', effect: "草上飞" },
+  { name: "《打狗棒法残卷》", type: 'book', desc: "丐帮绝学，虽然残缺但精妙无比。", price: 800, minLevel: 20, quality: 'rare', effect: "打狗棒法" },
+  { name: "《落英神剑掌谱》", type: 'book', desc: "姿态优美，虚实难测。", price: 1000, minLevel: 25, quality: 'rare', effect: "落英神剑掌" },
+  { name: "《易筋经》", type: 'book', desc: "少林至宝，改易筋骨。", price: 5000, minLevel: 50, quality: 'legendary', effect: "易筋经" },
+  { name: "《独孤剑意》", type: 'book', desc: "无招胜有招，只有剑意传承。", price: 6000, minLevel: 60, quality: 'legendary', effect: "独孤九剑" },
+  { name: "《疯魔录》", type: 'book', desc: "记载了禁忌武学的邪书，读之令人心神不宁。", price: 4000, minLevel: 45, quality: 'epic', effect: "逆转经脉" },
+  { name: "生锈的铁剑", type: 'weapon', desc: "勉强能砍东西。", price: 10, minLevel: 1, quality: 'common', power: 5 },
+  { name: "哨棒", type: 'weapon', desc: "结实的木棒。", price: 5, minLevel: 1, quality: 'common', power: 3 },
+  { name: "精钢剑", type: 'weapon', desc: "百炼精钢打造。", price: 150, minLevel: 10, quality: 'common', power: 20 },
+  { name: "百炼钢刀", type: 'weapon', desc: "刀背厚实，利于劈砍。", price: 180, minLevel: 12, quality: 'rare', power: 35 },
+  { name: "判官笔", type: 'weapon', desc: "精铁所制，专点穴道。", price: 300, minLevel: 20, quality: 'rare', power: 50 },
+  { name: "玄铁重剑(仿)", type: 'weapon', desc: "重剑无锋，大巧不工。", price: 1000, minLevel: 40, quality: 'epic', power: 120 },
+  { name: "倚天剑", type: 'weapon', desc: "安得倚天抽宝剑，跨海斩长鲸。", price: 5000, minLevel: 60, quality: 'legendary', power: 300 },
+  { name: "屠龙刀", type: 'weapon', desc: "武林至尊，宝刀屠龙。", price: 5500, minLevel: 65, quality: 'legendary', power: 320 },
+  { name: "打狗棒", type: 'weapon', desc: "通体碧绿，坚韧无比。", price: 4500, minLevel: 55, quality: 'epic', power: 250 },
+  { name: "粗布头巾", type: 'head', desc: "遮风挡雨。", price: 5, minLevel: 1, quality: 'common', power: 2 },
+  { name: "麻布衣", type: 'body', desc: "寻常百姓的衣物。", price: 10, minLevel: 1, quality: 'common', power: 5 },
+  { name: "草鞋", type: 'feet', desc: "走久了脚会磨泡。", price: 2, minLevel: 1, quality: 'common', power: 1 },
+  { name: "皮甲", type: 'body', desc: "硬皮硝制，有一定防御力。", price: 80, minLevel: 10, quality: 'common', power: 15 },
+  { name: "虎皮裙", type: 'legs', desc: "看起来很威风。", price: 150, minLevel: 15, quality: 'rare', power: 20 },
+  { name: "神行太保靴", type: 'feet', desc: "穿上后健步如飞。", price: 300, minLevel: 20, quality: 'rare', power: 25 },
+  { name: "金丝软甲", type: 'body', desc: "刀枪不入，轻便贴身。", price: 4000, minLevel: 55, quality: 'legendary', power: 150 },
+  { name: "软猬甲", type: 'body', desc: "桃花岛至宝，满布倒刺。", price: 4200, minLevel: 58, quality: 'legendary', power: 160 },
+  { name: "平安符", type: 'accessory', desc: "庙里求来的，保平安。", price: 20, minLevel: 1, quality: 'common', power: 5 },
+  { name: "精铁护腕", type: 'accessory', desc: "保护手腕，增加臂力。", price: 100, minLevel: 10, quality: 'rare', power: 15 },
+  { name: "温玉佩", type: 'accessory', desc: "冬暖夏凉，凝神静气。", price: 500, minLevel: 30, quality: 'epic', power: 40 },
+  { name: "通灵宝玉", type: 'accessory', desc: "似乎蕴含着某种灵性。", price: 2000, minLevel: 50, quality: 'legendary', power: 100 },
 ];
 
 export const STATIC_LOGS = {
