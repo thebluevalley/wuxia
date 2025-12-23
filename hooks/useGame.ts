@@ -7,7 +7,6 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
   : null;
 
 const REFRESH_INTERVAL = 3 * 60 * 60 * 1000; 
-// ⚠️ 核心：1小时刷新任务
 const QUEST_REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
 
 // --- 辅助函数 ---
@@ -218,6 +217,7 @@ export function useGame() {
 
     const newBoard = hero.questBoard.filter(q => q.id !== questId); 
     
+    // 主线任务瞬移
     let newLocation = hero.location;
     if (quest.category === 'main') {
         const saga = MAIN_SAGA.find(s => s.title === quest.script.title);
@@ -249,7 +249,6 @@ export function useGame() {
     triggerAI("recruit_companion", "", "recruit", { ...hero, companion: visitor });
   };
 
-  // ⚠️ 核心：强化 Context，让 AI 知道主线详情
   const triggerAI = async (eventType: string, suffix: string = "", action?: string, explicitHero?: HeroState) => {
     const currentHero = explicitHero || hero;
     if (!currentHero) return false;
@@ -260,7 +259,6 @@ export function useGame() {
         ? `当前篇章: ${MAIN_SAGA[currentHero.mainStoryIndex].title}` 
         : "传说终章";
 
-    // 获取当前主线任务详情（即使现在是 idle 状态，也需要知道主线背景）
     let currentMainQuestInfo = "无主线任务";
     if (currentHero.currentQuest?.category === 'main') {
         currentMainQuestInfo = `主线进行中: ${currentHero.currentQuest.name}。目标: ${currentHero.currentQuest.script.objective}。关键NPC: ${currentHero.currentQuest.script.npc}`;
@@ -273,7 +271,7 @@ export function useGame() {
         storyStage: getStoryStage(currentHero.level), 
         worldLore: WORLD_LORE, 
         mainSaga: mainSagaInfo,
-        mainQuestContext: currentMainQuestInfo, // 注入给后端
+        mainQuestContext: currentMainQuestInfo, 
         questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
         questStage: currentHero.currentQuest?.stage,
         questInfo: currentHero.currentQuest ? `[${currentHero.currentQuest.category}] ${currentHero.currentQuest.name}` : "无任务，游历中", 
@@ -291,7 +289,7 @@ export function useGame() {
       const data = await res.json();
       if (data.text) {
         if (eventType.includes('generate_')) {
-            // handle description updates
+            // update descriptions
         } else if (eventType === 'generate_rumor') {
            addMessage('rumor', '风声', data.text);
         } else {
@@ -358,7 +356,47 @@ export function useGame() {
       }
     });
     
-    // ... Books/Potions logic (omitted)
+    // Books & Potions logic omitted for space, keep original logic
+    const books = hero.inventory.filter(i => i.type === 'book');
+    books.forEach(book => {
+       const skillName = String(book.effect);
+       const existingSkill = hero.martialArts.find(s => s.name === skillName);
+       if (existingSkill) {
+          existingSkill.exp += 100;
+          logs.push(`研读 ${book.name}`);
+       } else {
+          hero.martialArts.push({ name: skillName, type: 'combat', level: 1, exp: 0, maxExp: 100, desc: "通过书籍习得" });
+          logs.push(`习得 ${skillName}`);
+       }
+       const idx = hero.inventory.findIndex(i => i.id === book.id);
+       if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
+       updated = true;
+    });
+
+    if (hero.hp < hero.maxHp * 0.5) {
+       const potion = hero.inventory.find(i => i.type === 'consumable' && !i.desc.includes("精力"));
+       if (potion) {
+          const heal = Number(potion.effect) || 0;
+          hero.hp = Math.min(hero.maxHp, hero.hp + heal);
+          logs.push(`使用了 ${potion.name}`);
+          const idx = hero.inventory.findIndex(i => i.id === potion.id);
+          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
+          updated = true;
+       }
+    }
+
+    if (hero.stamina < hero.maxStamina * 0.2) {
+       const food = hero.inventory.find(i => i.type === 'consumable' && (i.desc.includes("精力") || i.desc.includes("补气")));
+       if (food) {
+          const regen = Number(food.effect) || 0;
+          hero.stamina = Math.min(hero.maxStamina, hero.stamina + regen);
+          logs.push(`使用了 ${food.name}`);
+          const idx = hero.inventory.findIndex(i => i.id === food.id);
+          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
+          hero.actionCounts.drinking++; 
+          updated = true;
+       }
+    }
 
     if (equipChanged) { setTimeout(() => triggerAI('generate_equip_desc', '', undefined, hero), 100); }
     return { hero: updated ? hero : currentHero, logs, tagsChanged };
@@ -378,7 +416,7 @@ export function useGame() {
       let newQuest = managedHero.currentQuest;
       let queued = managedHero.queuedQuest;
 
-      // ⚠️ 1. 主线强制接取
+      // ⚠️ 1. 主线强制接取逻辑
       if (!newQuest && !queued && managedHero.mainStoryIndex < MAIN_SAGA.length) {
           const nextSaga = MAIN_SAGA[managedHero.mainStoryIndex];
           if (managedHero.level >= nextSaga.reqLevel) {
@@ -413,7 +451,7 @@ export function useGame() {
           }
       }
       
-      // ⚠️ 2. 刷新 (1小时)
+      // ⚠️ 2. 任务刷新逻辑
       if (Date.now() - (managedHero.lastQuestRefresh || 0) > QUEST_REFRESH_INTERVAL) {
          managedHero.questBoard = generateQuestBoard(managedHero);
          managedHero.lastQuestRefresh = Date.now();
@@ -445,11 +483,17 @@ export function useGame() {
            }
 
            if (queued) {
-             const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', managedHero.level);
+             // ⚠️ 修复：排队任务位置逻辑
+             let targetLoc = getLocationByQuest('life', managedHero.level);
+             if (queued.category === 'main') {
+                 const saga = MAIN_SAGA.find(s => s.title === queued.script.title);
+                 if (saga) targetLoc = saga.location;
+             }
+
              newQuest = queued;
              queued = null;
              managedHero.location = targetLoc; 
-             managedHero.state = newQuest.category === 'combat' ? 'fight' : 'idle';
+             managedHero.state = newQuest.category === 'main' ? 'fight' : 'idle';
              setTimeout(() => triggerAI('quest_start', '', undefined, managedHero), 500);
           } else {
              newQuest = null; 
@@ -460,9 +504,15 @@ export function useGame() {
         managedHero.queuedQuest = queued;
       } else {
          if (queued) {
+             let targetLoc = getLocationByQuest('life', managedHero.level);
+             if (queued.category === 'main') {
+                 const saga = MAIN_SAGA.find(s => s.title === queued.script.title);
+                 if (saga) targetLoc = saga.location;
+             }
              newQuest = queued; queued = null;
              managedHero.currentQuest = newQuest; managedHero.queuedQuest = queued;
-             managedHero.state = 'fight'; 
+             managedHero.location = targetLoc;
+             managedHero.state = newQuest.category === 'main' ? 'fight' : 'idle'; 
              aiEvent = 'quest_start';
          } 
       }
