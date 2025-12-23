@@ -249,7 +249,6 @@ export function useGame() {
       if (!res.ok) return false;
       const data = await res.json();
       if (data.text) {
-        // ⚠️ 核心新增：处理侧写更新
         if (eventType === 'generate_description') {
             setHero(h => h ? { ...h, description: data.text } : null);
             return true;
@@ -376,7 +375,6 @@ export function useGame() {
       if (autoLogs.length > 0) { setHero(managedHero); autoLogs.forEach(l => addLog(l, 'highlight')); }
       const activeHero = managedHero;
 
-      // ⚠️ 核心新增：当标签变化时，触发 AI 生成侧写
       if (tagsChanged) {
           await triggerAI('generate_description', '', undefined, activeHero);
       }
@@ -444,7 +442,14 @@ export function useGame() {
           }
         }
       } else {
-         if (Math.random() < 0.2) {
+         // ⚠️ 修复：在 else 分支里优先检查 queuedQuest
+         if (queued) {
+             const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', activeHero.level);
+             newQuest = queued;
+             queued = null;
+             newLocation = targetLoc; 
+             newState = newQuest.category === 'combat' ? 'fight' : 'idle';
+         } else if (Math.random() < 0.2) {
             newQuest = generateFillerQuest(activeHero.level, activeHero.storyStage);
             addLog(`【启程】休息片刻，决定去${newQuest.name}。`, 'system');
          }
