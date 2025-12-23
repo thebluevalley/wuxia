@@ -24,8 +24,8 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-// ⚠️ 核心升级：八大势力
-export type Faction = 'alliance' | 'freedom' | 'court' | 'sword' | 'healer' | 'cult' | 'invader' | 'neutral';
+// ⚠️ 核心修复：补全所有用到的势力 Key (包括 hidden)
+export type Faction = 'alliance' | 'freedom' | 'court' | 'sword' | 'healer' | 'cult' | 'invader' | 'hidden' | 'neutral';
 export const FACTIONS: Record<Faction, string> = {
   alliance: "长生盟 (江南财阀)",
   freedom: "自在门 (绿林豪客)",
@@ -34,6 +34,7 @@ export const FACTIONS: Record<Faction, string> = {
   healer: "药王谷 (悬壶济世)",
   cult: "拜火教 (西域异端)",
   invader: "北莽 (草原铁骑)",
+  hidden: "悲酥清风 (杀手组织)",
   neutral: "市井百态"
 };
 
@@ -127,9 +128,7 @@ export const WORLD_ARCHIVE = [
   "【红尘客栈】：江湖中唯一不能动手的地方。老板娘风情万种，但没人见过她出手的样子，因为见过的都死了。"
 ];
 
-// ⚠️ 核心修复：补回 PERSONALITIES
 export const PERSONALITIES = ["侠义", "乐天", "狂放", "儒雅", "贪财", "痴情", "机灵", "中庸", "逍遥"];
-
 export const NPC_NAMES_MALE = ["苏", "萧", "叶", "顾", "沈", "陆", "江", "楚", "独孤", "西门", "诸葛", "慕容", "李", "王", "张", "刘", "陈"];
 export const NPC_NAMES_FEMALE = ["灵儿", "语嫣", "婉清", "盈盈", "莫愁", "芷若", "敏", "蓉", "念慈", "素素", "红药", "师师"];
 export const NPC_NAMES_LAST = ["无忌", "一刀", "留香", "不败", "寻欢", "风", "云", "雷", "电", "靖", "康", "峰", "平", "冲"];
@@ -244,6 +243,7 @@ export const QUEST_SOURCES = {
 };
 
 export const LOOT_TABLE: Partial<Item>[] = [
+  // ... (保留之前的物品，可继续增加特色物品)
   { name: "女儿红(二十年)", type: 'consumable', desc: "埋在地下二十年的好酒，喝一口少一口。", price: 100, minLevel: 20, quality: 'rare', effect: 200 },
   { name: "叫花鸡", type: 'consumable', desc: "荷叶包着的美味，香飘十里。", price: 50, minLevel: 10, quality: 'common', effect: 80 },
   { name: "《广陵散》残谱", type: 'book', desc: "嵇康绝响，曲意高古。", price: 2000, minLevel: 40, quality: 'epic', effect: "音波功" },

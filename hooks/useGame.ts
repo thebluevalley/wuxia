@@ -13,7 +13,7 @@ const QUEST_REFRESH_INTERVAL = 6 * 60 * 60 * 1000;
 
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
-  return stage ? stage.name : "初出茅庐";
+  return stage ? stage.name : "微尘";
 };
 
 const calculateTags = (hero: HeroState): string[] => {
@@ -122,7 +122,7 @@ export function useGame() {
 
   const login = async (name: string, password: string) => {
     setLoading(true); setError(null);
-    const initialStage = "初出茅庐";
+    const initialStage = "微尘";
     const initialBoard = generateQuestBoard(1, initialStage);
 
     const newHero: HeroState = {
@@ -141,7 +141,8 @@ export function useGame() {
       currentQuest: null, queuedQuest: null, questBoard: initialBoard, lastQuestRefresh: Date.now(), 
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0,
-      reputation: { throne: 0, sect: 0, underworld: 0, cult: 0, neutral: 0 },
+      // ⚠️ 核心修复：更新势力 Key
+      reputation: { alliance: 0, freedom: 0, court: 0, sword: 0, healer: 0, cult: 0, invader: 0, hidden: 0, neutral: 0 },
       narrativeHistory: "初入江湖，一切未卜。",
       tags: ["初出茅庐"], 
       actionCounts: {},
@@ -442,7 +443,6 @@ export function useGame() {
           }
         }
       } else {
-         // ⚠️ 修复：在 else 分支里优先检查 queuedQuest
          if (queued) {
              const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', activeHero.level);
              newQuest = queued;
@@ -512,14 +512,17 @@ export function useGame() {
 
       if (aiEvent) {
          await triggerAI(aiEvent, logSuffix);
+      } else if (!aiEvent && newQuest && newQuest.stage === 'road' && Math.random() < 0.4) {
+         await triggerAI('quest_journey', logSuffix);
+      } else if (!aiEvent && !newQuest && Math.random() < 0.3) {
+         await triggerAI('idle_event', logSuffix);
       } else if (Math.random() < 0.05) {
          await triggerAI('generate_rumor');
-      } 
-      else if (logSuffix) {
+      } else if (logSuffix) {
          addLog(logSuffix, 'system');
       }
       
-      const nextTick = Math.floor(Math.random() * (120000 - 30000) + 30000); 
+      const nextTick = Math.floor(Math.random() * (180000 - 30000) + 30000); 
       timerRef.current = setTimeout(gameLoop, nextTick);
     };
     timerRef.current = setTimeout(gameLoop, 2000);
