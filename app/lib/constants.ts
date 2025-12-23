@@ -21,8 +21,25 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-export type QuestType = 'search' | 'hunt' | 'challenge' | 'train' | 'life';
-export type Quest = { name: string; type: QuestType; desc: string; progress: number; total: number; };
+// ⚠️ 任务系统核心定义
+export type QuestCategory = 'combat' | 'life'; // 武道 vs 红尘
+export type QuestRank = 1 | 2 | 3 | 4 | 5;     // 难度星级 (1=白, 2=绿, 3=蓝, 4=紫, 5=橙)
+
+export type Quest = { 
+  id: string;
+  name: string; 
+  category: QuestCategory; 
+  rank: QuestRank;
+  desc: string; 
+  progress: number; 
+  total: number;
+  reqLevel: number; // 建议等级
+  rewards: {
+    gold: number;
+    exp: number;
+    item?: Item; 
+  };
+};
 
 export type SkillType = 'attack' | 'inner' | 'speed' | 'medical' | 'trade';
 export type Skill = { name: string; type: SkillType; level: number; exp: number; maxExp: number; desc: string; };
@@ -30,7 +47,6 @@ export type Skill = { name: string; type: SkillType; level: number; exp: number;
 export type MessageType = 'rumor' | 'system';
 export type Message = { id: string; type: MessageType; title: string; content: string; time: string; isRead: boolean; };
 
-// 伙伴定义
 export type Companion = {
   id: string;
   name: string;
@@ -43,98 +59,62 @@ export type Companion = {
   buff: { type: 'attack' | 'defense' | 'heal' | 'luck' | 'exp'; val: number; };
 };
 
-export type Pet = {
-  name: string;
-  type: string;
-  level: number;
-  desc: string;
-};
+export type Pet = { name: string; type: string; level: number; desc: string; };
 
-// ⚠️ 核心修复：HeroState 必须包含 pet, companion, tavern
 export type HeroState = {
-  name: string;
-  level: number;
-  gender: '男' | '女';
-  age: number;
-  personality: string;
-  title: string;
-  motto: string;
-  godPower: number;
-  unlockedFeatures: string[];
-  storyStage: string;
-  
-  // 关键字段：宠物
+  name: string; level: number; gender: '男' | '女'; age: number; personality: string; title: string; motto: string;
+  godPower: number; unlockedFeatures: string[]; storyStage: string;
   pet: Pet | null;
-
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
-  hp: number; maxHp: number;
-  exp: number; maxExp: number;
-  gold: number;
-  alignment: number;
+  hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
   
-  currentQuest: Quest;
-  location: string;
+  // ⚠️ 任务相关
+  currentQuest: Quest | null; // 当前正在做的任务
+  questBoard: Quest[];        // 悬赏榜上的可选任务
+  
+  location: string; 
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena';
-  
-  logs: LogEntry[];
-  messages: Message[];
-  majorEvents: string[];
-  
-  inventory: Item[];
-  equipment: Equipment;
-  martialArts: Skill[];
-  lifeSkills: Skill[];
+  logs: LogEntry[]; messages: Message[]; majorEvents: string[];
+  inventory: Item[]; equipment: Equipment; martialArts: Skill[]; lifeSkills: Skill[];
   stats: { kills: number; days: number; arenaWins: number; };
-  
-  // 关键字段：酒馆
-  tavern: {
-    visitors: Companion[];
-    lastRefresh: number;
-  };
-  // 关键字段：伙伴
-  companion: Companion | null;
-  companionExpiry: number;
+  tavern: { visitors: Companion[]; lastRefresh: number; };
+  companion: Companion | null; companionExpiry: number;
 };
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
-export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "社恐"];
+export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "避世"];
 
-// ⚠️ 必须包含这些 NPC 相关的导出
 export const NPC_NAMES_FIRST = ["独孤", "西门", "欧阳", "诸葛", "慕容", "李", "王", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴", "徐", "孙", "马", "朱", "胡", "林", "郭", "何", "高", "罗", "郑", "梁", "谢", "宋", "唐", "许", "韩", "冯", "邓", "曹", "彭", "曾", "萧", "田", "董"];
 export const NPC_NAMES_LAST = ["一刀", "无忌", "吹雪", "寻欢", "留香", "不败", "求败", "铁手", "无情", "追命", "冷血", "小宝", "大侠", "三少", "四娘", "无缺", "灵珊", "盈盈", "语嫣", "莫愁", "过", "靖", "康", "峰", "誉", "竹", "梅", "兰", "菊", "风", "云", "霜", "雪", "雷", "电"];
 
 export const NPC_ARCHETYPES = {
   common: [
     { job: "店小二", buff: "luck", desc: "消息灵通，跑腿勤快。" },
-    { job: "落魄书生", buff: "exp", desc: "虽然手无缚鸡之力，但满腹经纶。" },
-    { job: "卖花女", buff: "heal", desc: "笑容甜美，能让人忘却疲惫。" },
-    { job: "地痞", buff: "attack", desc: "打架全靠一股狠劲。" }
+    { job: "落魄书生", buff: "exp", desc: "虽手无缚鸡之力，但满腹经纶。" },
+    { job: "卖花女", buff: "heal", desc: "笑容甜美，令人忘忧。" },
+    { job: "泼皮", buff: "attack", desc: "市井无赖，打架全靠一股狠劲。" }
   ],
   rare: [
     { job: "游方郎中", buff: "heal", desc: "医术精湛，悬壶济世。" },
     { job: "镖师", buff: "defense", desc: "走南闯北，经验丰富。" },
     { job: "算命先生", buff: "luck", desc: "铁口直断，趋吉避凶。" },
-    { job: "猎户", buff: "attack", desc: "擅长追踪和设伏。" }
+    { job: "猎户", buff: "attack", desc: "擅长追踪，箭术精准。" }
   ],
   epic: [
     { job: "独臂刀客", buff: "attack", desc: "刀法刚猛，力劈华山。" },
     { job: "峨眉女侠", buff: "attack", desc: "剑法轻灵，身法飘逸。" },
     { job: "少林武僧", buff: "defense", desc: "金钟罩铁布衫，刀枪不入。" },
-    { job: "丐帮长老", buff: "exp", desc: "眼线遍布天下，通晓江湖秘闻。" }
+    { job: "丐帮长老", buff: "exp", desc: "通晓天下秘闻。" }
   ],
   legendary: [
-    { job: "隐世扫地僧", buff: "exp", desc: "深不可测，一花一世界。" },
+    { job: "扫地僧", buff: "exp", desc: "深不可测，一花一世界。" },
     { job: "魔教圣女", buff: "attack", desc: "行事乖张，武功诡异。" },
     { job: "剑圣", buff: "attack", desc: "人剑合一，万剑归宗。" }
   ]
 };
 
-export const NPC_TRAITS = [
-  "嗜酒如命", "贪财好色", "刚正不阿", "沉默寡言", "话痨", 
-  "阴阳怪气", "胆小如鼠", "豪气干云", "多愁善感", "洁癖", 
-  "路痴", "毒舌", "中二病", "社恐", "吃货"
-];
+export const NPC_TRAITS = ["嗜酒", "贪财", "刚正", "寡言", "聒噪", "阴鸷", "胆怯", "豪迈", "多愁", "洁癖", "迷途", "毒舌", "狂妄", "避世", "贪食"];
 
 export const SKILL_LIBRARY = {
   attack: ["太祖长拳", "落英神剑掌", "降龙十八掌", "独孤九剑", "打狗棒法", "六脉神剑", "弹指神通", "黯然销魂掌"],
@@ -167,24 +147,59 @@ export const MAP_LOCATIONS = {
 };
 
 export const WORLD_MAP = [
-  // Tier 1: 1-10
   { name: "牛家村", type: "life", minLv: 1 }, { name: "破庙", type: "common", minLv: 1 }, { name: "乱葬岗", type: "hunt", minLv: 1 }, { name: "荒野古道", type: "common", minLv: 1 }, { name: "十里坡", type: "train", minLv: 1 },
-  // Tier 2: 10-30
   { name: "扬州城", type: "life", minLv: 10 }, { name: "快活林", type: "hunt", minLv: 10 }, { name: "悦来客栈", type: "common", minLv: 10 }, { name: "丐帮分舵", type: "challenge", minLv: 15 }, { name: "黑风寨", type: "hunt", minLv: 15 }, { name: "无量山", type: "search", minLv: 20 },
-  // Tier 3: 30-50
   { name: "汴京御街", type: "life", minLv: 30 }, { name: "五毒教总坛", type: "hunt", minLv: 30 }, { name: "绝情谷", type: "search", minLv: 35 }, { name: "桃花岛", type: "train", minLv: 35 }, { name: "终南山", type: "challenge", minLv: 40 },
-  // Tier 4: 50-80
   { name: "光明顶", type: "challenge", minLv: 50 }, { name: "少林藏经阁", type: "train", minLv: 55 }, { name: "黑木崖", type: "hunt", minLv: 60 }, { name: "紫禁之巅", type: "challenge", minLv: 65 }, { name: "剑冢", type: "search", minLv: 70 },
-  // Tier 5: 80+
   { name: "侠客岛", type: "train", minLv: 80 }, { name: "昆仑仙境", type: "search", minLv: 85 }, { name: "剑魔荒冢", type: "train", minLv: 90 }, { name: "破碎虚空", type: "common", minLv: 99 }
 ];
 
+export const STORY_STAGES = [
+  { level: 1, name: "初出茅庐", desc: "初入江湖的懵懂少年" },
+  { level: 10, name: "锋芒初露", desc: "小有名气的少侠" },
+  { level: 25, name: "名动一方", desc: "一方豪强，威震武林" },
+  { level: 40, name: "开宗立派", desc: "武学宗师，开山立柜" },
+  { level: 60, name: "一代宗师", desc: "天下无敌，独孤求败" },
+  { level: 100, name: "破碎虚空", desc: "羽化登仙，留下传说" }
+];
+
+// ⚠️ 核心新增：各境界的任务剧本库
+export const QUEST_TEMPLATES = {
+  "初出茅庐": {
+    combat: ["清理后山野狼", "教训村头恶霸", "驱赶偷鸡贼", "巡逻村口", "切磋武艺"],
+    life: ["帮王大妈找鸡", "替铁匠送货", "在酒馆打杂", "采集止血草", "抄写经书", "寻找走失孩童"]
+  },
+  "锋芒初露": {
+    combat: ["讨伐黑风寨", "追捕采花大盗", "护送扬州镖车", "挑战武馆教头", "清理运河水匪"],
+    life: ["探查古墓外围", "寻找失踪的信物", "调解帮派纠纷", "参加汴京诗会", "鉴定前朝宝物"]
+  },
+  "名动一方": {
+    combat: ["围攻光明顶前哨", "刺杀敌国探子", "镇压门派叛徒", "单挑十二连环坞", "夺取玄铁令"],
+    life: ["寻找传世名画", "破解珍珑棋局", "招募江湖门客", "经营商铺", "探访隐世高手"]
+  },
+  "开宗立派": {
+    combat: ["决战紫禁之巅", "清理魔教总坛", "抵御外族入侵", "争夺武林盟主", "探索绝情谷底"],
+    life: ["开坛讲道", "撰写武学秘籍", "建立分舵", "炼制长生丹", "参悟天道石碑"]
+  },
+  "一代宗师": {
+    combat: ["破碎虚空之战", "挑战上古神兽", "独战八大门派", "斩杀心魔", "逆天改命"],
+    life: ["游历红尘", "点化世人", "创造小世界", "寻找飞升契机", "归隐田园"]
+  },
+  "破碎虚空": {
+    combat: ["神魔大战", "修补天裂"],
+    life: ["重塑轮回", "俯瞰众生"]
+  }
+};
+
+export const WORLD_LORE = `
+背景：王朝末年，乱世江湖。
+势力：听雨楼(情报)、铸剑山庄(神兵)、隐元会(杀手)、丐帮(天下第一帮)。
+体系：内练一口气，外练筋骨皮。武学分外功、内功、轻功。
+`;
+
+// 兼容旧代码，保留 QUEST_SOURCES
 export const QUEST_SOURCES = {
-  search: ["寻找失传的《易筋经》残卷", "探寻前朝宝藏线索", "搜集打造屠龙刀的玄铁", "寻找传说中的天山雪莲", "寻找失踪的盟主信物"],
-  hunt:   ["讨伐黑风寨的土匪首领", "清理后山的吊睛白额虎", "追捕采花大盗‘万里独行’", "消灭为祸一方的五毒教徒", "刺杀通敌叛国的将军"],
-  challenge: ["挑战华山派大弟子", "去少林寺闯十八铜人阵", "与丐帮长老比拼酒量", "参加武林大会争夺盟主", "破解珍珑棋局"],
-  train:  ["在寒玉床上修炼内功", "在瀑布下练习拔剑一万次", "在梅花桩上练习轻功", "参悟石壁上的太玄经", "在海浪中修炼掌法"],
-  life:   ["帮隔壁王大妈寻找走失的鸭子", "去集市摆摊卖艺赚盘缠", "帮村长修补漏雨的屋顶", "为心上人描眉画画", "在酒馆打听江湖传闻"]
+  search: ["寻找失传的《易筋经》残卷"], hunt: ["讨伐黑风寨"], challenge: ["挑战华山"], train: ["修炼"], life: ["打杂"]
 };
 
 export const LOOT_TABLE: Partial<Item>[] = [
@@ -193,7 +208,7 @@ export const LOOT_TABLE: Partial<Item>[] = [
   { name: "粗布头巾", type: 'head', desc: "防御 +1", price: 5, minLevel: 1, quality: 'common' },
   { name: "麻布裤", type: 'legs', desc: "防御 +1", price: 5, minLevel: 1, quality: 'common' },
   { name: "草鞋", type: 'feet', desc: "身法 +1", price: 2, minLevel: 1, quality: 'common' },
-  { name: "女儿红", type: 'consumable', desc: "回血 +50，增加豪气", price: 20, minLevel: 10, quality: 'common' },
+  { name: "女儿红", type: 'consumable', desc: "回血 +50", price: 20, minLevel: 10, quality: 'common' },
   { name: "百炼钢刀", type: 'weapon', desc: "攻击 +10", price: 150, minLevel: 10, quality: 'rare' },
   { name: "精铁护腕", type: 'accessory', desc: "臂力 +2", price: 100, minLevel: 10, quality: 'rare' },
   { name: "皮甲", type: 'body', desc: "防御 +10", price: 80, minLevel: 10, quality: 'common' },
@@ -202,13 +217,13 @@ export const LOOT_TABLE: Partial<Item>[] = [
   { name: "金丝软甲(残)", type: 'body', desc: "防御 +30", price: 500, minLevel: 25, quality: 'rare' },
   { name: "平安符", type: 'accessory', desc: "福源 +5", price: 200, minLevel: 15, quality: 'common' },
   { name: "黑玉断续膏", type: 'consumable', desc: "回血 +500", price: 200, minLevel: 40, quality: 'rare' },
-  { name: "九花玉露丸", type: 'consumable', desc: "回血 +300, 内力大增", price: 300, minLevel: 35, quality: 'rare' },
+  { name: "九花玉露丸", type: 'consumable', desc: "回血 +300", price: 300, minLevel: 35, quality: 'rare' },
   { name: "玄铁重剑(仿)", type: 'weapon', desc: "攻击 +80", price: 1000, minLevel: 40, quality: 'epic' },
   { name: "武功秘籍残卷", type: 'book', desc: "记载着一招半式", price: 500, minLevel: 30, quality: 'rare' },
   { name: "大还丹", type: 'consumable', desc: "起死回生", price: 1000, minLevel: 60, quality: 'epic' },
-  { name: "倚天剑", type: 'weapon', desc: "武林至尊，攻击 +200", price: 5000, minLevel: 60, quality: 'legendary' },
-  { name: "屠龙刀", type: 'weapon', desc: "号令天下，攻击 +220", price: 5500, minLevel: 65, quality: 'legendary' },
-  { name: "软猬甲", type: 'body', desc: "刀枪不入，反弹伤害", price: 4000, minLevel: 55, quality: 'legendary' },
+  { name: "倚天剑", type: 'weapon', desc: "武林至尊", price: 5000, minLevel: 60, quality: 'legendary' },
+  { name: "屠龙刀", type: 'weapon', desc: "号令天下", price: 5500, minLevel: 65, quality: 'legendary' },
+  { name: "软猬甲", type: 'body', desc: "刀枪不入", price: 4000, minLevel: 55, quality: 'legendary' },
 ];
 
 export const STATIC_LOGS = {
@@ -216,7 +231,6 @@ export const STATIC_LOGS = {
     "风中隐约传来兵刃相交之声，令我不由得握紧了剑柄。",
     "路过一间破败的茶寮，那瞎眼的说书人正讲到高潮处。",
     "天边残阳如血，将孤独的影子拉得很长很长。",
-    "一阵马蹄声疾驰而过，尘土飞扬，不知又是哪里的急报。",
     "忽觉丹田发热，似乎是近日苦练略有小成。",
     "抚摸着手中的兵器，感受着它冰冷的温度。",
     "远处山峦起伏，恰似这人心险恶的江湖。",
@@ -231,7 +245,6 @@ export const STATIC_LOGS = {
     "街道两旁叫卖声不绝于耳，充满了红尘烟火气。",
     "酒楼上推杯换盏，几位豪客正在高谈阔论。",
     "市井之中卧虎藏龙，那卖菜的老翁眼神竟如鹰隼般锐利。",
-    "由于囊中羞涩，只能看着路边的酱牛肉咽口水。",
   ],
   arena: [
     "四周看台座无虚席，欢呼声震耳欲聋。",
@@ -240,18 +253,3 @@ export const STATIC_LOGS = {
     "胜负已分，台下爆发出雷鸣般的掌声。",
   ]
 };
-
-export const STORY_STAGES = [
-  { level: 1, name: "初出茅庐", desc: "初入江湖的懵懂少年" },
-  { level: 10, name: "锋芒初露", desc: "小有名气的少侠" },
-  { level: 25, name: "名动一方", desc: "一方豪强，威震武林" },
-  { level: 40, name: "开宗立派", desc: "武学宗师，开山立柜" },
-  { level: 60, name: "一代宗师", desc: "天下无敌，独孤求败" },
-  { level: 100, name: "破碎虚空", desc: "羽化登仙，留下传说" }
-];
-
-export const WORLD_LORE = `
-背景：王朝末年，乱世江湖。
-势力：听雨楼(情报)、铸剑山庄(神兵)、隐元会(杀手)、丐帮(天下第一帮)。
-体系：内练一口气，外练筋骨皮。武学分外功、内功、轻功。
-`;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QUEST_SOURCES, QuestType, PERSONALITIES, PET_TEMPLATES, ARENA_OPPONENTS, MAP_LOCATIONS, WORLD_MAP, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_FIRST, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion } from '@/app/lib/constants';
+import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QUEST_TEMPLATES, QuestType, PERSONALITIES, PET_TEMPLATES, ARENA_OPPONENTS, MAP_LOCATIONS, WORLD_MAP, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_FIRST, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, Quest, QuestRank } from '@/app/lib/constants';
 
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL 
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
@@ -13,19 +13,55 @@ const getStoryStage = (level: number) => {
   return stage ? stage.name : "初出茅庐";
 };
 
-const generateQuest = (): HeroState['currentQuest'] => {
-  const types: QuestType[] = ['search', 'hunt', 'challenge', 'train', 'life'];
-  const type = types[Math.floor(Math.random() * types.length)];
-  const templates = QUEST_SOURCES[type];
-  const name = templates[Math.floor(Math.random() * templates.length)];
-  return { name, type, desc: "努力中...", progress: 0, total: 100 };
+// ⚠️ 核心逻辑：生成悬赏榜
+const generateQuestBoard = (level: number, stageName: string): Quest[] => {
+  const quests: Quest[] = [];
+  const count = 4; 
+
+  // 根据境界选择模板，回退到初级
+  // @ts-ignore
+  const templates = QUEST_TEMPLATES[stageName] || QUEST_TEMPLATES["初出茅庐"];
+
+  for (let i = 0; i < count; i++) {
+    const isCombat = Math.random() > 0.4; // 60% 战斗，40% 生活
+    const category = isCombat ? 'combat' : 'life';
+    const pool = isCombat ? templates.combat : templates.life;
+    const name = pool[Math.floor(Math.random() * pool.length)];
+    
+    // 随机星级 (1-5)
+    const rand = Math.random();
+    let rank: QuestRank = 1;
+    if (rand < 0.1) rank = 5;      // 10% 传说
+    else if (rand < 0.3) rank = 4; // 20% 困难
+    else if (rand < 0.6) rank = 3; // 30% 普通
+    else rank = 2;                 // 40% 简单
+
+    // 奖励随等级和星级膨胀
+    const baseGold = level * 20 + 50;
+    const baseExp = level * 50 + 100;
+    const multiplier = rank * 1.5;
+
+    quests.push({
+      id: Date.now() + i + Math.random().toString(),
+      name: name,
+      category,
+      rank,
+      desc: isCombat ? "此去凶险，务必带足丹药。" : "需细心行事，不可鲁莽。",
+      progress: 0,
+      total: 100,
+      reqLevel: Math.max(1, level - 2 + Math.floor(Math.random() * 5)),
+      rewards: {
+        gold: Math.floor(baseGold * multiplier),
+        exp: Math.floor(baseExp * multiplier)
+      }
+    });
+  }
+  return quests;
 };
 
 const getLocationByQuest = (questType: QuestType, level: number): string => {
   const availableMaps = WORLD_MAP.filter(m => level >= m.minLv && level <= m.minLv + 40);
-  const typeMatches = availableMaps.filter(m => m.type === questType);
-  const pool = typeMatches.length > 0 ? typeMatches : availableMaps;
-  if (pool.length === 0) return "荒野古道";
+  const pool = availableMaps.length > 0 ? availableMaps : WORLD_MAP.slice(0, 3);
   return pool[Math.floor(Math.random() * pool.length)].name;
 };
 
@@ -35,54 +71,28 @@ const getInitialLifeSkills = (): Skill[] => [{ name: "包扎", type: 'medical', 
 const generateVisitors = (): Companion[] => {
   const visitors: Companion[] = [];
   const tiers: Quality[] = [];
-
-  // 1. 生成稀有度池
   for (let i = 0; i < 5; i++) {
     const rand = Math.random();
     let tier: Quality = 'common';
-    if (rand < 0.02) tier = 'legendary';
-    else if (rand < 0.10) tier = 'epic';
-    else if (rand < 0.35) tier = 'rare';
-    else tier = 'common';
+    if (rand < 0.02) tier = 'legendary'; else if (rand < 0.10) tier = 'epic'; else if (rand < 0.35) tier = 'rare'; else tier = 'common';
     tiers.push(tier);
   }
-
-  // 2. 保底检查 (⚠️ 修复点：使用 filter.length 替代 every，避免 TS 类型过度收窄报错)
   const commonCount = tiers.filter(t => t === 'common').length;
-  
   if (commonCount === 5) {
     const luckyIndex = Math.floor(Math.random() * 5);
     const pityRoll = Math.random();
-    // 强制修改数组中的元素，此时 TS 不会报错，因为 tiers 类型仍被视为 Quality[]
-    if (pityRoll < 0.1) tiers[luckyIndex] = 'legendary';
-    else if (pityRoll < 0.4) tiers[luckyIndex] = 'epic';
-    else tiers[luckyIndex] = 'rare';
+    if (pityRoll < 0.1) tiers[luckyIndex] = 'legendary'; else if (pityRoll < 0.4) tiers[luckyIndex] = 'epic'; else tiers[luckyIndex] = 'rare';
   }
-
-  // 3. 生成具体数据
   tiers.forEach((tier, i) => {
     const templates = NPC_ARCHETYPES[tier];
     const template = templates[Math.floor(Math.random() * templates.length)];
     const firstName = NPC_NAMES_FIRST[Math.floor(Math.random() * NPC_NAMES_FIRST.length)];
     const lastName = NPC_NAMES_LAST[Math.floor(Math.random() * NPC_NAMES_LAST.length)];
     const trait = NPC_TRAITS[Math.floor(Math.random() * NPC_TRAITS.length)];
-    
     const priceMap = { common: 200, rare: 1000, epic: 5000, legendary: 20000 };
     const buffVal = { common: 5, rare: 15, epic: 30, legendary: 80 };
-
-    visitors.push({
-      id: Date.now() + i + Math.random().toString(),
-      name: `${firstName}${lastName}`,
-      title: template.job,
-      archetype: template.job,
-      personality: trait,
-      desc: template.desc,
-      quality: tier,
-      price: priceMap[tier],
-      buff: { type: template.buff as any, val: buffVal[tier] }
-    });
+    visitors.push({ id: Date.now() + i + Math.random().toString(), name: `${firstName}${lastName}`, title: template.job, archetype: template.job, personality: trait, desc: template.desc, quality: tier, price: priceMap[tier], buff: { type: template.buff as any, val: buffVal[tier] } });
   });
-
   return visitors;
 };
 
@@ -91,11 +101,7 @@ const rollLoot = (level: number, luck: number): Partial<Item> | null => {
     if (validItems.length === 0) return null;
     const rand = Math.random() * 100 - (luck * 0.5);
     let targetQuality: Quality = 'common';
-    if (rand < 2) targetQuality = 'legendary';
-    else if (rand < 10) targetQuality = 'epic';
-    else if (rand < 30) targetQuality = 'rare';
-    else targetQuality = 'common';
-
+    if (rand < 2) targetQuality = 'legendary'; else if (rand < 10) targetQuality = 'epic'; else if (rand < 30) targetQuality = 'rare'; else targetQuality = 'common';
     let pool = validItems.filter(i => i.quality === targetQuality);
     if (pool.length === 0) pool = validItems.filter(i => i.quality === 'common');
     if (pool.length === 0) return null;
@@ -108,25 +114,25 @@ export function useGame() {
   const [hero, setHero] = useState<HeroState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
   const heroRef = useRef<HeroState | null>(null);
   const recentLogsRef = useRef<string[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    heroRef.current = hero;
-  }, [hero]);
+  useEffect(() => { heroRef.current = hero; }, [hero]);
 
   const login = async (name: string, password: string) => {
     setLoading(true); setError(null);
-    const initialQuest = { name: "初出茅庐", type: "life" as QuestType, desc: "熟悉环境", progress: 0, total: 100 };
     
+    // 初始生成悬赏榜
+    const initialStage = "初出茅庐";
+    const initialBoard = generateQuestBoard(1, initialStage);
+
     const newHero: HeroState = {
       name, level: 1, gender: Math.random() > 0.5 ? '男' : '女', age: 16, 
       personality: PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)], 
-      title: "初出茅庐", motto: "莫欺少年穷", godPower: 100, unlockedFeatures: [], 
-      pet: null, storyStage: "初出茅庐",
+      title: initialStage, motto: "莫欺少年穷", godPower: 100, unlockedFeatures: [], 
+      pet: null, storyStage: initialStage,
       attributes: { constitution: 10, strength: 10, dexterity: 10, intelligence: 10, luck: 10 },
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 200, 
       alignment: 0, location: "牛家村", state: 'idle', 
@@ -134,7 +140,11 @@ export function useGame() {
       inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
       stats: { kills: 0, days: 1, arenaWins: 0 },
-      currentQuest: initialQuest,
+      
+      // ⚠️ 任务系统初始化
+      currentQuest: null, 
+      questBoard: initialBoard,
+
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0
     };
@@ -147,7 +157,9 @@ export function useGame() {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
         if (!mergedData.tavern) mergedData.tavern = { visitors: generateVisitors(), lastRefresh: Date.now() };
-        if (!mergedData.pet) mergedData.pet = null;
+        // 兼容旧数据
+        if (!mergedData.questBoard) mergedData.questBoard = generateQuestBoard(mergedData.level, mergedData.storyStage);
+        
         setHero(mergedData);
         setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
       } else {
@@ -177,6 +189,46 @@ export function useGame() {
 
   const addMessage = (type: 'rumor' | 'system', title: string, content: string) => {
     setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; });
+  };
+
+  // ⚠️ 核心：接取任务
+  const acceptQuest = (questId: string) => {
+    if (!heroRef.current) return;
+    const hero = heroRef.current;
+    const quest = hero.questBoard.find(q => q.id === questId);
+    
+    if (!quest) return;
+    if (hero.level < quest.reqLevel) {
+      addLog(`【接取失败】此任务凶险，建议达到 Lv.${quest.reqLevel} 再尝试。`, 'system');
+      return;
+    }
+
+    const newBoard = hero.questBoard.filter(q => q.id !== questId); 
+    if (newBoard.length === 0) newBoard.push(...generateQuestBoard(hero.level, hero.storyStage).slice(0, 1));
+
+    // 计算地点
+    const targetLoc = getLocationByQuest(quest.category === 'combat' ? 'hunt' : 'life', hero.level);
+
+    setHero(prev => prev ? { 
+      ...prev, 
+      currentQuest: quest, 
+      questBoard: newBoard, 
+      location: targetLoc, // 移动到任务地点
+      state: quest.category === 'combat' ? 'fight' : 'idle' 
+    } : null);
+    
+    addLog(`【揭榜】前往 ${targetLoc} 执行：${quest.name}`, 'highlight');
+  };
+
+  // ⚠️ 核心：刷新悬赏榜
+  const refreshQuestBoard = () => {
+    if (!heroRef.current) return;
+    const hero = heroRef.current;
+    if (hero.gold < 50) { addLog("打点包打听需要 50 文。", 'system'); return; }
+    
+    const newBoard = generateQuestBoard(hero.level, hero.storyStage);
+    setHero(prev => prev ? { ...prev, gold: prev.gold - 50, questBoard: newBoard } : null);
+    addLog("【包打听】送来了一批新的委托。", 'system');
   };
 
   const hireCompanion = (visitorId: string) => {
@@ -220,7 +272,7 @@ export function useGame() {
         ...currentHero,
         storyStage: getStoryStage(currentHero.level),
         worldLore: WORLD_LORE,
-        questInfo: `[${currentHero.currentQuest.type}] ${currentHero.currentQuest.name} (${currentHero.currentQuest.progress}%)`,
+        questInfo: currentHero.currentQuest ? `[${currentHero.currentQuest.category}] ${currentHero.currentQuest.name} (${currentHero.currentQuest.progress}%)` : "无任务，游历中",
         petInfo: currentHero.pet ? `灵宠:${currentHero.pet.type}` : "无",
         companionInfo: currentHero.companion ? `伙伴:${currentHero.companion.title} ${currentHero.companion.name} (性格:${currentHero.companion.personality})` : "独行",
         skillInfo: `擅长${bestSkill?.name || '乱拳'}(Lv.${bestSkill?.level || 1})`,
@@ -281,38 +333,43 @@ export function useGame() {
 
       let newState = currentHero.state;
       let newLocation = currentHero.location;
+      
+      // ⚠️ 任务推进逻辑
       let newQuest = currentHero.currentQuest;
-      let newQuestProgress = newQuest.progress + 5 + Math.floor(Math.random() * 5);
+      let newQuestProgress = newQuest ? newQuest.progress : 0;
       
       let suffix = "";
       let goldChange = 0;
       let expChange = 0;
       let isQuestUpdate = false; 
 
-      if (newQuestProgress >= 100) {
-        newQuestProgress = 0;
-        const reward = Math.floor(Math.random() * 100) + 100;
-        goldChange += reward; expChange += 100;
-        
-        setHero(h => h ? { ...h, attributes: {...h.attributes, intelligence: h.attributes.intelligence + 1} } : null);
-        addLog(`【达成】完成 ${newQuest.name}`, 'highlight');
-        addMessage('system', '任务完成', `完成【${newQuest.name}】，赏金 ${reward}，经验 +100。`);
-        
-        const q = generateQuest();
-        newQuest = q;
-        const targetLoc = getLocationByQuest(q.type, currentHero.level);
-        newLocation = targetLoc;
+      if (newQuest) {
+        // 有任务，推进
+        newQuestProgress += 5 + Math.floor(Math.random() * 5); 
+        // 属性加成
+        if (newQuest.category === 'combat') newQuestProgress += Math.floor(currentHero.attributes.strength / 5);
+        else newQuestProgress += Math.floor(currentHero.attributes.luck / 5);
 
-        setTimeout(() => {
-           setHero(h => h ? { ...h, currentQuest: q, location: targetLoc } : null);
-           addLog(`【新程】前往 ${targetLoc} 执行：${q.name}`, 'system');
-        }, 1000);
-      } else { isQuestUpdate = true; }
+        if (newQuestProgress >= 100) {
+          // 完成
+          goldChange += newQuest.rewards.gold;
+          expChange += newQuest.rewards.exp;
+          setHero(h => h ? { ...h, attributes: {...h.attributes, intelligence: h.attributes.intelligence + 1} } : null);
+          addLog(`【达成】完成 ${newQuest.name}`, 'highlight');
+          addMessage('system', '任务完成', `完成【${newQuest.name}】，赏金 ${newQuest.rewards.gold}，经验 ${newQuest.rewards.exp}。`);
+          newQuest = null; // 任务结束，置空，等待接取
+          addLog("【闲暇】暂无委托，在江湖中随意游历...", 'system');
+        } else {
+          isQuestUpdate = true;
+        }
+      }
 
+      // 状态切换逻辑
       if (currentHero.level >= 10 && currentHero.state === 'idle' && Math.random() < 0.15) newState = 'arena';
       else if (currentHero.inventory.length >= 15 && currentHero.state !== 'town') newState = 'town';
       else if (currentHero.state !== 'town' && Math.random() < 0.2) newState = currentHero.state === 'idle' ? 'fight' : 'idle';
 
+      // 批量更新状态
       setHero(h => {
         if(!h) return null;
         const companion = h.companion;
@@ -320,7 +377,7 @@ export function useGame() {
 
         let finalH = { 
             ...h, state: newState, location: newLocation, storyStage: getStoryStage(h.level),
-            currentQuest: { ...newQuest, progress: newQuestProgress >= 100 ? 0 : newQuestProgress },
+            currentQuest: newQuest ? { ...newQuest, progress: newQuestProgress } : null,
             gold: h.gold + goldChange, exp: h.exp + expChange
         };
 
@@ -395,5 +452,5 @@ export function useGame() {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [hero?.name]);
 
-  return { hero, login, godAction, loading, error, clearError: () => setError(null), refreshTavern, hireCompanion };
+  return { hero, login, godAction, loading, error, clearError: () => setError(null), refreshTavern, hireCompanion, acceptQuest, refreshQuestBoard };
 }
