@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank, SkillType } from '@/app/lib/constants';
 
-// 打字机效果组件
+// ⚠️ 核心优化：慢速打字机 + 淡入效果
 const TypewriterText = ({ text, className }: { text: string, className?: string }) => {
   const [displayedText, setDisplayedText] = useState('');
   
@@ -18,12 +18,13 @@ const TypewriterText = ({ text, className }: { text: string, className?: string 
       } else {
         clearInterval(timer);
       }
-    }, 40); 
+    }, 80); // ⚠️ 速度：80ms/字，非常慢，适合阅读
 
     return () => clearInterval(timer);
   }, [text]);
 
-  return <span className={className}>{displayedText}</span>;
+  // 增加 animate-in fade-in 效果，让字迹显现更柔和
+  return <span className={`${className} animate-in fade-in duration-300`}>{displayedText}</span>;
 };
 
 export default function Home() {
@@ -31,13 +32,9 @@ export default function Home() {
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'messages' | 'tavern'>('logs');
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (activeTab === 'logs') {
-       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    }
-  }, [hero?.logs.length, activeTab]); 
+  
+  // ⚠️ 移除自动滚动，因为现在是倒序（最新在最上）
+  // const bottomRef = useRef<HTMLDivElement>(null);
 
   const getQualityColor = (q: Quality) => {
     switch (q) {
@@ -76,7 +73,6 @@ export default function Home() {
     return <ScrollText size={24} className="text-stone-800"/>;
   };
 
-  // ⚠️ 辅助函数：映射新技能类型到中文
   const getSkillLabel = (type: SkillType) => {
     switch (type) {
         case 'combat': return '战技';
@@ -166,22 +162,22 @@ export default function Home() {
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
         {hero.logs.map((log, index) => {
-          const isLatest = index >= hero.logs.length - 2; 
+          // ⚠️ 核心调整：仅最新的 (index === 0, 因为我们是倒序数组) 且为 highlight 的日志使用打字机
+          const isLatest = index === 0; 
           const isNarrative = log.type === 'highlight';
 
           return (
-            <div key={log.id} className="flex gap-2 items-baseline mb-2">
+            <div key={log.id} className="flex gap-2 items-baseline mb-4"> {/* 增加间距 */}
               <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
               {isLatest && isNarrative ? (
                  <TypewriterText 
                    text={log.text} 
-                   className="text-[14px] leading-7 text-justify font-medium text-amber-900" 
+                   className="text-[15px] leading-8 text-justify font-medium text-black" // 黑色，字号微调
                  />
               ) : (
-                 <span className={`text-[14px] leading-7 text-justify font-medium ${
-                     log.type === 'highlight' ? 'text-amber-900' : 
-                     log.type === 'system' ? 'text-stone-400 text-xs italic' : 
-                     'text-black' 
+                 <span className={`text-[15px] leading-8 text-justify font-medium ${
+                     log.type === 'highlight' ? 'text-black' : 
+                     'text-stone-500 text-xs' // 系统日志变灰变小
                    }`}>
                    {log.text}
                  </span>
@@ -189,7 +185,7 @@ export default function Home() {
             </div>
           );
         })}
-        <div ref={bottomRef} className="h-4" />
+        {/* 底部不需要留白了，因为最新的在最上面 */}
       </div>
       <div className="p-4 bg-gradient-to-t from-[#fcf9f2] via-[#fcf9f2] to-transparent">
          <div className="flex justify-between gap-4">
@@ -285,7 +281,6 @@ export default function Home() {
             {hero.martialArts.map((skill, i) => (
               <div key={i} className="flex justify-between items-center border-b border-stone-50 pb-2 last:border-0 last:pb-0">
                  <div><div className="font-bold text-stone-700 text-sm">{skill.name} <span className="text-xs font-normal text-stone-400 bg-stone-100 px-1 rounded">Lv.{skill.level}</span></div><div className="text-[10px] text-stone-400">{skill.desc}</div></div>
-                 {/* ⚠️ 修复：使用新的 getSkillLabel 函数 */}
                  <div className="text-xs text-stone-300">{getSkillLabel(skill.type)}</div>
               </div>
             ))}
