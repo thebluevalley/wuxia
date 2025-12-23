@@ -1,7 +1,8 @@
 'use client';
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollText, Zap, MapPin, User, Package, Shield, Sword, Heart, Clover, Wind, Brain, BicepsFlexed, Star, Clock, Battery, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, BookOpen, Quote, HardHat, Shirt, Footprints, Gem } from 'lucide-react';
+// ⚠️ 核心修复：确保引入了 Target
+import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
 import { ItemType, Quality } from '@/app/lib/constants';
 
 export default function Home() {
@@ -169,8 +170,6 @@ export default function Home() {
            <div className="text-center flex-1 border-r border-stone-100"><div className="text-xs text-stone-400">善恶</div><div className="font-bold text-stone-700">{hero.alignment}</div></div>
            <div className="text-center flex-1"><div className="text-xs text-stone-400">岁数</div><div className="font-bold text-stone-700">{hero.age}</div></div>
         </div>
-        
-        {/* ⚠️ 新增：江湖风评 (标签展示) */}
         <div className="mb-4">
            <div className="text-xs text-stone-400 mb-1">江湖风评</div>
            <div className="flex flex-wrap gap-2">
@@ -179,7 +178,6 @@ export default function Home() {
              )) : <span className="text-[10px] text-stone-300 italic">暂无评价</span>}
            </div>
         </div>
-
         {hero.unlockedFeatures.includes('motto') && (
            <div className="mt-4 p-3 bg-stone-50 rounded border border-stone-100 relative"><Quote size={12} className="absolute top-2 left-2 text-stone-300"/><div className="text-center text-sm font-serif italic text-stone-600">“{hero.motto}”</div></div>
         )}
@@ -251,6 +249,7 @@ export default function Home() {
   );
 
   const EquipView = () => { const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; return (<div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className={`text-sm ${getQualityColor(item.quality)}`}>{item.name} <span className="text-[10px] text-stone-400 ml-1">(强度 {item.power})</span></div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>);};
+  
   const MessagesView = () => { 
     const rumors = hero.messages.filter(m => m.type === 'rumor'); 
     const systems = hero.messages.filter(m => m.type === 'system'); 
