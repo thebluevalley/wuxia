@@ -51,7 +51,7 @@ export type Quest = {
   total: number;
   reqLevel: number;
   staminaCost: number; 
-  isAuto?: boolean; // 兼容旧逻辑
+  isAuto?: boolean; 
   rewards: { gold: number; exp: number; item?: Item; };
 };
 
@@ -106,14 +106,13 @@ export type HeroState = {
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
-// ⚠️ 补回缺失的常量 FLAVOR_TEXTS
 export const FLAVOR_TEXTS = {
   environment: ["凛冬的寒风呼啸", "君临城的腐臭味", "学士塔的乌鸦叫声", "铁王座的阴影", "狭海的咸湿海风", "北境的皑皑白雪"],
   action: ["擦拭瓦雷利亚钢剑", "喝了一口酸涩的红酒", "把玩着金龙币", "在神木林中祈祷", "低声密谋", "裹紧了毛皮斗篷"],
   object: ["龙晶匕首", "学士的项链", "无面者的硬币", "族谱", "半个洋葱", "染血的白袍"]
 };
 
-// ⚠️ 补回缺失的常量 QUEST_SCRIPTS (用于兼容旧逻辑)
+// 兼容旧逻辑
 export const QUEST_SCRIPTS = {
   "default": [
     { title: "巡逻", desc: "日常巡逻。", obj: "巡逻", antagonist: "无", twist: "无" }
@@ -231,7 +230,6 @@ export const WORLD_ARCHIVE = [
   "【龙之母】：在狭海对岸，最后的真龙孵化了三颗龙蛋。"
 ];
 
-// ⚠️ 补回缺失的常量 WORLD_LORE
 export const WORLD_LORE = "维斯特洛大陆，七国纷争，凛冬将至。";
 
 export const NPC_ARCHETYPES = {
@@ -251,6 +249,15 @@ export const NPC_ARCHETYPES = {
   legendary: [
     { job: "无面者", buff: "attack", desc: "顶级的刺客，没有名字。" }
   ]
+};
+
+// ⚠️ 补全 SKILL_LIBRARY
+export const SKILL_LIBRARY = {
+  combat: ["水舞者剑术", "双手巨剑", "长矛方阵", "多斯拉克马术", "十字弓"],
+  intrigue: ["谎言", "毒药", "情报网", "政治联姻"],
+  survival: ["生火", "狩猎", "抗寒", "草药学"],
+  knowledge: ["瓦雷利亚语", "历史", "战术", "渡鸦"],
+  command: ["鼓舞", "后勤", "攻城", "海战"]
 };
 
 export const PERSONALITIES = ["荣誉", "狡诈", "残忍", "忠诚", "贪婪", "虔诚", "疯癫"];
