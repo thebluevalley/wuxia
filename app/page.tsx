@@ -4,32 +4,29 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank, SkillType } from '@/app/lib/constants';
 
-// 打字机组件：增加防抖和状态清理，防止乱码
-const TypewriterText = ({ text, className, onComplete }: { text: string, className?: string, onComplete?: () => void }) => {
+// 打字机组件
+const TypewriterText = ({ text, className }: { text: string, className?: string }) => {
   const [displayedText, setDisplayedText] = useState('');
-  const indexRef = useRef(0);
-
+  
   useEffect(() => {
-    indexRef.current = 0;
-    setDisplayedText(''); 
-    
-    if (!text) return;
+    // 如果文本太短或已经完全显示，就不重置动画，防止闪烁
+    if (text === displayedText) return;
 
+    let index = 0;
+    setDisplayedText(''); 
     const timer = setInterval(() => {
-      if (indexRef.current < text.length) {
-        const char = text.charAt(indexRef.current);
-        setDisplayedText((prev) => prev + char);
-        indexRef.current++;
+      if (index < text.length) {
+        setDisplayedText((prev) => prev + text.charAt(index));
+        index++;
       } else {
         clearInterval(timer);
-        if (onComplete) onComplete();
       }
-    }, 50); // 50ms 适中速度
+    }, 80); 
 
     return () => clearInterval(timer);
-  }, [text]);
+  }, [text]); // 仅当 text 内容变化时才触发打字效果
 
-  return <span className={className}>{displayedText}</span>;
+  return <span className={`${className} animate-in fade-in duration-500`}>{displayedText}</span>;
 };
 
 export default function Home() {
@@ -163,30 +160,22 @@ export default function Home() {
   const LogsView = () => (
     <div className="flex flex-col h-full relative">
       <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth">
-        {/* ⚠️ 核心修复：移除 isNarrative 过滤，确保所有日志都显示 */}
-        {/* 增加空状态提示 */}
-        {hero.logs.length === 0 && (
-           <div className="text-center text-stone-400 text-sm mt-10 animate-pulse">正在书写历史...</div>
-        )}
-        
         {hero.logs.map((log, index) => {
-          // 仅最新的一条，且必须是 highlight 才打字
-          // ⚠️ 修复：即使不是 highlight，只要是最新一条，也给个淡入动画，避免太生硬
           const isLatest = index === 0; 
-          const useTypewriter = isLatest && log.type === 'highlight';
+          const isNarrative = log.type === 'highlight';
+
+          if (!isNarrative) return null;
 
           return (
-            <div key={log.id} className="flex gap-3 items-baseline mb-6 px-1">
-              <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-40 pt-1">{log.time}</span>
-              {useTypewriter ? (
+            <div key={log.id} className="flex gap-2 items-baseline mb-4">
+              <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-50">{log.time}</span>
+              {isLatest ? (
                  <TypewriterText 
                    text={log.text} 
-                   className="text-[15px] leading-7 text-justify font-medium text-black font-serif" 
+                   className="text-[15px] leading-8 text-justify font-medium text-black" 
                  />
               ) : (
-                 <span className={`text-[15px] leading-7 text-justify font-medium font-serif animate-in fade-in duration-500 ${
-                     log.type === 'highlight' ? 'text-black' : 'text-stone-600' // 普通文本稍微淡一点
-                   }`}>
+                 <span className="text-[15px] leading-8 text-justify font-medium text-black opacity-80">
                    {log.text}
                  </span>
               )}
@@ -397,11 +386,12 @@ export default function Home() {
     <div className="flex flex-col h-[100dvh] bg-[#fcf9f2] text-stone-800 font-serif max-w-md mx-auto shadow-2xl relative">
       <Header />
       <main className="flex-1 overflow-hidden bg-[#fcf9f2]">
-        {activeTab === 'logs' && <LogsView />}
-        {activeTab === 'hero' && <HeroView />}
-        {activeTab === 'bag' && <BagView />}
-        {activeTab === 'messages' && <MessagesView />}
-        {activeTab === 'tavern' && <TavernView />}
+        {/* ⚠️ 核心修复：使用 CSS hidden 而不是条件渲染，保持组件状态 */}
+        <div className={activeTab === 'logs' ? 'block h-full' : 'hidden'}><LogsView /></div>
+        <div className={activeTab === 'hero' ? 'block h-full' : 'hidden'}><HeroView /></div>
+        <div className={activeTab === 'bag' ? 'block h-full' : 'hidden'}><BagView /></div>
+        <div className={activeTab === 'messages' ? 'block h-full' : 'hidden'}><MessagesView /></div>
+        <div className={activeTab === 'tavern' ? 'block h-full' : 'hidden'}><TavernView /></div>
       </main>
       <nav className="h-16 bg-white border-t border-stone-200 flex justify-around items-center px-1 flex-none z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
          <button onClick={() => setActiveTab('logs')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'logs' ? 'text-stone-800' : 'text-stone-400'}`}><ScrollText size={18} strokeWidth={activeTab === 'logs' ? 2.5 : 2} /><span className="text-[9px] font-bold">故事</span></button>
