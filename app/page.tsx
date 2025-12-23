@@ -5,7 +5,8 @@ import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Foot
 import { ItemType, Quality, QuestRank } from '@/app/lib/constants';
 
 export default function Home() {
-  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
+  // ⚠️ 引入 useItem
+  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest, useItem } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'equip' | 'messages' | 'tavern'>('logs');
@@ -88,8 +89,6 @@ export default function Home() {
              <div className="w-4 h-4 rounded-full border border-amber-900 flex items-center justify-center text-[10px]">文</div>
              {hero.gold}
            </div>
-           
-           {/* ⚠️ 新增：精力值显示 */}
            <div className="flex items-center gap-2">
              <div className="flex flex-col items-end">
                <div className="flex items-center gap-1 text-emerald-800 font-bold text-[10px]"><Battery size={10}/> {Math.floor(hero.stamina)}</div>
@@ -106,12 +105,12 @@ export default function Home() {
          <div className="flex justify-between text-[10px] text-stone-500 mb-1">
             <span className="flex items-center gap-1 font-bold text-stone-700 truncate max-w-[200px]">
               <Target size={10} className="text-stone-800 shrink-0"/> 
-              {hero.currentQuest ? hero.currentQuest.name : "暂无任务"}
+              {hero.currentQuest ? hero.currentQuest.name : "暂无任务 (闲逛中)"}
             </span>
-            <span className="font-mono">{hero.currentQuest ? `${hero.currentQuest.progress}%` : "0%"}</span>
+            <span className="font-mono">{hero.currentQuest ? `${hero.currentQuest.progress}%` : "--"}</span>
          </div>
          <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden mb-1">
-           <div className={`h-full transition-all duration-700 rounded-full ${hero.currentQuest ? 'bg-amber-600' : 'bg-stone-200'}`} style={{ width: hero.currentQuest ? `${hero.currentQuest.progress}%` : '0%' }} />
+           <div className={`h-full transition-all duration-700 rounded-full ${hero.currentQuest ? 'bg-amber-600' : 'bg-transparent'}`} style={{ width: hero.currentQuest ? `${hero.currentQuest.progress}%` : '0%' }} />
          </div>
          {hero.queuedQuest && (
            <div className="text-[9px] text-stone-400 flex items-center gap-1 border-t border-stone-50 pt-1">
@@ -215,9 +214,36 @@ export default function Home() {
 
   const AttributeRow = ({icon, label, val, color}: any) => (<div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm text-stone-600">{icon} {label}</span><div className="flex items-center gap-2"><div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden"><div className="h-full bg-stone-400" style={{width: `${Math.min(100, val * 2)}%`}}></div></div><span className="font-mono text-xs w-6 text-right">{val}</span></div></div>);
 
-  const BagView = () => (<div className="p-4 h-full overflow-y-auto"><h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3><div className="space-y-2">{hero.inventory.map((item,i)=><div key={i} className="bg-white border border-stone-100 p-3 rounded flex justify-between"><span className={`text-sm ${getQualityColor(item.quality)}`}>{item.name}</span><div className="text-right"><span className="text-xs text-stone-400 block">x{item.count}</span><span className="text-[10px] bg-stone-100 px-1 rounded text-stone-500">价{item.price}</span></div></div>)}</div></div>);
+  // ⚠️ 核心修改：行囊增加“使用”按钮
+  const BagView = () => (
+    <div className="p-4 h-full overflow-y-auto">
+      <h3 className="font-bold text-stone-800 mb-4 px-2">行囊 ({hero.inventory.length}/20)</h3>
+      <div className="space-y-2">
+        {hero.inventory.map((item,i)=> (
+          <div key={i} className="bg-white border border-stone-100 p-3 rounded flex justify-between items-center">
+            <div>
+              <span className={`text-sm font-bold ${getQualityColor(item.quality)}`}>{item.name}</span>
+              <div className="text-xs text-stone-400">x{item.count} <span className="ml-2 text-[10px] text-stone-300">{item.desc}</span></div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] bg-stone-50 px-1 rounded text-stone-400">价{item.price}</span>
+              {/* 只有消耗品和书籍可以使用 */}
+              {(item.type === 'consumable' || item.type === 'book') && (
+                <button 
+                  onClick={() => useItem(item.id)}
+                  className="bg-stone-800 text-white text-[10px] px-2 py-1 rounded hover:bg-stone-700 active:scale-95"
+                >
+                  {item.type === 'book' ? '研读' : '服用'}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const EquipView = () => { const slots: {key: ItemType, label: string, icon: any}[] = [{ key: 'head', label: '头饰', icon: <HardHat size={18}/> }, { key: 'weapon', label: '兵器', icon: <Sword size={18}/> }, { key: 'body',  label: '衣甲', icon: <Shirt size={18}/> }, { key: 'legs', label: '护腿', icon: <Shield size={18}/> }, { key: 'feet', label: '鞋靴', icon: <Footprints size={18}/> }, { key: 'accessory', label: '饰品', icon: <Gem size={18}/> }]; return (<div className="p-4 h-full overflow-y-auto"><div className="space-y-3">{slots.map((slot) => { const item = hero.equipment[slot.key as keyof typeof hero.equipment]; return (<div key={slot.key} className="bg-white border border-stone-100 p-4 rounded-lg flex items-center gap-4 shadow-sm"><div className={`w-10 h-10 rounded-full flex items-center justify-center border ${item ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-stone-50 border-stone-100 text-stone-300'}`}>{slot.icon}</div><div className="flex-1"><div className="text-xs text-stone-400 mb-1">{slot.label}</div>{item ? <div className={`text-sm ${getQualityColor(item.quality)}`}>{item.name}</div> : <div className="text-stone-300 italic text-sm">空</div>}</div></div>)})}</div></div>);};
-  
   const MessagesView = () => { 
     const rumors = hero.messages.filter(m => m.type === 'rumor'); 
     const systems = hero.messages.filter(m => m.type === 'system'); 
@@ -261,7 +287,6 @@ export default function Home() {
     );
   };
 
-  // ⚠️ 移除手动刷新按钮
   const TavernView = () => (
     <div className="p-4 h-full overflow-y-auto">
        <div className="flex justify-between items-center mb-6 px-1">

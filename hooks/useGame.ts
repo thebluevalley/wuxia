@@ -35,7 +35,6 @@ const generateQuestBoard = (level: number, stageName: string): Quest[] => {
     const baseExp = level * 50 + 100;
     const multiplier = rank * 1.5;
     
-    // ⚠️ 消耗精力 = 星级 * 10
     const staminaCost = rank * 10;
 
     quests.push({
@@ -69,7 +68,7 @@ const generateFillerQuest = (level: number, stageName: string): Quest => {
     progress: 0, total: 100,
     reqLevel: 1,
     isAuto: true,
-    staminaCost: 5, // 挂机任务消耗很少
+    staminaCost: 5, 
     rewards: { gold: level * 5 + 10, exp: level * 10 + 20 }
   };
 };
@@ -83,12 +82,10 @@ const getLocationByQuest = (questType: QuestType, level: number): string => {
 const getInitialSkills = (): Skill[] => [{ name: "太祖长拳", type: 'attack', level: 1, exp: 0, maxExp: 100, desc: "江湖流传最广的入门拳法" }];
 const getInitialLifeSkills = (): Skill[] => [{ name: "包扎", type: 'medical', level: 1, exp: 0, maxExp: 100, desc: "简单的伤口处理" }];
 
-// ⚠️ 核心修改：生成有性别和性格的 NPC
 const generateVisitors = (): Companion[] => {
   const visitors: Companion[] = [];
   const tiers: Quality[] = [];
   
-  // 保底逻辑
   for (let i = 0; i < 5; i++) {
     const rand = Math.random();
     let tier: Quality = 'common';
@@ -106,9 +103,7 @@ const generateVisitors = (): Companion[] => {
     const templates = NPC_ARCHETYPES[tier];
     const template = templates[Math.floor(Math.random() * templates.length)];
     
-    // ⚠️ 性别判断逻辑
     let gender: '男' | '女' = Math.random() > 0.5 ? '男' : '女';
-    // 某些职业固定性别
     if (template.job.includes('女') || template.job.includes('花')) gender = '女';
     if (template.job.includes('僧') || template.job.includes('少')) gender = '男';
 
@@ -164,7 +159,8 @@ export function useGame() {
   const login = async (name: string, password: string) => {
     setLoading(true); setError(null);
     const initialStage = "初出茅庐";
-    const initialQuest = generateFillerQuest(1, initialStage); 
+    
+    // 初始状态：不给任务，让其留白
     const initialBoard = generateQuestBoard(1, initialStage);
 
     const newHero: HeroState = {
@@ -173,7 +169,6 @@ export function useGame() {
       title: initialStage, motto: "莫欺少年穷", godPower: 100, unlockedFeatures: [], 
       pet: null, storyStage: initialStage,
       attributes: { constitution: 10, strength: 10, dexterity: 10, intelligence: 10, luck: 10 },
-      // ⚠️ 初始化精力
       stamina: 120, maxStamina: 120,
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 200, 
       alignment: 0, location: "牛家村", state: 'idle', 
@@ -182,7 +177,7 @@ export function useGame() {
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
       stats: { kills: 0, days: 1, arenaWins: 0 },
       
-      currentQuest: initialQuest, 
+      currentQuest: null, // ⚠️ 初始留白
       queuedQuest: null, 
       questBoard: initialBoard,
       lastQuestRefresh: Date.now(), 
@@ -198,7 +193,6 @@ export function useGame() {
       if (user) {
         if (user.password !== password) { setError("密令错误！"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
-        // 兼容性
         if (!mergedData.tavern) mergedData.tavern = { visitors: generateVisitors(), lastRefresh: Date.now() };
         if (!mergedData.questBoard) mergedData.questBoard = generateQuestBoard(mergedData.level, mergedData.storyStage);
         if (!mergedData.lastQuestRefresh) mergedData.lastQuestRefresh = Date.now();
@@ -235,6 +229,54 @@ export function useGame() {
     setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; });
   };
 
+  // ⚠️ 核心新增：使用物品逻辑
+  const useItem = (itemId: string) => {
+    if (!heroRef.current) return;
+    const hero = heroRef.current;
+    const itemIndex = hero.inventory.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) return;
+    const item = hero.inventory[itemIndex];
+
+    let msg = "";
+    let updatedHero = { ...hero };
+    let consume = true;
+
+    if (item.type === 'consumable') {
+       const effectVal = Number(item.effect) || 0;
+       // 简单判断：如果描述里有“精力”就回精力，否则默认回血
+       if (item.desc.includes("精力") || item.desc.includes("补气")) {
+          updatedHero.stamina = Math.min(updatedHero.maxStamina, updatedHero.stamina + effectVal);
+          msg = `服下 ${item.name}，精力恢复 ${effectVal} 点。`;
+       } else {
+          updatedHero.hp = Math.min(updatedHero.maxHp, updatedHero.hp + effectVal);
+          msg = `服下 ${item.name}，气血恢复 ${effectVal} 点。`;
+       }
+    } else if (item.type === 'book') {
+       const skillName = String(item.effect);
+       const existingSkill = hero.martialArts.find(s => s.name === skillName);
+       if (existingSkill) {
+          existingSkill.exp += 100; // 已学会，加熟练度
+          msg = `研读 ${item.name}，【${skillName}】熟练度提升！`;
+       } else {
+          // 新技能，简单起见默认它是 'attack' 类型，实际应查表
+          updatedHero.martialArts = [...updatedHero.martialArts, { name: skillName, type: 'attack', level: 1, exp: 0, maxExp: 100, desc: "新习得的武学" }];
+          msg = `研读 ${item.name}，习得【${skillName}】！`;
+       }
+    } else {
+       consume = false; // 装备等不可直接使用
+    }
+
+    if (consume) {
+       if (updatedHero.inventory[itemIndex].count > 1) {
+          updatedHero.inventory[itemIndex].count--;
+       } else {
+          updatedHero.inventory = updatedHero.inventory.filter(i => i.id !== itemId);
+       }
+       setHero(updatedHero);
+       addLog(msg, 'highlight');
+    }
+  };
+
   const acceptQuest = (questId: string) => {
     if (!heroRef.current) return;
     const hero = heroRef.current;
@@ -245,23 +287,19 @@ export function useGame() {
       addLog(`【接取失败】此任务凶险，建议达到 Lv.${quest.reqLevel} 再尝试。`, 'system');
       return;
     }
-    // ⚠️ 精力检查
     if (hero.stamina < quest.staminaCost) {
       addLog(`【精力不足】身体疲惫，需休息恢复。(需要 ${quest.staminaCost} 精力)`, 'system');
       return;
     }
-    
     if (hero.queuedQuest) {
       addLog(`【接取失败】你已经预约了下一个任务，请先完成。`, 'system');
       return;
     }
 
     const newBoard = hero.questBoard.filter(q => q.id !== questId); 
-    
-    // 扣除精力并预约
     setHero(prev => prev ? { 
       ...prev, 
-      stamina: prev.stamina - quest.staminaCost, // 立即扣除
+      stamina: prev.stamina - quest.staminaCost, 
       queuedQuest: quest, 
       questBoard: newBoard 
     } : null);
@@ -288,11 +326,9 @@ export function useGame() {
     triggerAI("recruit_companion", "", "recruit", { ...hero, companion: visitor });
   };
 
-  // ⚠️ 移除手动刷新导出，仅保留内部逻辑
   const refreshTavernInternal = (force: boolean = false) => {
     setHero(prev => {
         if (!prev) return null;
-        // 自动刷新不需要钱
         return { ...prev, tavern: { visitors: generateVisitors(), lastRefresh: Date.now() } };
     });
     addLog("酒馆里来了一批新客。", "system");
@@ -302,7 +338,6 @@ export function useGame() {
     const currentHero = explicitHero || hero;
     if (!currentHero) return false;
     
-    // ⚠️ 节制伙伴描写：70% 概率不传伙伴信息给 AI，防止复读机
     const showCompanion = Math.random() > 0.7;
     const companionInfo = (showCompanion && currentHero.companion) 
       ? `伙伴:${currentHero.companion.title} ${currentHero.companion.name} (性别:${currentHero.companion.gender}, 性格:${currentHero.companion.personality})` 
@@ -364,25 +399,21 @@ export function useGame() {
       const currentHero = heroRef.current;
       if (!currentHero) return;
 
-      // 1. 恢复：神力 + 精力 (缓慢恢复，闲置时更快)
-      const staminaRegen = currentHero.state === 'idle' ? 1 : 0.5; // 闲置回得快
+      const staminaRegen = currentHero.state === 'idle' ? 1 : 0.5;
       
       setHero(h => h ? { 
         ...h, 
         godPower: Math.min(100, h.godPower + 5),
-        stamina: Math.min(h.maxStamina, h.stamina + (Math.random() < 0.2 ? 1 : 0)) // 约10秒回1点
+        stamina: Math.min(h.maxStamina, h.stamina + (Math.random() < 0.2 ? 1 : 0)) 
       } : null);
       
-      // 2. 伙伴过期
       if (currentHero.companion && Date.now() > currentHero.companionExpiry) {
          addLog(`【离别】${currentHero.companion.name} 拱手道别：“青山不改，绿水长流！”`, "system");
          setHero(h => h ? { ...h, companion: null } : null);
       }
 
-      // 3. 酒馆刷新 (自动)
       if (Date.now() - currentHero.tavern.lastRefresh > REFRESH_INTERVAL) { refreshTavernInternal(); }
 
-      // 4. 悬赏榜刷新
       if (Date.now() - (currentHero.lastQuestRefresh || 0) > QUEST_REFRESH_INTERVAL) {
          const newBoard = generateQuestBoard(currentHero.level, currentHero.storyStage);
          setHero(h => h ? { ...h, questBoard: newBoard, lastQuestRefresh: Date.now() } : null);
@@ -412,6 +443,7 @@ export function useGame() {
           addLog(`【达成】完成 ${newQuest.name}`, 'highlight');
           addMessage('system', '任务完成', `完成【${newQuest.name}】，赏金 ${newQuest.rewards.gold}，经验 ${newQuest.rewards.exp}。`);
           
+          // ⚠️ 任务完成后的逻辑分支
           if (queued) {
              const targetLoc = getLocationByQuest(queued.category === 'combat' ? 'hunt' : 'life', currentHero.level);
              newQuest = queued;
@@ -420,17 +452,30 @@ export function useGame() {
              newState = newQuest.category === 'combat' ? 'fight' : 'idle';
              addLog(`【新程】开始执行预约委托：${newQuest.name}`, 'highlight');
           } else {
-             const filler = generateFillerQuest(currentHero.level, currentHero.storyStage);
-             // 挂机任务也要扣一点点精力，防止无限刷，但不会扣成负数
-             setHero(h => h ? { ...h, stamina: Math.max(0, h.stamina - filler.staminaCost) } : null);
-             newQuest = filler;
-             addLog(`【日常】顺手做些杂事：${filler.name}`, 'system');
+             // ⚠️ 留白机制：70% 概率不接新任务，直接置空进入闲逛状态
+             if (Math.random() < 0.7) {
+               newQuest = null; 
+               newState = 'idle'; // 强制进入闲逛
+               addLog("【闲暇】暂无要事，在附近游山玩水，稍作休整。", 'system');
+             } else {
+               const filler = generateFillerQuest(currentHero.level, currentHero.storyStage);
+               setHero(h => h ? { ...h, stamina: Math.max(0, h.stamina - filler.staminaCost) } : null);
+               newQuest = filler;
+               addLog(`【日常】顺手做些杂事：${filler.name}`, 'system');
+             }
           }
         } else {
           isQuestUpdate = true;
         }
       } else {
-         newQuest = generateFillerQuest(currentHero.level, currentHero.storyStage);
+         // ⚠️ 如果当前无任务（留白中），尝试接新的自动任务
+         // 20% 概率结束留白
+         if (Math.random() < 0.2) {
+            newQuest = generateFillerQuest(currentHero.level, currentHero.storyStage);
+            // 恢复一点体力
+            setHero(h => h ? { ...h, stamina: Math.min(h.maxStamina, h.stamina + 5) } : null);
+            addLog(`【启程】休息片刻，决定去${newQuest.name}。`, 'system');
+         }
       }
 
       if (currentHero.level >= 10 && currentHero.state === 'idle' && Math.random() < 0.15) newState = 'arena';
@@ -483,13 +528,12 @@ export function useGame() {
            const loot = rollLoot(finalH.level, luck);
            if (loot) {
              const item = { ...loot, id: Date.now().toString(), count: 1 } as Item;
-             if (item.type === 'consumable') {
-                if (finalH.hp < finalH.maxHp) { finalH.hp = Math.min(finalH.maxHp, finalH.hp + 50); setTimeout(() => addLog(`服下${item.name}。(生命+50)`, 'system'), 200); }
-                else { const idx = finalH.inventory.findIndex(i => i.name === item.name); if(idx>=0) finalH.inventory[idx].count++; else finalH.inventory.push(item); }
+             if (item.type === 'consumable' || item.type === 'book') { // 书也可以堆叠
+                const idx = finalH.inventory.findIndex(i => i.name === item.name); if(idx>=0) finalH.inventory[idx].count++; else finalH.inventory.push(item);
              } else {
                 const idx = finalH.inventory.findIndex(i => i.name === item.name); if(idx>=0) finalH.inventory[idx].count++; else finalH.inventory.push(item);
-                if (Math.random() < 0.5) suffix = `(获得: ${item.name})`;
              }
+             if (Math.random() < 0.5) suffix = `(获得: ${item.name})`;
            }
         }
 
@@ -519,6 +563,6 @@ export function useGame() {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [hero?.name]);
 
-  // ⚠️ 仅导出 acceptQuest，不导出 refreshTavern
-  return { hero, login, godAction, loading, error, clearError: () => setError(null), hireCompanion, acceptQuest };
+  // ⚠️ 导出 useItem
+  return { hero, login, godAction, loading, error, clearError: () => setError(null), hireCompanion, acceptQuest, useItem };
 }

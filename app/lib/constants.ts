@@ -10,6 +10,8 @@ export type Item = {
   minLevel: number;
   count: number;
   price: number;
+  // ⚠️ 新增：物品效果（数值 或 技能名）
+  effect?: string | number; 
 };
 
 export type Equipment = {
@@ -35,7 +37,6 @@ export type Quest = {
   total: number;
   reqLevel: number;
   isAuto?: boolean;
-  // ⚠️ 新增：精力消耗
   staminaCost: number; 
   rewards: {
     gold: number;
@@ -53,7 +54,6 @@ export type Message = { id: string; type: MessageType; title: string; content: s
 export type Companion = {
   id: string;
   name: string;
-  // ⚠️ 新增：性别
   gender: '男' | '女'; 
   title: string;
   archetype: string;
@@ -71,7 +71,6 @@ export type HeroState = {
   godPower: number; unlockedFeatures: string[]; storyStage: string;
   pet: Pet | null;
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
-  // ⚠️ 新增：精力值
   stamina: number; maxStamina: number;
   hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
   
@@ -93,7 +92,6 @@ export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' 
 
 export const PERSONALITIES = ["侠义", "孤僻", "狂放", "儒雅", "贪财", "痴情", "阴狠", "中庸", "避世"];
 
-// ⚠️ 拆分男女名字库
 export const NPC_NAMES_MALE = ["啸天", "无忌", "一刀", "寻欢", "留香", "不败", "求败", "铁手", "无情", "冷血", "小宝", "大侠", "三少", "风", "云", "雷", "电", "靖", "康", "峰", "平", "冲", "过", "伯光", "志平"];
 export const NPC_NAMES_FEMALE = ["语嫣", "灵珊", "盈盈", "莫愁", "芷若", "敏", "蓉", "念慈", "双", "素素", "药师", "凤凰", "不悔", "襄", "芙", "龙女", "铁心", "无双", "红药", "师师"];
 export const NPC_NAMES_LAST = ["独孤", "西门", "欧阳", "诸葛", "慕容", "李", "王", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴", "徐", "孙", "马", "朱", "胡", "林", "郭", "何", "高", "罗", "郑", "梁", "谢", "宋", "唐", "许", "韩", "冯", "邓", "曹", "彭", "曾", "萧", "田", "董"];
@@ -102,7 +100,7 @@ export const NPC_ARCHETYPES = {
   common: [
     { job: "店小二", buff: "luck", desc: "消息灵通，跑腿勤快。" },
     { job: "落魄书生", buff: "exp", desc: "虽手无缚鸡之力，但满腹经纶。" },
-    { job: "卖花女", buff: "heal", desc: "笑容甜美，令人忘忧。" }, // 这种通常固定女性，生成时处理
+    { job: "卖花女", buff: "heal", desc: "笑容甜美，令人忘忧。" }, 
     { job: "泼皮", buff: "attack", desc: "市井无赖，打架全靠一股狠劲。" }
   ],
   rare: [
@@ -113,13 +111,13 @@ export const NPC_ARCHETYPES = {
   ],
   epic: [
     { job: "独臂刀客", buff: "attack", desc: "刀法刚猛，力劈华山。" },
-    { job: "峨眉女侠", buff: "attack", desc: "剑法轻灵，身法飘逸。" }, // 固定女性
-    { job: "少林武僧", buff: "defense", desc: "金钟罩铁布衫，刀枪不入。" }, // 固定男性
+    { job: "峨眉女侠", buff: "attack", desc: "剑法轻灵，身法飘逸。" }, 
+    { job: "少林武僧", buff: "defense", desc: "金钟罩铁布衫，刀枪不入。" }, 
     { job: "丐帮长老", buff: "exp", desc: "通晓天下秘闻。" }
   ],
   legendary: [
     { job: "扫地僧", buff: "exp", desc: "深不可测，一花一世界。" },
-    { job: "魔教圣女", buff: "attack", desc: "行事乖张，武功诡异。" }, // 固定女性
+    { job: "魔教圣女", buff: "attack", desc: "行事乖张，武功诡异。" }, 
     { job: "剑圣", buff: "attack", desc: "人剑合一，万剑归宗。" }
   ]
 };
@@ -210,28 +208,54 @@ export const QUEST_SOURCES = {
   search: ["寻找失传的《易筋经》残卷"], hunt: ["讨伐黑风寨"], challenge: ["挑战华山"], train: ["修炼"], life: ["打杂"]
 };
 
+// ⚠️ 核心新增：海量物品库 (含秘籍和药水)
 export const LOOT_TABLE: Partial<Item>[] = [
-  { name: "半个冷馒头", type: 'consumable', desc: "回血 +10", price: 1, minLevel: 1, quality: 'common' },
-  { name: "生锈的铁剑", type: 'weapon', desc: "攻击 +1", price: 10, minLevel: 1, quality: 'common' },
-  { name: "粗布头巾", type: 'head', desc: "防御 +1", price: 5, minLevel: 1, quality: 'common' },
-  { name: "麻布裤", type: 'legs', desc: "防御 +1", price: 5, minLevel: 1, quality: 'common' },
-  { name: "草鞋", type: 'feet', desc: "身法 +1", price: 2, minLevel: 1, quality: 'common' },
-  { name: "女儿红", type: 'consumable', desc: "回血 +50", price: 20, minLevel: 10, quality: 'common' },
-  { name: "百炼钢刀", type: 'weapon', desc: "攻击 +10", price: 150, minLevel: 10, quality: 'rare' },
-  { name: "精铁护腕", type: 'accessory', desc: "臂力 +2", price: 100, minLevel: 10, quality: 'rare' },
-  { name: "皮甲", type: 'body', desc: "防御 +10", price: 80, minLevel: 10, quality: 'common' },
-  { name: "金疮药", type: 'consumable', desc: "回血 +100", price: 50, minLevel: 20, quality: 'common' },
-  { name: "神行太保靴", type: 'feet', desc: "身法 +15", price: 300, minLevel: 20, quality: 'rare' },
-  { name: "金丝软甲(残)", type: 'body', desc: "防御 +30", price: 500, minLevel: 25, quality: 'rare' },
-  { name: "平安符", type: 'accessory', desc: "福源 +5", price: 200, minLevel: 15, quality: 'common' },
-  { name: "黑玉断续膏", type: 'consumable', desc: "回血 +500", price: 200, minLevel: 40, quality: 'rare' },
-  { name: "九花玉露丸", type: 'consumable', desc: "回血 +300", price: 300, minLevel: 35, quality: 'rare' },
-  { name: "玄铁重剑(仿)", type: 'weapon', desc: "攻击 +80", price: 1000, minLevel: 40, quality: 'epic' },
-  { name: "武功秘籍残卷", type: 'book', desc: "记载着一招半式", price: 500, minLevel: 30, quality: 'rare' },
-  { name: "大还丹", type: 'consumable', desc: "起死回生", price: 1000, minLevel: 60, quality: 'epic' },
-  { name: "倚天剑", type: 'weapon', desc: "武林至尊", price: 5000, minLevel: 60, quality: 'legendary' },
-  { name: "屠龙刀", type: 'weapon', desc: "号令天下", price: 5500, minLevel: 65, quality: 'legendary' },
-  { name: "软猬甲", type: 'body', desc: "刀枪不入", price: 4000, minLevel: 55, quality: 'legendary' },
+  // --- 消耗品 ---
+  { name: "半个冷馒头", type: 'consumable', desc: "干硬难咽，聊胜于无。", price: 1, minLevel: 1, quality: 'common', effect: 10 }, // +HP
+  { name: "女儿红", type: 'consumable', desc: "陈年好酒，回血并增加豪气。", price: 20, minLevel: 10, quality: 'common', effect: 50 },
+  { name: "金疮药", type: 'consumable', desc: "江湖常备跌打药。", price: 50, minLevel: 15, quality: 'common', effect: 100 },
+  { name: "大力丸", type: 'consumable', desc: "街头卖艺人的秘方，据说能补气。", price: 30, minLevel: 5, quality: 'common', effect: 20 }, // 补精力
+  { name: "九花玉露丸", type: 'consumable', desc: "桃花岛秘药，清香袭人。", price: 300, minLevel: 30, quality: 'rare', effect: 300 },
+  { name: "黑玉断续膏", type: 'consumable', desc: "西域灵药，可续断骨。", price: 500, minLevel: 40, quality: 'rare', effect: 500 },
+  { name: "天山雪莲", type: 'consumable', desc: "生于绝壁，不仅回血还能精进修为。", price: 1000, minLevel: 50, quality: 'epic', effect: 1000 },
+  { name: "大还丹", type: 'consumable', desc: "少林圣药，起死回生，增加一甲子功力。", price: 2000, minLevel: 60, quality: 'epic', effect: 2000 },
+
+  // --- 武功秘籍 (Effect = 对应 Skill Name) ---
+  { name: "《长拳图解》", type: 'book', desc: "太祖长拳的入门图谱。", price: 50, minLevel: 1, quality: 'common', effect: "太祖长拳" },
+  { name: "《吐纳心法》", type: 'book', desc: "道家基础呼吸法门。", price: 100, minLevel: 5, quality: 'common', effect: "吐纳法" },
+  { name: "《草上飞秘籍》", type: 'book', desc: "轻功入门，身轻如燕。", price: 200, minLevel: 10, quality: 'common', effect: "草上飞" },
+  { name: "《打狗棒法残卷》", type: 'book', desc: "丐帮绝学，虽然残缺但精妙无比。", price: 800, minLevel: 20, quality: 'rare', effect: "打狗棒法" },
+  { name: "《落英神剑掌谱》", type: 'book', desc: "姿态优美，虚实难测。", price: 1000, minLevel: 25, quality: 'rare', effect: "落英神剑掌" },
+  { name: "《易筋经》", type: 'book', desc: "少林至宝，改易筋骨。", price: 5000, minLevel: 50, quality: 'legendary', effect: "易筋经" },
+  { name: "《独孤九剑总决》", type: 'book', desc: "破尽天下武功。", price: 6000, minLevel: 60, quality: 'legendary', effect: "独孤九剑" },
+  { name: "《凌波微步图》", type: 'book', desc: "依卦象而行，令敌人无可奈何。", price: 4000, minLevel: 45, quality: 'epic', effect: "凌波微步" },
+
+  // --- 武器 ---
+  { name: "生锈的铁剑", type: 'weapon', desc: "勉强能砍东西。", price: 10, minLevel: 1, quality: 'common' },
+  { name: "哨棒", type: 'weapon', desc: "结实的木棒。", price: 5, minLevel: 1, quality: 'common' },
+  { name: "精钢剑", type: 'weapon', desc: "百炼精钢打造。", price: 150, minLevel: 10, quality: 'common' },
+  { name: "百炼钢刀", type: 'weapon', desc: "刀背厚实，利于劈砍。", price: 180, minLevel: 12, quality: 'rare' },
+  { name: "判官笔", type: 'weapon', desc: "精铁所制，专点穴道。", price: 300, minLevel: 20, quality: 'rare' },
+  { name: "玄铁重剑(仿)", type: 'weapon', desc: "重剑无锋，大巧不工。", price: 1000, minLevel: 40, quality: 'epic' },
+  { name: "倚天剑", type: 'weapon', desc: "安得倚天抽宝剑，跨海斩长鲸。", price: 5000, minLevel: 60, quality: 'legendary' },
+  { name: "屠龙刀", type: 'weapon', desc: "武林至尊，宝刀屠龙。", price: 5500, minLevel: 65, quality: 'legendary' },
+  { name: "打狗棒", type: 'weapon', desc: "通体碧绿，坚韧无比。", price: 4500, minLevel: 55, quality: 'epic' },
+
+  // --- 防具 ---
+  { name: "粗布头巾", type: 'head', desc: "遮风挡雨。", price: 5, minLevel: 1, quality: 'common' },
+  { name: "麻布衣", type: 'body', desc: "寻常百姓的衣物。", price: 10, minLevel: 1, quality: 'common' },
+  { name: "草鞋", type: 'feet', desc: "走久了脚会磨泡。", price: 2, minLevel: 1, quality: 'common' },
+  { name: "皮甲", type: 'body', desc: "硬皮硝制，有一定防御力。", price: 80, minLevel: 10, quality: 'common' },
+  { name: "虎皮裙", type: 'legs', desc: "看起来很威风。", price: 150, minLevel: 15, quality: 'rare' },
+  { name: "神行太保靴", type: 'feet', desc: "穿上后健步如飞。", price: 300, minLevel: 20, quality: 'rare' },
+  { name: "金丝软甲", type: 'body', desc: "刀枪不入，轻便贴身。", price: 4000, minLevel: 55, quality: 'legendary' },
+  { name: "软猬甲", type: 'body', desc: "桃花岛至宝，满布倒刺。", price: 4200, minLevel: 58, quality: 'legendary' },
+
+  // --- 饰品 ---
+  { name: "平安符", type: 'accessory', desc: "庙里求来的，保平安。", price: 20, minLevel: 1, quality: 'common' },
+  { name: "精铁护腕", type: 'accessory', desc: "保护手腕，增加臂力。", price: 100, minLevel: 10, quality: 'rare' },
+  { name: "温玉佩", type: 'accessory', desc: "冬暖夏凉，凝神静气。", price: 500, minLevel: 30, quality: 'epic' },
+  { name: "通灵宝玉", type: 'accessory', desc: "似乎蕴含着某种灵性。", price: 2000, minLevel: 50, quality: 'legendary' },
 ];
 
 export const STATIC_LOGS = {
