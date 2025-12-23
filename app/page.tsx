@@ -1,10 +1,10 @@
 'use client';
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState, memo } from 'react';
-import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery } from 'lucide-react';
+import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery, Crown } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank, SkillType, HeroState } from '@/app/lib/constants';
 
-// --- 全局辅助函数 (必须在组件外部定义) ---
+// --- 全局辅助函数 ---
 
 const getQualityColor = (q: Quality) => {
   switch (q) {
@@ -347,8 +347,13 @@ const TavernView = memo(({ hero, hireCompanion, acceptQuest }: { hero: HeroState
                  <div key={quest.id} className="bg-white border border-stone-200 p-3 rounded-lg shadow-sm relative overflow-hidden group">
                     <div className="flex justify-between items-start mb-1">
                        <div className="flex items-center gap-2">
-                          <span className="text-stone-600 text-sm">{quest.category === 'combat' ? <Sword size={14}/> : <Beer size={14}/>}</span>
-                          <span className="font-bold text-stone-700 text-sm">{quest.name}</span>
+                          <span className="text-stone-600 text-sm">
+                            {/* ⚠️ 修复：适配 main / side 分类 */}
+                            {quest.category === 'main' ? <Crown size={14} className="text-amber-600"/> : <Scroll size={14}/>}
+                          </span>
+                          <span className={`text-sm ${quest.category === 'main' ? 'font-bold text-amber-800' : 'text-stone-700'}`}>
+                            {quest.name}
+                          </span>
                        </div>
                        <div className="flex gap-0.5 text-stone-300">{[...Array(quest.rank)].map((_, i) => <Star key={i} size={8} fill="currentColor"/>)}</div>
                     </div>
