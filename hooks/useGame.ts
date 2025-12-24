@@ -44,6 +44,10 @@ const generateQuestBoard = (hero: HeroState): Quest[] => {
   for (let i = 0; i < 4; i++) {
       const template = sidePool[Math.floor(Math.random() * sidePool.length)];
       const rank = Math.ceil(Math.random() * 3) as QuestRank;
+      
+      // ⚠️ 增强：生成更具体的描述
+      const detailedDesc = `当前急需${template.desc}，必须前往${location}执行【${template.title}】。这可能会有些危险，但为了资源是值得的。`;
+
       quests.push({
           id: `side_${Date.now()}_${i}`,
           name: template.title,
@@ -52,13 +56,14 @@ const generateQuestBoard = (hero: HeroState): Quest[] => {
           faction: 'nature',
           script: { 
               title: template.title, 
-              description: template.desc, 
+              // ⚠️ 传递给 AI 的详细描述
+              description: detailedDesc, 
               objective: template.title, 
               antagonist: template.antagonist, 
               twist: "无", 
               npc: "无" 
           },
-          desc: template.desc,
+          desc: detailedDesc, // 界面显示
           stage: 'start',
           progress: 0,
           total: rank * 60, 
@@ -212,109 +217,6 @@ export function useGame() {
 
   const addMessage = (type: 'rumor' | 'system', title: string, content: string) => { setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; }); };
   
-  // ⚠️ 核心函数：AI 触发器
-  const triggerAI = async (eventType: string, suffix: string = "", action?: string, explicitHero?: HeroState, forceSeed?: string) => {
-    if (Date.now() < aiCooldownRef.current) return false;
-    if (isRequestingRef.current) return false;
-
-    const currentHero = explicitHero || hero;
-    if (!currentHero) return false;
-    
-    isRequestingRef.current = true;
-
-    const companionInfo = currentHero.companion ? `伙伴:${currentHero.companion.title}` : "独自";
-    const mainSagaInfo = currentHero.mainStoryIndex < MAIN_SAGA.length ? MAIN_SAGA[currentHero.mainStoryIndex].title : "完结";
-    
-    let questTitle = "无";
-    let taskObjective = "生存"; 
-    let questCategory = "none";
-
-    if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
-        questTitle = currentHero.activeExpedition.name;
-        taskObjective = `在${currentHero.activeExpedition.name}探索未知`;
-        questCategory = "expedition";
-    } else if (currentHero.currentQuest) {
-        questTitle = currentHero.currentQuest.name;
-        taskObjective = currentHero.currentQuest.script.objective || currentHero.currentQuest.name; 
-        questCategory = currentHero.currentQuest.category;
-    }
-
-    let seedEvent = forceSeed || currentHero.currentSeed || "";
-    if (!seedEvent && (eventType === 'quest_journey' || eventType === 'idle_event')) {
-        seedEvent = pickEventSeed(currentHero.location, taskObjective);
-    }
-
-    const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
-    const recentLogs = recentLogsRef.current || [];
-    const strategy = currentHero.strategy || { longTermGoal: "生存", currentFocus: "活着", urgency: "medium" };
-
-    try {
-      const context = { 
-        ...currentHero, 
-        storyStage: getStoryStage(currentHero.level), 
-        worldLore: WORLD_LORE, 
-        mainSaga: mainSagaInfo,
-        questTitle,
-        taskObjective,
-        questCategory,
-        seedEvent, 
-        questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
-        questStage: currentHero.currentQuest?.stage,
-        companionInfo: companionInfo, 
-        recentLogs: recentLogs, 
-        tags: currentHero.tags || [],
-        equipment: currentHero.equipment,
-        isDanger: isDanger,
-        strategy: strategy 
-      };
-      
-      const res = await fetch('/api/ai', { method: 'POST', body: JSON.stringify({ context, eventType, userAction: action }) });
-      
-      if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`API Error: ${res.status} - ${errorText.substring(0, 50)}`);
-      }
-      
-      const data = await res.json();
-      if (data.text) {
-        if (eventType.includes('generate_')) {
-            if (eventType === 'generate_rumor') addMessage('rumor', '信号', data.text);
-            else if (eventType === 'generate_description') setHero(h => h ? {...h, description: data.text} : null);
-            else if (eventType === 'generate_equip_desc') setHero(h => h ? {...h, equipmentDescription: data.text} : null);
-        } else {
-           const fullText = suffix ? `${data.text} ${suffix}` : data.text;
-           addLog(fullText, 'highlight');
-        }
-      }
-    } catch (e: any) { 
-        console.error("AI Generation Failed:", e); 
-        if (e.message.includes('429')) {
-            aiCooldownRef.current = Date.now() + 30000;
-            addLog("(思维过载，暂时休息...)", "system");
-        } else {
-            addLog(`(信号中断: ${e.message})`, "bad");
-        }
-    } finally {
-        isRequestingRef.current = false;
-    }
-    return true;
-  };
-
-  // ⚠️ 修复：补回 godAction
-  const godAction = async (type: 'bless' | 'punish') => {
-    if (!hero) return;
-    if (hero.godPower < 25) { addMessage('system', '意志', "精神力不足。"); return; }
-    if (type === 'bless') { 
-      setHero(h => h ? {...h, hp: h.maxHp, godPower: h.godPower - 25} : null); 
-      addMessage('system', '幸运', "发现了一些草药。");
-      triggerAI('god_action', ''); 
-    } else { 
-      setHero(h => h ? {...h, hp: Math.max(1, h.hp - 20), exp: h.exp + 50, godPower: h.godPower - 25} : null); 
-      addMessage('system', '磨难', "虽然受伤了，但你学到了教训。");
-      triggerAI('god_action', ''); 
-    }
-  };
-
   const acceptQuest = (questId: string) => { 
     if(!heroRef.current) return; 
     const hero=heroRef.current; 
@@ -413,6 +315,108 @@ export function useGame() {
     return { hero: updated ? hero : currentHero, logs, tagsChanged };
   };
 
+  const triggerAI = async (eventType: string, suffix: string = "", action?: string, explicitHero?: HeroState, forceSeed?: string) => {
+    if (Date.now() < aiCooldownRef.current) return false;
+    if (isRequestingRef.current) return false;
+
+    const currentHero = explicitHero || hero;
+    if (!currentHero) return false;
+    
+    isRequestingRef.current = true;
+
+    const companionInfo = currentHero.companion ? `伙伴:${currentHero.companion.title}` : "独自";
+    const mainSagaInfo = currentHero.mainStoryIndex < MAIN_SAGA.length ? MAIN_SAGA[currentHero.mainStoryIndex].title : "完结";
+    
+    let questTitle = "无";
+    let taskObjective = "生存"; 
+    let questCategory = "none";
+
+    if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
+        questTitle = currentHero.activeExpedition.name;
+        taskObjective = `在${currentHero.activeExpedition.name}探索未知`;
+        questCategory = "expedition";
+    } else if (currentHero.currentQuest) {
+        questTitle = currentHero.currentQuest.name;
+        taskObjective = currentHero.currentQuest.script.objective || currentHero.currentQuest.name; 
+        questCategory = currentHero.currentQuest.category;
+    }
+
+    let seedEvent = forceSeed || currentHero.currentSeed || "";
+    if (!seedEvent && (eventType === 'quest_journey' || eventType === 'idle_event')) {
+        seedEvent = pickEventSeed(currentHero.location, taskObjective);
+    }
+
+    const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
+    const recentLogs = recentLogsRef.current || [];
+    const strategy = currentHero.strategy || { longTermGoal: "生存", currentFocus: "活着", urgency: "medium" };
+
+    try {
+      const context = { 
+        ...currentHero, 
+        storyStage: getStoryStage(currentHero.level), 
+        worldLore: WORLD_LORE, 
+        mainSaga: mainSagaInfo,
+        questTitle,
+        taskObjective,
+        questCategory,
+        seedEvent, 
+        // ⚠️ 关键：将完整的任务对象传递给后端，以便读取 description
+        questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
+        questStage: currentHero.currentQuest?.stage,
+        companionInfo: companionInfo, 
+        recentLogs: recentLogs, 
+        tags: currentHero.tags || [],
+        equipment: currentHero.equipment,
+        isDanger: isDanger,
+        strategy: strategy 
+      };
+      
+      const res = await fetch('/api/ai', { method: 'POST', body: JSON.stringify({ context, eventType, userAction: action }) });
+      
+      if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`API Error: ${res.status} - ${errorText.substring(0, 50)}`);
+      }
+      
+      const data = await res.json();
+      if (data.text) {
+        if (eventType.includes('generate_')) {
+            if (eventType === 'generate_rumor') addMessage('rumor', '信号', data.text);
+            else if (eventType === 'generate_description') setHero(h => h ? {...h, description: data.text} : null);
+            else if (eventType === 'generate_equip_desc') setHero(h => h ? {...h, equipmentDescription: data.text} : null);
+        } else {
+           const fullText = suffix ? `${data.text} ${suffix}` : data.text;
+           addLog(fullText, 'highlight');
+        }
+      }
+    } catch (e: any) { 
+        console.error("AI Generation Failed:", e); 
+        if (e.message.includes('429')) {
+            aiCooldownRef.current = Date.now() + 30000;
+            addLog("(思维过载，暂时休息...)", "system");
+        } else {
+            addLog(`(信号中断: ${e.message})`, "bad");
+        }
+    } finally {
+        isRequestingRef.current = false;
+    }
+    return true;
+  };
+
+  const godAction = async (type: 'bless' | 'punish') => {
+    if (!hero) return;
+    if (hero.godPower < 25) { addMessage('system', '意志', "精神力不足。"); return; }
+    if (type === 'bless') { 
+      setHero(h => h ? {...h, hp: h.maxHp, godPower: h.godPower - 25} : null); 
+      addMessage('system', '幸运', "发现了一些草药。");
+      triggerAI('god_action', ''); 
+    } else { 
+      setHero(h => h ? {...h, hp: Math.max(1, h.hp - 20), exp: h.exp + 50, godPower: h.godPower - 25} : null); 
+      addMessage('system', '磨难', "虽然受伤了，但你学到了教训。");
+      triggerAI('god_action', ''); 
+    }
+  };
+
   const autoDirector = (currentHero: HeroState) => {
       const isHurt = currentHero.hp < currentHero.maxHp * 0.4;
       const isHungry = currentHero.stamina < 30;
@@ -442,12 +446,14 @@ export function useGame() {
           faction: 'nature',
           script: { 
               title: chosenTaskTitle, 
-              description: `为了${newStrategy.currentFocus}，我必须${chosenTaskTitle}。`, 
-              objective: `${chosenTaskTitle}以${newStrategy.currentFocus}`, 
+              // ⚠️ 核心修正：自动生成的描述更像一个真正的任务指引
+              description: `当前的首要策略是【${newStrategy.currentFocus}】。为了实现这一点，必须前往${currentHero.location}，执行【${chosenTaskTitle}】行动。`,
+              objective: chosenTaskTitle, 
               antagonist: "自然环境", 
               twist: seedEvent 
           },
-          desc: `为了${newStrategy.longTermGoal}而努力。`,
+          // 界面显示
+          desc: `为了${newStrategy.currentFocus}，前往${currentHero.location}${chosenTaskTitle}。`,
           stage: 'start',
           progress: 0,
           total: 30, 
