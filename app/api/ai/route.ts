@@ -15,7 +15,6 @@ export async function POST(req: Request) {
     const isSideTask = context.questCategory === 'side' || context.questCategory === 'auto';
     const taskTarget = context.taskObjective || "生存"; 
     
-    // ⚠️ 获取策略上下文
     const strategy = context.strategy || { longTermGoal: "活着", currentFocus: "生存" };
     const seedEvent = context.seedEvent || "";
     const recentLogs = context.recentLogs || [];
@@ -23,25 +22,26 @@ export async function POST(req: Request) {
 
     let styleInstruction = "";
     if (isDanger) {
-        styleInstruction = "【生死时刻】：极度紧迫。肾上腺素飙升。";
+        styleInstruction = "【生死时刻】：极度紧迫。肾上腺素飙升。短促有力。";
     } else if (isSideTask) {
-        // ⚠️ 核心：将短期动作与长期目标联系起来
         styleInstruction = `【以小见大】：描写具体的物理动作【${taskTarget}】。同时，在潜台词中透露出这个动作是为了实现长期目标【${strategy.longTermGoal}】。`;
     } else {
         styleInstruction = "【生存日记】：充满画面感和文学性的微型小说片段。";
     }
 
+    // ⚠️ 核心升级：弹性字数限制
     const baseInstruction = `
       你是一个硬核荒野求生游戏的叙事引擎。
       语言：简体中文。
       风格：${styleInstruction}
-      字数：60-90字 (保持细节丰富，不要太短)。
+      字数：30-90字 (弹性区间)。
       
       【核心规则】：
       1. **拒绝重复**：绝对不要写以下内容：[${recentLogsText}]。
-      2. **拒绝废话**：每一句话都要有实质内容（动作、环境反馈、身体感受）。
-      3. **逻辑连贯**：主角当前专注于【${strategy.currentFocus}】。
-      4. **种子扩写**：如果有事件种子，请基于它进行文学润色。
+      2. **拒绝废话**：每一句话都要有实质内容。
+      3. **长短结合**：如果是重要发现，可以写长一点（80字左右）；如果是日常琐事，简洁有力即可（30-50字）。不要每次都写小作文。
+      4. **逻辑连贯**：主角当前专注于【${strategy.currentFocus}】。
+      5. **种子扩写**：如果有事件种子，请基于它进行文学润色。
       
       背景：
       - 地点：${context.location}。
@@ -60,14 +60,13 @@ export async function POST(req: Request) {
       case 'quest_start':
         prompt = `${baseInstruction} 
         事件：开始任务【${context.questTitle}】。
-        指令：写一句准备动作。比如检查工具。
-        潜台词：做这件事是为了${strategy.currentFocus}。`;
+        指令：写一句准备动作。比如检查工具。`;
         break;
 
       case 'quest_journey':
         prompt = `${baseInstruction} 
         当前动作：【${taskTarget}】。
-        事件种子："${seedEvent}" (如果没有则忽略)。
+        事件种子："${seedEvent}"。
         指令：详细描写这个动作的过程。强调物理反馈（重量、质感、疼痛）。
         示例：如果是"收集木材"，写"拖着湿重的浮木在沙滩上留下深深的痕迹，肩膀被磨得生疼，但为了${strategy.longTermGoal}，我不能停下。"`;
         break;
