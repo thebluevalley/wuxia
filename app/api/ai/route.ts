@@ -23,93 +23,116 @@ export async function POST(req: Request) {
     });
 
     // --------------------------------------------------------
-    // 🆕 模式 A：剧情批量预生成 (Batch Generation)
+    // 🆕 模式 A：剧情批量预生成 (Batch Generation - 畅销书模式)
     // --------------------------------------------------------
     if (eventType === 'generate_script_batch') {
         const questDesc = context.questScript?.description || "";
         const location = context.location || "荒野";
         
+        // ⚠️ 核心升级：文学化 Prompt
         const batchPrompt = `
-          你是一个硬核生存小说家。
-          请基于以下剧情梗概，**扩写成一段完整的第一人称生存日记**。
+          你是一位获得普利策奖的硬核生存小说家（风格类似《路》或《火星救援》）。
+          请基于下方的【剧情核心】，创作一段极具沉浸感、文学性极高的第一人称叙事文本。
           
-          【剧情梗概】：
+          【剧情核心】：
           "${questDesc}"
           
-          【要求】：
-          1. **拆分输出**：请将这段剧情拆分为 **5 到 8 个** 独立的自然段。
-          2. **格式强制**：**必须**只返回一个 JSON 字符串数组，格式为：["段落1内容...", "段落2内容...", "段落3内容..."]。不要包含 markdown 代码块标记，不要包含任何其他文字。
-          3. **内容风格**：
-             - 第一人称"我"。
-             - 沉浸感强，包含环境描写（声、光、味）和具体的动作细节。
-             - 每一段字数控制在 60-120 字之间。
-             - 逻辑连贯，像在讲故事。
+          【极高标准的写作要求】：
+          1. **拒绝流水账**：
+             - **严禁**连续使用以"我"开头的句子。
+             - **严禁**简单的"动作+结果"句式（如"我打开了门，看见了..."）。
+             - 请使用倒装句、侧面描写、环境隐喻来替代平铺直叙。
+          
+          2. **多维叙事（必须包含以下元素）**：
+             - **感官特写**：不要只写看见了什么。写出指尖划过粗糙铁锈的触感、吸入肺部那股灼烧的灰尘味、耳边死一般的寂静。
+             - **心理潜流**：不要直接写"我很害怕"。写下意识的生理反应（比如"胃里一阵痉挛"）或瞬间闪过的无关记忆。
+             - **环境交互**：环境不是背景板，它是对手。写出环境对他人的压迫感。
+          
+          3. **长短错落的节奏**：
+             - 输出必须是一个 **JSON 字符串数组**。
+             - 包含 **5 到 8 个** 自然段。
+             - **字数强制波动**：必须混合 **极短句 (20-40字)** 和 **长描写 (80-120字)**。不要让每段话看起来一样长！
+          
+          【范例对比】：
+          ❌ 差：我拿起石头砸开了椰子。椰汁流了出来，我喝了一口，很好喝。
+          ✅ 好：双手止不住地颤抖，那块锋利的黑曜石在掌心划出了血痕。随着一声闷响，坚硬的椰壳终于裂开了一道缝隙。清甜的汁液顺着指缝流淌，那一刻，我仿佛尝到了生命本身的味道。
           
           背景：${location}
+          现在，请开始你的创作，只返回 JSON 数组。
         `;
 
         const completion = await openai.chat.completions.create({
             messages: [{ role: "user", content: batchPrompt }],
             model: PROVIDER_CONFIG.model,
-            temperature: 0.7, // 稍微降低随机性，保证 JSON 格式稳定
-            max_tokens: 1024, // 允许长文本生成
+            temperature: 0.8, // 保持较高的创造力
+            max_tokens: 2000, 
         });
 
         let content = completion.choices[0]?.message?.content || "[]";
-        // 清理可能存在的 markdown 标记
         content = content.replace(/```json/g, '').replace(/```/g, '').trim();
         
-        // 尝试解析 JSON
         try {
             const storyArray = JSON.parse(content);
             if (Array.isArray(storyArray)) {
                 return NextResponse.json({ storyBatch: storyArray });
             }
         } catch (e) {
-            console.error("JSON Parse Error:", e, content);
-            // 兜底：如果 JSON 解析失败，按换行符强行分割
-            const fallbackArray = content.split('\n').filter(line => line.length > 20);
+            console.error("JSON Parse Error:", e);
+            const fallbackArray = content.split('\n').map(s => s.trim()).filter(line => line.length > 10);
             return NextResponse.json({ storyBatch: fallbackArray });
         }
     }
 
     // --------------------------------------------------------
-    // 🔄 模式 B：传统的单条生成 (用于随机事件/Idle)
+    // 🔄 模式 B：单条随机事件 (保持原有的随机性，但提升文笔)
     // --------------------------------------------------------
-    // ... (保留原有的单条生成逻辑，用于处理非主线的随机事件) ...
-    
     const isDanger = context.isDanger;
     const taskTarget = context.taskObjective || "生存"; 
     const recentLogs = context.recentLogs || [];
     const recentLogsText = recentLogs.join(" | ");
     const location = context.location || "荒野";
-    
+    const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
+
+    const rand = Math.random();
+    let lengthInstruction = "";
+    if (rand < 0.4) lengthInstruction = "字数：20-40字。极简、有力。";
+    else if (rand < 0.7) lengthInstruction = "字数：40-70字。";
+    else lengthInstruction = "字数：70-100字。细腻描写。";
+
+    if (isDanger) lengthInstruction = "字数：20-30字。短促，窒息感。";
+
     const baseInstruction = `
-      你是一个硬核荒野求生游戏的叙事引擎。
-      请用第一人称"我"的视角，生成一段 30-80 字的生存记录。
-      只描写动作和环境，不要写心理活动。
+      你是一个硬核生存小说家。用第一人称"我"写一段话。
+      
+      【要求】：
+      1. ${lengthInstruction}
+      2. **拒绝平庸**：不要写"我正在做..."。用侧面描写。比如用"汗水滴进眼睛的刺痛"来表现"累"。
+      3. **场景+行动**：必须将【${taskTarget}】这个动作融入到【${envFlavor}】的环境描写中。
+      4. 避开：[${recentLogsText}]。
       
       背景：${location}
-      任务：${taskTarget}
-      
-      拒绝重复：[${recentLogsText}]
     `;
 
     const completion = await openai.chat.completions.create({
       messages: [{ role: "user", content: baseInstruction }],
       model: PROVIDER_CONFIG.model,
       temperature: 0.9, 
-      max_tokens: 150, 
+      max_tokens: 200, 
     });
 
     let text = completion.choices[0]?.message?.content || "";
     text = text.replace(/^(Task:|Context:|Response:|Here is|Scene:|Day 1|日记|【.*?】).*/gi, '').trim();
     text = text.replace(/^["']|["']$/g, ''); 
+    text = text.replace(/\*\*/g, ''); 
 
     return NextResponse.json({ text });
 
   } catch (error: any) {
     console.error("AI API Error:", error);
-    return NextResponse.json({ text: null, error: error.message }, { status: 500 });
+    let msg = error.message;
+    if (error.status === 401) msg = "API Key 无效。";
+    if (error.status === 403) msg = "权限不足 (403)。";
+    if (error.status === 429) msg = "请求过快。";
+    return NextResponse.json({ text: null, error: msg }, { status: 500 });
   }
 }
