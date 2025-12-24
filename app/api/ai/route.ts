@@ -4,45 +4,44 @@ import { FLAVOR_TEXTS, WORLD_ARCHIVE } from "@/app/lib/constants";
 
 export async function POST(req: Request) {
   const apiKey = process.env.GROQ_API_KEY;
-  
-  // ⚠️ 明确返回 500 错误，前端将捕获并显示
-  if (!apiKey) {
-      return NextResponse.json({ text: null, error: "Missing GROQ_API_KEY" }, { status: 500 });
-  }
+  if (!apiKey) return NextResponse.json({ text: null, error: "Missing Key" }, { status: 500 });
 
   try {
     const { context, eventType, userAction } = await req.json();
     const groq = new Groq({ apiKey });
 
-    // ... (Prompt 保持上一版的文学风格，无需改动) ...
     const isDanger = context.isDanger;
     const isMainQuest = context.questCategory === 'main';
     const isSideTask = context.questCategory === 'side' || context.questCategory === 'auto';
     const taskTarget = context.taskObjective || "生存"; 
+    
+    // ⚠️ 获取策略上下文
+    const strategy = context.strategy || { longTermGoal: "活着", currentFocus: "生存" };
     const seedEvent = context.seedEvent || "";
     const recentLogs = context.recentLogs || [];
     const recentLogsText = recentLogs.join(" | ");
 
     let styleInstruction = "";
     if (isDanger) {
-        styleInstruction = "【生死时刻】：极度紧迫。描写肾上腺素、疼痛、本能反应。";
+        styleInstruction = "【生死时刻】：极度紧迫。肾上腺素飙升。";
     } else if (isSideTask) {
-        styleInstruction = "【沉浸式动作】：基于物理现实的描写。强调物品的质感（粗糙、湿滑）、重量、以及身体的反馈（肌肉酸痛、手掌磨破）。";
+        // ⚠️ 核心：将短期动作与长期目标联系起来
+        styleInstruction = `【以小见大】：描写具体的物理动作【${taskTarget}】。同时，在潜台词中透露出这个动作是为了实现长期目标【${strategy.longTermGoal}】。`;
     } else {
-        styleInstruction = "【生存快照】：充满画面感的微型小说片段。";
+        styleInstruction = "【生存日记】：充满画面感和文学性的微型小说片段。";
     }
 
     const baseInstruction = `
       你是一个硬核荒野求生游戏的叙事引擎。
       语言：简体中文。
       风格：${styleInstruction}
-      字数：60-90字 (不要太短，要有细节)。
+      字数：60-90字 (保持细节丰富，不要太短)。
       
       【核心规则】：
-      1. **拒绝废话**：不要写"我正在努力"、"这很难"、"希望能活下去"这种虚词。
-      2. **拒绝重复**：绝对不要写以下内容或类似的句式：[${recentLogsText}]。
-      3. **信息增量**：每一句话都要提供新的环境细节或动作反馈。
-      4. **种子扩写**：必须基于给定的【事件种子】进行润色和扩写，使其更具文学性。
+      1. **拒绝重复**：绝对不要写以下内容：[${recentLogsText}]。
+      2. **拒绝废话**：每一句话都要有实质内容（动作、环境反馈、身体感受）。
+      3. **逻辑连贯**：主角当前专注于【${strategy.currentFocus}】。
+      4. **种子扩写**：如果有事件种子，请基于它进行文学润色。
       
       背景：
       - 地点：${context.location}。
@@ -53,74 +52,58 @@ export async function POST(req: Request) {
     switch (eventType) {
       case 'start_game':
         prompt = `任务：写第一篇日记。
-        内容：我醒了。感官细节（沙子的粗糙、海水的咸腥、身体的剧痛）。迷茫与恐惧。
+        内容：我醒了。感官细节（沙子的粗糙、海水的咸腥、身体的剧痛）。
+        目标：${strategy.longTermGoal}。
         要求：100字左右，极具代入感。`;
         break;
       
       case 'quest_start':
         prompt = `${baseInstruction} 
         事件：开始任务【${context.questTitle}】。
-        指令：写一段出发前的准备。检查装备的细节，或者观察目标地点的险恶。`;
+        指令：写一句准备动作。比如检查工具。
+        潜台词：做这件事是为了${strategy.currentFocus}。`;
         break;
 
       case 'quest_journey':
         prompt = `${baseInstruction} 
-        当前任务：【${taskTarget}】。
-        事件种子："${seedEvent}"。
-        指令：**扩写这个种子**。加入感官描写（触觉、听觉、嗅觉）。
-        例如：如果种子是"被刺扎了"，扩写为"一根带倒钩的荆棘刺穿了掌心，鲜血瞬间渗了出来，钻心的疼让我倒吸一口凉气。"`;
+        当前动作：【${taskTarget}】。
+        事件种子："${seedEvent}" (如果没有则忽略)。
+        指令：详细描写这个动作的过程。强调物理反馈（重量、质感、疼痛）。
+        示例：如果是"收集木材"，写"拖着湿重的浮木在沙滩上留下深深的痕迹，肩膀被磨得生疼，但为了${strategy.longTermGoal}，我不能停下。"`;
         break;
 
       case 'quest_climax':
         prompt = `${baseInstruction} 
-        事件：任务遭遇突发危机！
-        指令：具体的危险描写！不仅仅是"遇到危险"，而是"岩石崩塌"、"毒蛇攻击"的具体画面。`;
+        事件：任务遭遇小意外！
+        指令：极短的危机描写！例如工具断裂、毒虫叮咬。`;
         break;
 
       case 'quest_end':
         prompt = `${baseInstruction} 
         事件：任务【${context.questTitle}】完成。
-        指令：描写成果的物质细节。比如物资的重量、手上的伤痕、或者完成后的虚脱感。`;
+        指令：描写看着成果的瞬间。感到离【${strategy.longTermGoal}】又近了一步。`;
         break;
       
       case 'expedition_start':
-        prompt = `${baseInstruction} 整理好行囊，最后回头看了一眼营地，然后一头钻进了【${context.location}】的阴影中。`;
+        prompt = `${baseInstruction} 整理好行囊，为了寻找${strategy.longTermGoal}的线索，毅然踏入【${context.location}】。`;
         break;
       
       case 'expedition_event':
-        prompt = `${baseInstruction} 
-        事件：探险中发现了"${seedEvent}"。
-        指令：详细描写这个发现。它的外观、气味、以及给主角带来的心理压迫感。`;
+        prompt = `${baseInstruction} 探险中发现了一个惊人的东西。描写它的外观和给主角带来的震撼。`;
         break;
       
       case 'expedition_end':
-        prompt = `${baseInstruction} 探险结束。描写满身泥泞、伤痕累累但满载而归的狼狈样。`;
+        prompt = `${baseInstruction} 探险结束。虽然满身泥泞，但收获颇丰。`;
         break;
 
       case 'idle_event':
         prompt = `${baseInstruction} 
-        状态：短暂的休息。
-        事件种子："${seedEvent}"。
-        指令：扩写这个种子。描写在残酷环境下的片刻喘息。`;
+        状态：短暂休息。
+        指令：写一个放松的细节。但在内心深处，依然挂念着【${strategy.longTermGoal}】。`;
         break;
 
-      case 'recruit_companion':
-        prompt = `${baseInstruction} 遇到幸存者。描写他衣衫褴褛的细节和警惕的眼神。`;
-        break;
-      case 'god_action':
-        prompt = `${baseInstruction} 突发意外。描写运气好或坏的具体表现。`;
-        break;
-      case 'generate_rumor':
-        prompt = `写一句刻在树干或石头上的求生留言（如"别喝河水"）。15字以内，带惊悚感。`;
-        break;
-      case 'generate_description':
-        prompt = `一句话形容主角现在的狼狈模样。强调脏乱和伤痕。`;
-        break;
-      case 'generate_equip_desc':
-        prompt = `一句话形容身上的装备。强调磨损和简陋。`;
-        break;
       default:
-        prompt = `${baseInstruction} 记录这一刻的生存状态。`;
+        prompt = `${baseInstruction} 记录这一刻。`;
     }
 
     const completion = await groq.chat.completions.create({
@@ -137,7 +120,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ text });
 
   } catch (error: any) {
-    // ⚠️ 捕获所有错误并返回 500，让前端看到具体原因
     return NextResponse.json({ text: null, error: error.message }, { status: 500 });
   }
 }
