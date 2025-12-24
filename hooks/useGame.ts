@@ -109,8 +109,10 @@ export function useGame() {
   const [error, setError] = useState<string | null>(null);
   const heroRef = useRef<HeroState | null>(null);
   const recentLogsRef = useRef<string[]>([]);
-  // ⚠️ 核心修复：请求锁。防止 AI 还在思考时，下一个请求又发出去，导致堆积和掉线。
+  
+  // ⚠️ 请求锁与冷却机制
   const isRequestingRef = useRef(false);
+  const aiCooldownRef = useRef(0);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -188,9 +190,7 @@ export function useGame() {
       const newHistory = (prev.narrativeHistory + " " + text).slice(-800); 
       const newLog: LogEntry = { id: Date.now().toString(), text, type: finalType, time: timeStr };
       const newLogs = [newLog, ...prev.logs].slice(0, 50);
-      
       recentLogsRef.current = newLogs.slice(0, 5).map(l => l.text);
-      
       return { ...prev, logs: newLogs, narrativeHistory: newHistory };
     });
   };
@@ -275,20 +275,19 @@ export function useGame() {
   };
 
   const triggerAI = async (eventType: string, suffix: string = "", action?: string, explicitHero?: HeroState) => {
-    // ⚠️ 核心修复：如果上一个请求还在进行，直接放弃本次触发，防止堆积
+    if (Date.now() < aiCooldownRef.current) return false;
     if (isRequestingRef.current) return false;
 
     const currentHero = explicitHero || hero;
     if (!currentHero) return false;
     
-    // ⚠️ 加锁
     isRequestingRef.current = true;
 
     const companionInfo = currentHero.companion ? `伙伴:${currentHero.companion.title}` : "独自";
     const mainSagaInfo = currentHero.mainStoryIndex < MAIN_SAGA.length ? MAIN_SAGA[currentHero.mainStoryIndex].title : "完结";
     
     let questTitle = "无";
-    let taskObjective = "生存"; 
+    let taskObjective = "休息/放松"; 
     let questCategory = "none";
 
     if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
@@ -329,7 +328,7 @@ export function useGame() {
       
       if (!res.ok) {
           const errorText = await res.text();
-          throw new Error(`API Error: ${res.status} ${res.statusText} - ${errorText.substring(0, 50)}`);
+          throw new Error(`API Error: ${res.status} - ${errorText.substring(0, 100)}`);
       }
       
       const data = await res.json();
@@ -345,10 +344,13 @@ export function useGame() {
       }
     } catch (e: any) { 
         console.error("AI Generation Failed:", e); 
-        // ⚠️ 诊断信息：直接显示错误原因，而不是兜底文本
-        addLog(`(信号中断: ${e.message || "未知错误"})`, "bad");
+        if (e.message.includes('429')) {
+            aiCooldownRef.current = Date.now() + 30000;
+            addLog("(思维过载，暂时休息...)", "system");
+        } else {
+            addLog(`(信号中断: ${e.message})`, "bad");
+        }
     } finally {
-        // ⚠️ 解锁
         isRequestingRef.current = false;
     }
     return true;
@@ -524,13 +526,16 @@ export function useGame() {
              await triggerAI('quest_journey'); 
           } 
           
-          const nextTick = 10000 + Math.random() * 5000;
-          timerRef.current = setTimeout(gameLoop, nextTick);
-
       } catch (error) {
           console.error("GameLoop Error:", error);
       } finally {
-          if (!timerRef.current) timerRef.current = setTimeout(gameLoop, 10000);
+          const currentHero = heroRef.current;
+          const isDanger = currentHero ? (currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3) : false;
+          // ⚠️ 慢节奏：沉浸式体验 (18s - 28s)
+          const minTick = isDanger ? 12000 : 18000;
+          const maxTick = isDanger ? 18000 : 28000;
+          const nextTick = Math.floor(Math.random() * (maxTick - minTick) + minTick); 
+          timerRef.current = setTimeout(gameLoop, nextTick);
       }
     };
     
