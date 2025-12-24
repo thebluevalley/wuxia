@@ -10,27 +10,34 @@ export async function POST(req: Request) {
     const { context, eventType, userAction } = await req.json();
     const groq = new Groq({ apiKey });
 
-    const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
     const isDanger = context.isDanger;
     const isMainQuest = context.questCategory === 'main';
     const isSideTask = context.questCategory === 'side' || context.questCategory === 'auto';
     const taskTarget = context.taskObjective || "生存"; 
     
-    // ⚠️ 防重核心：获取最近日志
-    const recentLogs = context.recentLogs || [];
-    const recentLogsText = recentLogs.join(" | ");
+    // ⚠️ 核心：获取具体的事件种子 (如 "斧头卡住了")
+    const seedEvent = context.seedEvent || "";
 
-    const envFlavorText = isSideTask ? "专注手头工作，无视环境" : envFlavor;
-    
     let styleInstruction = "";
+    let actionInstruction = "";
+
     if (context.isDanger) {
         styleInstruction = "【危急】：极短句。只有动作。心跳感。";
     } else if (isSideTask) {
-        styleInstruction = `【物理动作模式】：只描写执行【${taskTarget}】的**具体微观动作**。例如手的触感、工具的声音。`;
+        styleInstruction = "【扩写模式】：基于给定的物理微事件进行扩写。";
+        // 如果有种子，强制使用种子
+        if (seedEvent) {
+            actionInstruction = `当前发生的具体事件是："${seedEvent}"。请用第一人称日记体描述这个瞬间。不要直接照抄，要改写得更有代入感。`;
+        } else {
+            actionInstruction = `描写执行【${taskTarget}】时的一个微小阻碍或发现。`;
+        }
     } else if (isMainQuest) {
-        styleInstruction = "【剧情日记】：可以包含心理活动和世界观。";
+        styleInstruction = "【剧情日记】：可以包含心理活动。";
     } else {
-        styleInstruction = "【生存快照】：记录当下的状态。";
+        styleInstruction = "【生存快照】：记录状态。";
+        if (seedEvent) {
+            actionInstruction = `休息时发生了这件事："${seedEvent}"。请改写它。`;
+        }
     }
 
     const baseInstruction = `
@@ -40,13 +47,11 @@ export async function POST(req: Request) {
       字数限制：40字以内。
       
       【绝对禁令】：
-      1. **严禁重复**：绝对不要写和以下内容相似的句子：[${recentLogsText}]。
-      2. 严禁废话：不要写"我正在努力工作"、"这很难"这种空话。
-      3. 必须写新的细节。
+      1. 严禁重复废话。
+      2. ${actionInstruction}
       
       背景：
       - 地点：${context.location}。
-      - 氛围：${envFlavorText}。
     `;
 
     let prompt = "";
@@ -61,11 +66,7 @@ export async function POST(req: Request) {
         break;
 
       case 'quest_journey':
-        prompt = `${baseInstruction} 
-        当前任务：【${taskTarget}】。
-        指令：写一个**此前没写过的**具体动作细节。
-        比如：如果任务是砍树，这次写"木屑溅到了眼睛里"或者"手掌被树皮磨破了"。
-        不要写重复的动作！`;
+        prompt = `${baseInstruction}`; // 依靠上面的 actionInstruction
         break;
 
       case 'quest_climax':
@@ -81,10 +82,7 @@ export async function POST(req: Request) {
         break;
       
       case 'expedition_event':
-        prompt = `${baseInstruction} 
-        事件：在【${context.location}】探险中。
-        指令：描写一个惊险的片段或发现。
-        `;
+        prompt = `${baseInstruction} 探险中发现了一个惊人的东西。`;
         break;
       
       case 'expedition_end':
@@ -92,10 +90,7 @@ export async function POST(req: Request) {
         break;
 
       case 'idle_event':
-        prompt = `${baseInstruction} 
-        状态：正在休息。
-        指令：写一个从未写过的放松细节。禁止写哼歌、打盹（如果最近写过）。
-        `;
+        prompt = `${baseInstruction}`; // 依靠上面的 actionInstruction
         break;
 
       case 'recruit_companion':
@@ -105,13 +100,13 @@ export async function POST(req: Request) {
         prompt = `${baseInstruction} 突发意外。运气好或坏。`;
         break;
       case 'generate_rumor':
-        prompt = `写一句求生涂鸦（如“北方有水”）。15字以内。`;
+        prompt = `写一句求生涂鸦。15字以内。`;
         break;
       case 'generate_description':
-        prompt = `一句话形容主角现在的狼狈模样。30字以内。`;
+        prompt = `一句话形容主角现在的狼狈模样。`;
         break;
       case 'generate_equip_desc':
-        prompt = `一句话形容身上的装备。20字以内。`;
+        prompt = `一句话形容身上的装备。`;
         break;
       default:
         prompt = `${baseInstruction} 记录这一刻。`;
@@ -120,7 +115,7 @@ export async function POST(req: Request) {
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 0.9, // 提高随机性以避免重复
+      temperature: 0.9, 
       max_tokens: 150, 
     });
 

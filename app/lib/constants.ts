@@ -54,13 +54,12 @@ export type Quest = {
   rewards: { gold: number; exp: number; item?: Item; };
 };
 
-// ⚠️ 新增：探险定义
 export type Expedition = {
   id: string;
   name: string;
   desc: string;
   difficulty: QuestRank;
-  duration: number; // 毫秒
+  duration: number; 
   startTime?: number;
   endTime?: number;
   location: string;
@@ -108,14 +107,12 @@ export type HeroState = {
   questBoard: Quest[];
   lastQuestRefresh: number;
 
-  // ⚠️ 新增：探险相关状态
   activeExpedition: Expedition | null;
   expeditionBoard: Expedition[];
   lastExpeditionRefresh: number;
 
   narrativeHistory: string;
   location: string; 
-  // 增加 'expedition' 状态
   state: 'idle' | 'fight' | 'sleep' | 'town' | 'dungeon' | 'arena' | 'expedition';
   logs: LogEntry[]; messages: Message[]; majorEvents: string[];
   inventory: Item[]; equipment: Equipment; martialArts: Skill[]; lifeSkills: Skill[];
@@ -132,52 +129,83 @@ export const FLAVOR_TEXTS = {
   object: ["生锈铁片", "动物骨头", "漂流瓶", "燧石", "干椰子", "塑料碎片"]
 };
 
-// ⚠️ 新增：探险地点库
+// ⚠️ 核心升级：海量预设事件种子库
+// 这里的每一条都是具体的物理事件，AI 负责把它写得好看
+export const EVENT_SEEDS: Record<string, string[]> = {
+  // 通用动作
+  "收集": [
+    "发现了一根形状完美的弯曲木头", "木头太湿了，很难搬运", "手被木刺扎了一下", "翻开木头发现下面有虫子", 
+    "这块木头上有旧时代的油漆痕迹", "把几根小树枝捆在一起", "用力拖拽一根巨大的浮木", "海浪差点卷走刚收集的木材"
+  ],
+  "寻找": [
+    "扒开茂密的蕨类植物", "在石头缝隙里仔细查看", "顺着动物的足迹追踪", "发现了一些奇怪的排泄物",
+    "阳光太刺眼，眯着眼睛观察", "用棍子探路，防止踩空", "闻到了远处飘来的异味", "似乎看到了闪光的东西"
+  ],
+  "制作": [
+    "石刀的刃口崩了一个缺口", "绳子打结时不小心勒到了手", "尝试用唾液软化藤蔓", "零件拼凑在一起发出了咔哒声",
+    "这种材料比想象中更坚硬", "刮掉表面的树皮", "用火烤一下让木头变硬", "仔细打磨边缘直到光滑"
+  ],
+  "休息": [
+    "脱下鞋子倒出里面的沙子", "用海水清洗发炎的伤口", "嚼着一根带甜味的草根", "盯着火苗发呆",
+    "在沙滩上画出了家乡的地图", "整理背包里的破烂", "数着剩下的食物储备", "按摩酸痛的小腿肌肉"
+  ],
+  
+  // 特定地点事件
+  "荒芜海滩": [
+    "一只寄居蟹夹住了脚趾", "海浪冲上来一个塑料瓶", "发现了一只死去的信天翁", "沙子里埋着半个生锈的铁罐",
+    "涨潮了，不得不往高处移动", "海风把沙子吹进了眼睛", "远处海面上似乎有背鳍划过", "捡到一块漂亮的白色珊瑚"
+  ],
+  "深邃丛林": [
+    "被带刺的藤蔓划破了脸", "一只巨大的蜘蛛落在肩膀上", "踩到了松软的腐殖土，陷了下去", "听到头顶传来猴子的叫声",
+    "空气潮湿得让人窒息", "发现了一棵长满红色果实的树", "蚊子多得像轰炸机", "被树根绊了一跤"
+  ]
+};
+
 export const EXPEDITION_LOCATIONS = [
-  { name: "被遗忘的二战掩体", desc: "岛屿深处有一个混凝土入口，里面也许有旧时代的武器。", diff: 4 },
-  { name: "食人族圣地", desc: "充满危险的图腾林，但据说有黄金。", diff: 5 },
-  { name: "迷雾沼泽", desc: "能见度极低，充满了毒蛇和珍稀药草。", diff: 3 },
-  { name: "沉船湾", desc: "一艘巨大的货轮残骸，只有退潮时能进入。", diff: 4 },
-  { name: "蝙蝠岩洞", desc: "巨大的天然洞穴，适合采集硝石。", diff: 2 },
-  { name: "神秘灯塔", desc: "岛的另一端有一座废弃的灯塔。", diff: 3 }
+  { name: "被遗忘的二战掩体", desc: "岛屿深处有一个混凝土入口。", diff: 4 },
+  { name: "食人族圣地", desc: "充满危险的图腾林。", diff: 5 },
+  { name: "迷雾沼泽", desc: "能见度极低。", diff: 3 },
+  { name: "沉船湾", desc: "巨大的货轮残骸。", diff: 4 },
+  { name: "蝙蝠岩洞", desc: "巨大的天然洞穴。", diff: 2 },
+  { name: "神秘灯塔", desc: "岛的另一端。", diff: 3 }
 ];
 
 export const AUTO_TASKS = {
   "荒芜海滩": [
-    { title: "捡拾贝壳", desc: "寻找可以当碗用的贝壳。", obj: "搜索沙滩", antagonist: "沙蟹" },
-    { title: "清理营地", desc: "把周围的烂叶子扫走。", obj: "大扫除", antagonist: "蜈蚣" },
-    { title: "观察潮汐", desc: "记录涨潮的规律。", obj: "观察", antagonist: "无聊" }
+    { title: "捡拾贝壳", desc: "寻找容器。", obj: "收集", antagonist: "沙蟹" },
+    { title: "清理营地", desc: "防止毒虫。", obj: "整理", antagonist: "蜈蚣" },
+    { title: "观察潮汐", desc: "记录规律。", obj: "观察", antagonist: "无聊" }
   ],
   "深邃丛林": [
-    { title: "采集藤蔓", desc: "需要绳子。", obj: "采集", antagonist: "带刺植物" },
-    { title: "加固陷阱", desc: "检查昨天下的套索。", obj: "检查", antagonist: "空手而归" }
+    { title: "采集藤蔓", desc: "需要绳子。", obj: "收集", antagonist: "带刺植物" },
+    { title: "加固陷阱", desc: "检查套索。", obj: "制作", antagonist: "空手而归" }
   ],
   "default": [
-    { title: "打磨工具", desc: "把石刀磨得更锋利。", obj: "打磨", antagonist: "手酸" },
-    { title: "整理物资", desc: "清点剩下的食物。", obj: "盘点", antagonist: "饥饿感" }
+    { title: "打磨工具", desc: "磨锋利。", obj: "制作", antagonist: "手酸" },
+    { title: "整理物资", desc: "盘点。", obj: "休息", antagonist: "饥饿感" }
   ]
 };
 
 export const MAIN_SAGA = [
   { title: "第一章：苏醒", npc: "无", desc: "痛。全身都痛。我被冲上了一个陌生的海滩。", obj: "检查伤势", antagonist: "剧痛", twist: "腿上有一道深深的口子。", location: "荒芜海滩", reqLevel: 1 },
-  { title: "第二章：水源", npc: "干渴", desc: "如果不尽快找到淡水，我活不过明天。", obj: "寻找水源", antagonist: "脱水", twist: "发现了一个浑浊的水坑。", location: "椰林边缘", reqLevel: 2 },
-  { title: "第三章：庇护所", npc: "暴风雨", desc: "一场热带风暴即将来临。", obj: "搭建草棚", antagonist: "狂风", twist: "风暴中，海面上似乎有灯光。", location: "海边岩洞", reqLevel: 3 },
-  { title: "第四章：第一团火", npc: "原始本能", desc: "我需要火。我要征服这个原始世界。", obj: "钻木取火", antagonist: "潮湿", twist: "烟雾升起。", location: "临时营地", reqLevel: 5 },
-  { title: "第五章：武器", npc: "恐惧", desc: "丛林深处的吼声越来越近。", obj: "制作长矛", antagonist: "坚硬木材", twist: "发现了一具插着断箭的尸骨。", location: "深邃丛林", reqLevel: 8 }
+  { title: "第二章：水源", npc: "干渴", desc: "如果不尽快找到淡水，我活不过明天。", obj: "寻找", antagonist: "脱水", twist: "发现了一个浑浊的水坑。", location: "椰林边缘", reqLevel: 2 },
+  { title: "第三章：庇护所", npc: "暴风雨", desc: "一场热带风暴即将来临。", obj: "制作", antagonist: "狂风", twist: "风暴中，海面上似乎有灯光。", location: "海边岩洞", reqLevel: 3 },
+  { title: "第四章：第一团火", npc: "原始本能", desc: "我需要火。我要征服这个原始世界。", obj: "制作", antagonist: "潮湿", twist: "烟雾升起。", location: "临时营地", reqLevel: 5 },
+  { title: "第五章：武器", npc: "恐惧", desc: "丛林深处的吼声越来越近。", obj: "制作", antagonist: "坚硬木材", twist: "发现了一具插着断箭的尸骨。", location: "深邃丛林", reqLevel: 8 }
 ];
 
 export const SIDE_QUESTS = {
   "荒芜海滩": [
-    { title: "抓捕沙蟹", desc: "跑得很快，但肉质鲜美。", obj: "狩猎", antagonist: "螃蟹" },
-    { title: "收集漂流木", desc: "优质的干燥木材。", obj: "采集", antagonist: "沉重" }
+    { title: "抓捕沙蟹", desc: "跑得很快。", obj: "寻找", antagonist: "螃蟹" },
+    { title: "收集漂流木", desc: "优质木材。", obj: "收集", antagonist: "沉重" }
   ],
   "深邃丛林": [
-    { title: "采集野果", desc: "小心的红色的果子。", obj: "采集", antagonist: "中毒" },
-    { title: "寻找草药", desc: "止血草是必备品。", obj: "采药", antagonist: "蛇" }
+    { title: "采集野果", desc: "小心有毒。", obj: "收集", antagonist: "中毒" },
+    { title: "寻找草药", desc: "止血草。", obj: "寻找", antagonist: "蛇" }
   ],
   "default": [
-    { title: "制作绳索", desc: "用树皮编织。", obj: "手工", antagonist: "枯燥" },
-    { title: "练习投掷", desc: "提高命中率。", obj: "训练", antagonist: "脱靶" }
+    { title: "制作绳索", desc: "编织。", obj: "制作", antagonist: "枯燥" },
+    { title: "练习投掷", desc: "提高命中。", obj: "制作", antagonist: "脱靶" }
   ]
 };
 
@@ -213,13 +241,11 @@ export const STORY_STAGES = [{ level: 1, name: "幸存者" }, { level: 10, name:
 
 export const STATIC_LOGS = {
   idle: [
-    "躺在沙滩上，看着云发呆。",
-    "用沙子擦掉匕首上的锈迹。",
-    "海风有些冷，裹紧了衣服。",
-    "听到远处传来雷声。",
-    "在火堆旁打了个盹。",
-    "整理了一下乱糟糟的头发。",
-    "看着一只蚂蚁搬运食物。",
-    "哼着一首旧时代的歌。"
+    "捡起一块锋利的石头。",
+    "检查了一遍陷阱。",
+    "海风有些冷。",
+    "远处传来雷声。",
+    "整理了一下头发。",
+    "观察蚂蚁搬家。"
   ]
 };

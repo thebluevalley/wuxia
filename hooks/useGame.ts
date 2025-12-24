@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QuestCategory, Quest, QuestRank, Faction, MAIN_SAGA, SIDE_QUESTS, AUTO_TASKS, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_MALE, NPC_NAMES_FEMALE, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, WORLD_MAP, PERSONALITIES, EXPEDITION_LOCATIONS, Expedition } from '@/app/lib/constants';
+import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QuestCategory, Quest, QuestRank, Faction, MAIN_SAGA, SIDE_QUESTS, AUTO_TASKS, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_MALE, NPC_NAMES_FEMALE, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, WORLD_MAP, PERSONALITIES, EXPEDITION_LOCATIONS, Expedition, EVENT_SEEDS } from '@/app/lib/constants';
 
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL 
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
@@ -9,6 +9,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
 const EXPEDITION_REFRESH_INTERVAL = 4 * 60 * 60 * 1000; 
 
+// --- 辅助函数 ---
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "幸存者";
@@ -22,6 +23,23 @@ const calculateTags = (hero: HeroState): string[] => {
   if (equipment.weapon) tags.add("武装"); else tags.add("空手");
   if (hero.state === 'expedition') tags.add("探险中");
   return Array.from(tags).slice(0, 5);
+};
+
+// ⚠️ 核心：智能种子选择器
+const pickEventSeed = (location: string, objective: string): string => {
+    // 1. 尝试匹配具体动作 (如 "收集", "寻找")
+    // objective 可能是 "收集漂流木"，我们取前两个字作为 key
+    const actionKey = objective.substring(0, 2); 
+    const actionSeeds = EVENT_SEEDS[actionKey] || [];
+    
+    // 2. 尝试匹配地点 (如 "荒芜海滩")
+    const locationSeeds = EVENT_SEEDS[location] || [];
+    
+    // 3. 混合池子
+    const pool = [...actionSeeds, ...locationSeeds];
+    
+    if (pool.length === 0) return "仔细观察周围的环境"; // 兜底
+    return pool[Math.floor(Math.random() * pool.length)];
 };
 
 const generateQuestBoard = (hero: HeroState): Quest[] => {
@@ -175,7 +193,6 @@ export function useGame() {
     const finalType: LogEntry['type'] = 'highlight'; 
     setHero(prev => {
       if (!prev) return null;
-      // ⚠️ 严格的客户端防重：如果新文本已存在于最近 5 条日志中，拒绝添加
       const recentTexts = prev.logs.slice(0, 5).map(l => l.text);
       if (recentTexts.includes(text)) {
           return prev;
@@ -186,7 +203,6 @@ export function useGame() {
       const newLog: LogEntry = { id: Date.now().toString(), text, type: finalType, time: timeStr };
       const newLogs = [newLog, ...prev.logs].slice(0, 50);
       
-      // 更新 ref 供 AI 使用
       recentLogsRef.current = newLogs.slice(0, 5).map(l => l.text);
       
       return { ...prev, logs: newLogs, narrativeHistory: newHistory };
@@ -280,22 +296,28 @@ export function useGame() {
     const mainSagaInfo = currentHero.mainStoryIndex < MAIN_SAGA.length ? MAIN_SAGA[currentHero.mainStoryIndex].title : "完结";
     
     let questTitle = "无";
-    let taskObjective = "休息/放松"; 
+    let taskObjective = "生存"; 
     let questCategory = "none";
 
     if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
         questTitle = currentHero.activeExpedition.name;
-        taskObjective = `在${currentHero.activeExpedition.name}探索未知`;
+        taskObjective = `在${currentHero.activeExpedition.name}探险`;
         questCategory = "expedition";
     } else if (currentHero.currentQuest) {
         questTitle = currentHero.currentQuest.name;
-        taskObjective = currentHero.currentQuest.name; 
+        taskObjective = currentHero.currentQuest.script.objective; // "收集", "制作"
         questCategory = currentHero.currentQuest.category;
     }
 
-    const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
+    // ⚠️ 核心：选择事件种子
+    let seedEvent = "";
+    if (eventType === 'quest_journey' || eventType === 'idle_event') {
+        // 如果是闲逛，objective 就是 "休息"
+        const seedObj = eventType === 'idle_event' ? '休息' : taskObjective;
+        seedEvent = pickEventSeed(currentHero.location, seedObj);
+    }
 
-    // ⚠️ 发送最近的日志给后端，用于防重
+    const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
     const recentLogs = recentLogsRef.current || [];
 
     try {
@@ -307,10 +329,11 @@ export function useGame() {
         questTitle,
         taskObjective,
         questCategory,
+        seedEvent, // ⚠️ 传入后端
         questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
         questStage: currentHero.currentQuest?.stage,
         companionInfo: companionInfo, 
-        recentLogs: recentLogs, // ⚠️ 关键字段
+        recentLogs: recentLogs, 
         tags: currentHero.tags || [],
         equipment: currentHero.equipment,
         isDanger: isDanger 
@@ -333,14 +356,7 @@ export function useGame() {
       }
     } catch (e) { 
         console.error(e); 
-        // ⚠️ 智能兜底 V2：确保不重复
-        const lastLog = currentHero.logs[0]?.text;
-        let fallback = "";
-        let attempts = 0;
-        do {
-            fallback = STATIC_LOGS.idle[Math.floor(Math.random() * STATIC_LOGS.idle.length)];
-            attempts++;
-        } while ((fallback === lastLog || recentLogs.includes(fallback)) && attempts < 10);
+        const fallback = STATIC_LOGS.idle[Math.floor(Math.random() * STATIC_LOGS.idle.length)];
         addLog(fallback, "highlight");
     }
     return false;
@@ -464,8 +480,7 @@ export function useGame() {
               managedHero.state = 'sleep';
               aiEvent = 'idle_event'; 
           } else if (!newQuest && !queued) {
-              // ⚠️ 关键修改：大幅降低随机发呆概率 (30% -> 5%)，强制忙碌
-              if (Math.random() < 0.05) { 
+              if (Math.random() < 0.05) { // ⚠️ 降低到 5%
                   managedHero.state = 'idle';
                   aiEvent = 'idle_event'; 
               } else {
