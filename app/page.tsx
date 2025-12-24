@@ -1,7 +1,7 @@
 'use client';
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState, memo } from 'react';
-import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery, Crown, Tent } from 'lucide-react';
+import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery, Crown, Tent, Compass } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank, SkillType, HeroState } from '@/app/lib/constants';
 
 // --- 全局辅助函数 ---
@@ -130,18 +130,18 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
       
       {/* 状态面板：探险 > 主线 > 普通 */}
       {isExpedition ? (
-         <div className="bg-gradient-to-r from-stone-800 to-stone-600 border-l-4 border-stone-900 p-3 shadow-sm rounded-r mb-3 text-white animate-in slide-in-from-top duration-500">
+         <div className="bg-gradient-to-r from-amber-100 via-[#fffdf7] to-white border-l-4 border-amber-500 p-3 shadow-sm rounded-r mb-3 text-amber-900 animate-in slide-in-from-top duration-500">
             <div className="flex justify-between items-center mb-1">
-               <span className="flex items-center gap-1.5 text-xs font-bold tracking-wide">
-                 <Tent size={14}/> 
+               <span className="flex items-center gap-1.5 text-xs font-bold tracking-wide font-serif">
+                 <Compass size={14} className="text-amber-600"/> 
                  探险中: {hero.activeExpedition?.name}
                </span>
-               <span className="text-[10px] font-mono opacity-80">
+               <span className="text-[10px] font-mono opacity-80 bg-amber-200/50 px-2 py-0.5 rounded-full">
                  剩余 {hero.activeExpedition ? Math.ceil((hero.activeExpedition.endTime! - Date.now())/60000) : 0} 分钟
                </span>
             </div>
-            <div className="text-[10px] opacity-60 italic border-t border-white/10 pt-1 mt-1">
-              正在深入未知区域...
+            <div className="text-[10px] opacity-70 italic border-t border-amber-200/30 pt-1 mt-1 font-serif">
+              正在深入未知区域，一切小心...
             </div>
          </div>
       ) : isMainQuest ? (
@@ -367,6 +367,7 @@ const MessagesView = memo(({ hero }: { hero: HeroState }) => {
 });
 MessagesView.displayName = 'MessagesView';
 
+// ⚠️ 核心修改：探险面板视觉升级 (暖色调 + 羊皮纸风格)
 const TavernView = memo(({ hero, hireCompanion, acceptQuest, startExpedition }: { hero: HeroState, hireCompanion: (id: string) => void, acceptQuest: (id: string) => void, startExpedition: (id: string) => void }) => {
     const refreshTimeLeft = Math.max(0, 4 * 60 * 60 * 1000 - (Date.now() - (hero.lastExpeditionRefresh || 0)));
     const hours = Math.floor(refreshTimeLeft / (1000 * 60 * 60));
@@ -380,27 +381,29 @@ const TavernView = memo(({ hero, hireCompanion, acceptQuest, startExpedition }: 
               <div className="text-[10px] text-stone-400 flex items-center gap-1"><Clock size={10}/> {hours}小时后更新</div>
            </div>
            {hero.state === 'expedition' ? (
-               <div className="p-6 text-center border-2 border-dashed border-stone-300 rounded-lg bg-stone-50">
-                   <div className="animate-pulse text-stone-500 mb-2 font-bold flex flex-col items-center justify-center gap-2">
-                     <Tent size={24} className="text-stone-400"/>
+               <div className="p-6 text-center border-2 border-dashed border-amber-300/50 rounded-xl bg-[#fffdf7] shadow-sm">
+                   <div className="animate-pulse text-amber-800 mb-2 font-bold flex flex-col items-center justify-center gap-2 font-serif tracking-wide">
+                     <Compass size={32} className="text-amber-500"/>
                      正在【{hero.activeExpedition?.name}】探险中...
                    </div>
-                   <div className="text-xs text-stone-400">其他活动已暂停</div>
+                   <div className="text-xs text-amber-600/70 font-serif italic">其他活动已暂停，请等待归来。</div>
                </div>
            ) : (
                <div className="space-y-3">
                   {hero.expeditionBoard.map((exp) => (
-                     <div key={exp.id} className="bg-stone-800 text-white p-4 rounded-lg shadow-md relative overflow-hidden group transition-transform active:scale-[0.98]">
-                        <div className="absolute top-0 right-0 p-2 opacity-10"><MapPin size={64}/></div>
-                        <div className="font-bold text-lg mb-1">{exp.name}</div>
-                        <div className="text-xs text-stone-400 mb-3">{exp.desc}</div>
-                        <div className="flex justify-between items-center border-t border-stone-700 pt-2">
-                            <div className="text-[10px] bg-stone-700 px-2 py-1 rounded flex items-center gap-2">
+                     <div key={exp.id} className="bg-[#fffdf7] border-2 border-amber-200/80 p-4 rounded-xl shadow-sm relative overflow-hidden group transition-all hover:shadow-md active:scale-[0.98]">
+                        <div className="absolute top-0 right-0 p-2 text-amber-900/5"><MapPin size={72}/></div>
+                        <div className="font-bold text-lg mb-1 text-amber-900 font-serif tracking-wide">{exp.name}</div>
+                        <div className="text-xs text-stone-600 mb-3 leading-relaxed font-serif italic">{exp.desc}</div>
+                        <div className="flex justify-between items-center border-t border-amber-100 pt-3">
+                            <div className="text-[10px] bg-amber-100/50 text-amber-800 px-2 py-1 rounded-full flex items-center gap-2 font-mono">
                               <span>难度: {exp.difficulty}星</span>
-                              <span className="text-stone-500">|</span>
+                              <span className="text-amber-300">|</span>
                               <span>时长: 30分</span>
                             </div>
-                            <button onClick={() => startExpedition(exp.id)} className="bg-amber-600 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-amber-500 active:scale-95 shadow-lg transition-colors">出发</button>
+                            <button onClick={() => startExpedition(exp.id)} className="bg-amber-600 text-white px-5 py-1.5 rounded-full text-xs font-bold hover:bg-amber-500 active:scale-95 shadow hover:shadow-md transition-all flex items-center gap-1">
+                              <Footprints size={12} /> 出发
+                            </button>
                         </div>
                      </div>
                   ))}
