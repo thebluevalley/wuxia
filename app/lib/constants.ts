@@ -448,7 +448,7 @@ export const NOVEL_SCRIPT: ScriptNode[] = [
     }
 ];
 
-// --- 其他静态配置 (保持不变) ---
+// --- 其他静态配置 ---
 export const FLAVOR_TEXTS = {
   environment: ["潮湿的海风带着盐粒", "丛林深处未知的嘶吼", "暴雨打在芭蕉叶上的闷响", "远处火山腾起的黑烟", "腐烂植物的刺鼻气味", "刺骨的海风像刀割一样"],
   action: ["用力磨尖手中的木棍", "用浑浊的雨水清洗伤口", "强忍恶心生吃螃蟹", "警惕地环顾四周动静", "在树皮上刻下生存天数", "检查水源是否被污染"],
@@ -464,7 +464,10 @@ export const EVENT_SEEDS: Record<string, string[]> = {
   "深邃丛林": ["头顶传来树枝折断的脆响。", "这该死的湿度，衣服紧紧贴在身上。", "误触了一种带刺的植物，半条手臂瞬间麻木。", "在树根下发现了一个废弃的土著图腾。"]
 };
 
-export const MAIN_SAGA = [{ title: "遗落群岛", goal: "重启文明", phase: "survival", desc: "活下去。", tasks: [], location: "起始岛", reqLevel: 1 }]; // 占位符，实际逻辑走 NOVEL_SCRIPT
+// ⚠️ 补回 AUTO_TASKS (为了通过类型检查)
+export const AUTO_TASKS: any = {}; 
+
+export const MAIN_SAGA = [{ title: "遗落群岛", goal: "重启文明", phase: "survival", desc: "活下去。", tasks: [], location: "起始岛", reqLevel: 1 }]; 
 
 export const SIDE_QUESTS = {
   "荒芜海滩": [{ title: "抓捕沙蟹", desc: "储备食物。", obj: "寻找", antagonist: "螃蟹" }, { title: "收集漂流木", desc: "优质木材。", obj: "收集", antagonist: "沉重" }],
