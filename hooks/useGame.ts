@@ -189,6 +189,7 @@ export function useGame() {
     setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; });
   };
 
+  // ⚠️ 核心重构：手动接受任务逻辑
   const acceptQuest = (questId: string) => {
     if (!heroRef.current) return;
     const hero = heroRef.current;
@@ -197,19 +198,53 @@ export function useGame() {
     const quest = hero.questBoard.find(q => q.id === questId);
     if (!quest) return;
     if (hero.level < quest.reqLevel) { addMessage('system', '拒绝', `需Lv.${quest.reqLevel}`); return; }
-    if (hero.queuedQuest) { addMessage('system', '繁忙', `有任务在身`); return; }
-
+    
     const newBoard = hero.questBoard.filter(q => q.id !== questId); 
     
+    // 主线瞬移逻辑
     let newLocation = hero.location;
     if (quest.category === 'main') {
         const saga = MAIN_SAGA.find(s => s.title === quest.script.title);
         if (saga && saga.location) newLocation = saga.location;
+    } else {
+        // 支线也需要移动到对应地点（如果设定了）
+        // 简单处理：如果是支线，位置暂时不变，或者根据任务类型变
+        // 这里保持不变，依赖 gameLoop 的过程描述
     }
 
-    setHero(prev => prev ? { ...prev, stamina: prev.stamina - quest.staminaCost, queuedQuest: quest, questBoard: newBoard, location: newLocation } : null);
-    addMessage('system', '决心', `接受：${quest.name}`);
-    triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest, location: newLocation }); 
+    // 判断主角是否忙碌 (非 auto 任务才算忙)
+    const isBusy = hero.currentQuest && hero.currentQuest.category !== 'auto';
+
+    if (isBusy) {
+        // 如果真的很忙（正在做主线或手动支线），则排队
+        if (hero.queuedQuest) { addMessage('system', '繁忙', `队列已满`); return; }
+        
+        setHero(prev => prev ? { 
+            ...prev, 
+            queuedQuest: quest, 
+            questBoard: newBoard 
+        } : null);
+        addMessage('system', '计划', `已列入计划：${quest.name}`);
+        triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest }); // AI 描写准备过程
+    } else {
+        // ⚠️ 瞬发逻辑：如果正在发呆或做自动任务，直接打断，立即开始！
+        const newHeroState = { 
+            ...hero, 
+            stamina: hero.stamina - quest.staminaCost, 
+            currentQuest: quest, // 直接上位
+            queuedQuest: null,   // 清空队列
+            questBoard: newBoard, 
+            location: newLocation,
+            state: 'fight' // 激活状态
+        };
+        
+        setHero(newHeroState);
+        addMessage('system', '执行', `立即开始：${quest.name}`);
+        
+        // ⚠️ 关键：触发 'quest_journey' (过程) 而不是 'quest_start' (准备)
+        // 这样 AI 会立刻描写 "正在砍树/正在寻找"，而不是 "我打算去..."
+        triggerAI('quest_journey', '', 'start', newHeroState); 
+    }
   };
 
   const startExpedition = (expeditionId: string) => {
@@ -218,20 +253,23 @@ export function useGame() {
       const exp = hero.expeditionBoard.find(e => e.id === expeditionId);
       if (!exp) return;
       
-      if (hero.currentQuest || hero.queuedQuest) { addMessage('system', '繁忙', '先完成手头工作。'); return; }
+      if (hero.currentQuest && hero.currentQuest.category !== 'auto') { addMessage('system', '繁忙', '先完成手头工作。'); return; }
       if (hero.stamina < 30) { addMessage('system', '疲惫', '体力不足。'); return; }
 
-      setHero(prev => prev ? {
-          ...prev,
+      const newHeroState = {
+          ...hero,
           activeExpedition: { ...exp, startTime: Date.now(), endTime: Date.now() + exp.duration },
           state: 'expedition',
-          stamina: prev.stamina - 30,
+          stamina: hero.stamina - 30,
           location: exp.location,
-          expeditionBoard: prev.expeditionBoard.filter(e => e.id !== expeditionId)
-      } : null);
+          expeditionBoard: hero.expeditionBoard.filter(e => e.id !== expeditionId),
+          currentQuest: null, // 暂停自动任务
+          queuedQuest: null
+      };
 
+      setHero(newHeroState);
       addMessage('system', '出发', `前往【${exp.name}】探险`);
-      triggerAI('expedition_start', '', 'start', { ...hero, activeExpedition: exp, location: exp.location });
+      triggerAI('expedition_start', '', 'start', newHeroState);
   };
 
   const hireCompanion = (visitorId: string) => {
@@ -415,17 +453,21 @@ export function useGame() {
              addMessage('system', '探险', '发现了新的探索区域');
           }
 
-          // ⚠️ 修复：如果 queued 存在，绝对不许休息
+          // 智能休息/自动任务
           const needRest = managedHero.stamina < 30 || managedHero.hp < 50;
-          if (needRest && !newQuest && !queued) {
+          
+          // ⚠️ 修复：如果正在做正经任务 (manual/main)，绝对不休息！
+          const isBusyWithRealJob = newQuest && newQuest.category !== 'auto';
+
+          if (needRest && !isBusyWithRealJob && !queued) {
               managedHero.state = 'sleep';
               aiEvent = 'idle_event'; 
           } else if (!newQuest && !queued) {
+              // 只有真的没事干了，才考虑 auto task
               if (Math.random() < 0.3) { 
                   managedHero.state = 'idle';
                   aiEvent = 'idle_event'; 
               } else {
-                  // Auto-Busy logic
                   const locationKey = AUTO_TASKS[managedHero.location as keyof typeof AUTO_TASKS] ? managedHero.location : "default";
                   // @ts-ignore
                   const autoPool = AUTO_TASKS[locationKey] || AUTO_TASKS["default"];

@@ -13,14 +13,14 @@ export async function POST(req: Request) {
     const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
     const isDanger = context.isDanger;
     
-    // 获取具体的任务目标字符串，例如 "钻木取火" 或 "寻找水源"
+    // 明确的任务上下文
     const currentAction = context.taskObjective || "生存"; 
 
     let styleInstruction = "";
     if (isDanger) {
         styleInstruction = "【危急状态】：极短句。动词为主。强调紧迫感。";
     } else {
-        styleInstruction = "【沉浸动作】：第一人称日记。专注于描写“我”正在做的具体动作细节。";
+        styleInstruction = "【第一人称动作】：专注于描写'我'正在做的具体动作。不要写心理活动，写手上的活。";
     }
 
     const baseInstruction = `
@@ -49,25 +49,24 @@ export async function POST(req: Request) {
         break;
 
       case 'quest_journey':
-        // ⚠️ 核心修改：强制绑定任务内容
+        // ⚠️ 核心修改：强制绑定任务内容，产生即时反馈感
         prompt = `${baseInstruction} 
-        当前专注：正在进行【${currentAction}】。
+        当前正在进行：【${currentAction}】。
         指令：写一个**正在执行该动作**的具体细节。
-        正确示例（如果任务是找水）："舔舐叶片上的露珠"、"挖开潮湿的泥土"。
-        正确示例（如果任务是伐木）："石斧砍在树干上震得虎口发麻"、"收集散落的树枝"。
-        **绝对禁止**：写与【${currentAction}】无关的风景描写或发呆。不要写"我在路上"。`;
+        示例：如果任务是找水，写"扒开阔叶植物寻找露水"。
+        示例：如果任务是伐木，写"石斧砍在树干上震得虎口发麻"。
+        禁止：不要写"我正在路上"或"我准备开始"。直接写动作。`;
         break;
 
       case 'quest_climax':
         prompt = `${baseInstruction} 
-        事件：任务【${context.questTitle}】遭遇阻碍/高潮！
-        指令：${context.questScript?.antagonist ? `与【${context.questScript.antagonist}】对抗！` : "最后的冲刺！"}
-        要求：极短的动作描写。`;
+        事件：任务遭遇阻碍！
+        指令：与困难对抗的瞬间！极短动作描写。`;
         break;
 
       case 'quest_end':
         prompt = `${baseInstruction} 
-        事件：任务【${context.questTitle}】完成。
+        事件：任务完成。
         指令：描写成果带来的满足感或身体的疲惫感。`;
         break;
       
@@ -78,7 +77,7 @@ export async function POST(req: Request) {
       case 'expedition_event':
         prompt = `${baseInstruction} 
         事件：在【${context.location}】探险中。
-        指令：描写一个惊险的片段或发现。比如：发现旧时代的遗物、听到奇怪的嘶吼、险些跌落深渊。
+        指令：描写一个惊险的片段或发现。比如：发现旧时代的遗物、听到奇怪的嘶吼。
         `;
         break;
       
@@ -89,7 +88,7 @@ export async function POST(req: Request) {
       case 'idle_event':
         prompt = `${baseInstruction} 
         状态：暂时没有任务，正在休息。
-        指令：写一个放松的瞬间。比如：看着海浪发呆、在沙滩上画画、打盹、按摩酸痛的肌肉。
+        指令：写一个放松的瞬间。比如：看着海浪发呆、在沙滩上画画、打盹。
         `;
         break;
 
