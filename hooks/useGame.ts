@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QuestCategory, Quest, QuestRank, Faction, MAIN_SAGA, SIDE_QUESTS, AUTO_TASKS, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_MALE, NPC_NAMES_FEMALE, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, WORLD_MAP, PERSONALITIES, EXPEDITION_LOCATIONS, Expedition, EVENT_SEEDS } from '@/app/lib/constants';
+import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QuestCategory, Quest, QuestRank, Faction, MAIN_SAGA, SIDE_QUESTS, AUTO_TASKS, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_MALE, NPC_NAMES_FEMALE, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, WORLD_MAP, PERSONALITIES, EXPEDITION_LOCATIONS, Expedition } from '@/app/lib/constants';
 
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL 
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!) 
@@ -25,21 +25,11 @@ const calculateTags = (hero: HeroState): string[] => {
   return Array.from(tags).slice(0, 5);
 };
 
-// ⚠️ 核心：智能种子选择器
+// ⚠️ 智能种子选择器
 const pickEventSeed = (location: string, objective: string): string => {
-    // 1. 尝试匹配具体动作 (如 "收集", "寻找")
-    // objective 可能是 "收集漂流木"，我们取前两个字作为 key
-    const actionKey = objective.substring(0, 2); 
-    const actionSeeds = EVENT_SEEDS[actionKey] || [];
-    
-    // 2. 尝试匹配地点 (如 "荒芜海滩")
-    const locationSeeds = EVENT_SEEDS[location] || [];
-    
-    // 3. 混合池子
-    const pool = [...actionSeeds, ...locationSeeds];
-    
-    if (pool.length === 0) return "仔细观察周围的环境"; // 兜底
-    return pool[Math.floor(Math.random() * pool.length)];
+    // 简单模拟，不再依赖庞大的 EVENT_SEEDS 字典，直接返回基础描述，把压力给 AI
+    // 如果需要之前的 EVENT_SEEDS 逻辑可以保留，但为了精简这里暂时简化
+    return `${objective}的时候发生了意外`; 
 };
 
 const generateQuestBoard = (hero: HeroState): Quest[] => {
@@ -193,6 +183,7 @@ export function useGame() {
     const finalType: LogEntry['type'] = 'highlight'; 
     setHero(prev => {
       if (!prev) return null;
+      // 这里的防重逻辑仍然保留，防止 AI 自己输出重复内容
       const recentTexts = prev.logs.slice(0, 5).map(l => l.text);
       if (recentTexts.includes(text)) {
           return prev;
@@ -296,26 +287,21 @@ export function useGame() {
     const mainSagaInfo = currentHero.mainStoryIndex < MAIN_SAGA.length ? MAIN_SAGA[currentHero.mainStoryIndex].title : "完结";
     
     let questTitle = "无";
-    let taskObjective = "生存"; 
+    let taskObjective = "休息/放松"; 
     let questCategory = "none";
 
     if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
         questTitle = currentHero.activeExpedition.name;
-        taskObjective = `在${currentHero.activeExpedition.name}探险`;
+        taskObjective = `在${currentHero.activeExpedition.name}探索未知`;
         questCategory = "expedition";
     } else if (currentHero.currentQuest) {
         questTitle = currentHero.currentQuest.name;
-        taskObjective = currentHero.currentQuest.script.objective; // "收集", "制作"
+        taskObjective = currentHero.currentQuest.name; 
         questCategory = currentHero.currentQuest.category;
     }
 
-    // ⚠️ 核心：选择事件种子
-    let seedEvent = "";
-    if (eventType === 'quest_journey' || eventType === 'idle_event') {
-        // 如果是闲逛，objective 就是 "休息"
-        const seedObj = eventType === 'idle_event' ? '休息' : taskObjective;
-        seedEvent = pickEventSeed(currentHero.location, seedObj);
-    }
+    // 简化种子逻辑，交给后端生成
+    let seedEvent = ""; 
 
     const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
     const recentLogs = recentLogsRef.current || [];
@@ -329,7 +315,7 @@ export function useGame() {
         questTitle,
         taskObjective,
         questCategory,
-        seedEvent, // ⚠️ 传入后端
+        seedEvent, 
         questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
         questStage: currentHero.currentQuest?.stage,
         companionInfo: companionInfo, 
@@ -356,8 +342,8 @@ export function useGame() {
       }
     } catch (e) { 
         console.error(e); 
-        const fallback = STATIC_LOGS.idle[Math.floor(Math.random() * STATIC_LOGS.idle.length)];
-        addLog(fallback, "highlight");
+        // ⚠️ 调试模式：禁用兜底，直接显示失败信息
+        addLog(`(AI掉线) 这句话AI还没想好...`, "bad");
     }
     return false;
   };
@@ -480,7 +466,7 @@ export function useGame() {
               managedHero.state = 'sleep';
               aiEvent = 'idle_event'; 
           } else if (!newQuest && !queued) {
-              if (Math.random() < 0.05) { // ⚠️ 降低到 5%
+              if (Math.random() < 0.05) { // 5% 概率发呆
                   managedHero.state = 'idle';
                   aiEvent = 'idle_event'; 
               } else {
