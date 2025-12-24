@@ -9,7 +9,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
 const EXPEDITION_REFRESH_INTERVAL = 4 * 60 * 60 * 1000; 
 
-// --- 辅助函数 ---
+// --- 辅助函数 (保持不变) ---
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "幸存者";
@@ -223,10 +223,8 @@ export function useGame() {
             location: newLocation,
             state: 'fight' 
         };
-        
         setHero(newHeroState);
         addMessage('system', '执行', `立即开始：${quest.name}`);
-        // ⚠️ 关键：直接触发过程描写，无需等待
         triggerAI('quest_journey', '', 'start', newHeroState); 
     }
   };
@@ -281,8 +279,7 @@ export function useGame() {
         taskObjective = `在${currentHero.activeExpedition.name}探索未知`;
     } else if (currentHero.currentQuest) {
         questTitle = currentHero.currentQuest.name;
-        // ⚠️ 核心：直接使用任务名作为目标，让 AI 知道具体要做什么
-        // 之前只传了 objective (如“采集”)，现在传 "收集漂流木"
+        // ⚠️ 核心：传递明确的任务名，例如 "收集漂流木"
         taskObjective = currentHero.currentQuest.name; 
     }
 

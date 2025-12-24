@@ -10,27 +10,29 @@ export async function POST(req: Request) {
     const { context, eventType, userAction } = await req.json();
     const groq = new Groq({ apiKey });
 
-    const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
-    const isDanger = context.isDanger;
+    // ⚠️ 任务模式下，忽略环境氛围，专注于动作
+    const isTaskActive = eventType === 'quest_journey' || eventType === 'quest_start' || eventType === 'quest_climax';
+    const envFlavor = isTaskActive ? "忽略环境，专注动作" : FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
     
-    // ⚠️ 获取具体的任务名 (例如 "收集漂流木")
-    const currentAction = context.taskObjective || "生存"; 
+    // 获取具体的任务动作 (例如 "收集漂流木")
+    const taskTarget = context.taskObjective || "生存"; 
 
     let styleInstruction = "";
-    if (isDanger) {
-        styleInstruction = "【危急状态】：极短句。动词为主。强调紧迫感。";
+    if (context.isDanger) {
+        styleInstruction = "【危急状态】：极短句。只有动作。心跳感。";
+    } else if (isTaskActive) {
+        styleInstruction = "【特写镜头】：只描写手部动作和物品细节。禁止描写风景和心情。";
     } else {
-        styleInstruction = "【第一人称动作】：专注于描写'我'正在做的具体动作细节。拒绝心理活动。";
+        styleInstruction = "【第一人称日记】：描写环境、身体感受和心理活动。";
     }
 
     const baseInstruction = `
-      你是一个荒野求生文字游戏引擎。
+      你是一个求生游戏的文字引擎。
       语言：简体中文。
       风格：${styleInstruction}
-      字数限制：50字以内。
+      字数限制：40字以内。
       
       背景：
-      - 状态：${context.hp < 30 ? "重伤" : "健康"}。
       - 地点：${context.location}。
       - 氛围：${envFlavor}。
     `;
@@ -44,34 +46,36 @@ export async function POST(req: Request) {
       
       case 'quest_start':
         prompt = `${baseInstruction} 
-        事件：决定开始任务【${context.questTitle}】。
-        指令：写一句准备动作。检查工具，观察目标。`;
+        事件：开始任务【${context.questTitle}】。
+        指令：写一句准备动作。比如拿起工具，或者确认方向。`;
         break;
 
       case 'quest_journey':
-        // ⚠️ 核心修改：强制绑定任务内容
+        // ⚠️ 核心修改：特写镜头模式
         prompt = `${baseInstruction} 
-        当前正在进行：【${currentAction}】。
-        指令：写一个**正在执行该动作**的具体细节。
-        示例：如果任务是"收集漂流木"，写"弯腰捡起一根湿漉漉的木头，沉甸甸的"。
-        示例：如果任务是"找水"，写"扒开阔叶植物，寻找叶片上的露珠"。
-        禁止：不要写"我正在做任务"或"我准备开始"。直接写动作！`;
+        【绝对指令】：
+        1. 主角正在全神贯注地做：【${taskTarget}】。
+        2. 只写动作细节！比如手的触感、工具的声音、物品的重量。
+        3. **严禁**写"我正在做任务"、"风景很美"、"心情很沉重"。
+        4. 示例：(任务是砍树) -> "石斧一次次砍在树干上，震得虎口发麻，木屑飞溅。"
+        5. 示例：(任务是找水) -> "扒开腐烂的落叶，下面湿润的泥土里渗出了一点水。"
+        6. 当前任务是：${taskTarget}。请写一个具体的动作画面。`;
         break;
 
       case 'quest_climax':
         prompt = `${baseInstruction} 
         事件：任务遭遇阻碍！
-        指令：与困难对抗的瞬间！极短动作描写。`;
+        指令：极短的动作描写！例如工具断了、脚滑了、被虫子咬了。`;
         break;
 
       case 'quest_end':
         prompt = `${baseInstruction} 
-        事件：任务完成。
-        指令：描写成果带来的满足感或身体的疲惫感。`;
+        事件：任务【${context.questTitle}】完成。
+        指令：描写看着成果的瞬间。`;
         break;
       
       case 'expedition_start':
-        prompt = `${baseInstruction} 带上装备，踏入【${context.location}】。充满了未知的恐惧。`;
+        prompt = `${baseInstruction} 带上装备，踏入【${context.location}】。`;
         break;
       
       case 'expedition_event':
@@ -82,13 +86,13 @@ export async function POST(req: Request) {
         break;
       
       case 'expedition_end':
-        prompt = `${baseInstruction} 探险结束。满载而归，活着真好。`;
+        prompt = `${baseInstruction} 探险结束。满载而归。`;
         break;
 
       case 'idle_event':
         prompt = `${baseInstruction} 
-        状态：暂时没有任务，正在休息。
-        指令：写一个放松的瞬间。比如：看着海浪发呆、在沙滩上画画、打盹。
+        状态：没有任务，正在休息。
+        指令：写一个放松的瞬间。比如：看着海浪发呆、在沙滩上画画、打盹、清理指甲。
         `;
         break;
 
@@ -114,7 +118,7 @@ export async function POST(req: Request) {
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 0.8, 
+      temperature: 0.7, // 降低随机性，让 AI 更听话
       max_tokens: 150, 
     });
 
