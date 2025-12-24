@@ -9,7 +9,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 3 * 60 * 60 * 1000; 
 const QUEST_REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
 
-// --- 辅助函数 ---
+// --- 辅助函数 (保持不变) ---
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "幸存者";
@@ -21,27 +21,20 @@ const calculateTags = (hero: HeroState): string[] => {
 
   if (hp < maxHp * 0.1) tags.add("濒死");
   else if (hp < maxHp * 0.3) tags.add("重伤");
-  
   if (stamina < 20) tags.add("力竭");
   else if (stamina > 100) tags.add("精力充沛");
-
   if (gold > 50000) tags.add("巨富");
   else if (gold < 50) tags.add("赤贫");
-
   if (actionCounts.kills > 100) tags.add("屠夫");
   if (actionCounts.drinking > 20) tags.add("酒鬼");
-
   if (attributes.strength > 20) tags.add("魔山之力");
   if (attributes.intelligence > 20) tags.add("小恶魔之智");
-
   const weaponName = equipment.weapon?.name || "";
   if (weaponName.includes("剑")) tags.add("剑客");
   else if (weaponName.includes("锤")) tags.add("战士");
   else if (weaponName.includes("匕首")) tags.add("刺客");
   else if (!equipment.weapon) tags.add("赤手空拳");
-  
   if (stats.arenaWins > 50) tags.add("竞技场之王");
-
   return Array.from(tags).slice(0, 10);
 };
 
@@ -156,7 +149,6 @@ export function useGame() {
       lastQuestRefresh: 0, 
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0,
-      // ⚠️ 修复：reputation 使用正确的 Faction 键
       reputation: { nature: 0, survivor: 0, savage: 0, ruins: 0, beast: 0, unknown: 0, neutral: 0, faith: 0, watch: 0 },
       narrativeHistory: "海难幸存。",
       tags: ["幸存者", "湿透"], 
@@ -361,6 +353,7 @@ export function useGame() {
       }
     });
     
+    // Auto-Consume logic
     if (hero.hp < hero.maxHp * 0.5) {
        const potion = hero.inventory.find(i => i.type === 'consumable' && !i.desc.includes("热量"));
        if (potion) {
@@ -527,9 +520,10 @@ export function useGame() {
          setHero(managedHero);
       }
       
+      // ⚠️ 心跳放缓：5s - 8s (危险)，12s - 18s (平时)
       const isDanger = managedHero.state === 'fight' || managedHero.hp < managedHero.maxHp * 0.3;
-      const minTick = isDanger ? 3000 : 8000;
-      const maxTick = isDanger ? 6000 : 12000;
+      const minTick = isDanger ? 5000 : 12000;
+      const maxTick = isDanger ? 8000 : 18000;
       const nextTick = Math.floor(Math.random() * (maxTick - minTick) + minTick); 
       
       timerRef.current = setTimeout(gameLoop, nextTick);

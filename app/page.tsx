@@ -84,7 +84,7 @@ const TypewriterText = memo(({ text, className }: { text: string, className?: st
         clearInterval(timer);
         hasAnimatedRef.current = true; 
       }
-    }, 50); 
+    }, 50); // 50ms 保持流畅
 
     return () => clearInterval(timer);
   }, [text]);
@@ -98,7 +98,6 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
     ? Math.min(100, Math.floor((hero.currentQuest.progress / hero.currentQuest.total) * 100)) 
     : 0;
   
-  // 判断是否为主线
   const isMainQuest = hero.currentQuest?.category === 'main';
 
   return (
@@ -132,7 +131,6 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
         </div>
       </div>
       
-      {/* ⚠️ 核心：主线任务显示区 */}
       {isMainQuest ? (
         <div className="bg-gradient-to-r from-amber-50 via-[#fcf9f2] to-white border-l-4 border-amber-700 p-3 shadow-sm rounded-r mb-3 animate-in slide-in-from-top duration-700">
            <div className="flex justify-between items-center mb-1">
@@ -152,7 +150,6 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
            )}
         </div>
       ) : (
-        /* 普通/无任务显示 */
         <div className="bg-white border border-stone-200 rounded p-2 shadow-sm flex flex-col gap-1 mb-2">
            <div className="flex justify-between text-[10px] text-stone-500 mb-1">
               <span className="flex items-center gap-1 font-bold text-stone-700 truncate max-w-[200px]">
@@ -183,7 +180,8 @@ Header.displayName = 'Header';
 const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type: 'bless'|'punish') => void }) => {
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex-1 overflow-y-auto p-5 space-y-8 scroll-smooth pb-20">
+      {/* ⚠️ 核心修改：space-y-4 减小间距，看起来更紧凑 */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 scroll-smooth pb-20">
         {hero.logs.map((log, index) => {
           const isLatest = index === 0; 
           const isNarrative = log.type === 'highlight';
@@ -191,15 +189,15 @@ const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type:
           if (!isNarrative) return null;
 
           return (
-            <div key={log.id} className="flex gap-3 items-baseline">
-              <span className="text-[10px] text-stone-400 font-sans shrink-0 w-8 text-right tabular-nums opacity-50 pt-1">{log.time}</span>
+            <div key={log.id} className="flex gap-2 items-start">
+              <span className="text-[10px] text-stone-300 font-sans shrink-0 w-8 text-right tabular-nums opacity-60 pt-[3px]">{log.time}</span>
               {isLatest ? (
                  <TypewriterText 
                    text={log.text} 
-                   className="text-[15px] leading-8 text-justify font-medium text-stone-900 font-serif" 
+                   className="text-[14px] leading-relaxed text-justify font-medium text-stone-800 font-serif" 
                  />
               ) : (
-                 <span className="text-[15px] leading-8 text-justify font-medium text-stone-900 font-serif opacity-90">
+                 <span className="text-[14px] leading-relaxed text-justify font-medium text-stone-700 font-serif opacity-80">
                    {log.text}
                  </span>
               )}
@@ -225,7 +223,8 @@ const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type:
 });
 LogsView.displayName = 'LogsView';
 
-// ... (EquipSlot, AttributeRow, HeroView, BagView, MessagesView 保持不变) ...
+// ... (EquipSlot, AttributeRow, HeroView, BagView, MessagesView, TavernView, Home 保持不变) ...
+// 为了确保完整性，请保留这些组件
 const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
     <div className="flex flex-col items-center bg-white p-2 rounded border border-stone-100">
        <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${item ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-300'}`}>{icon}</div>
