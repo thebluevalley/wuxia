@@ -1,10 +1,11 @@
 'use client';
 import { useGame } from '@/hooks/useGame';
 import { useEffect, useRef, useState, memo } from 'react';
-import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery, Crown } from 'lucide-react';
+import { ScrollText, Zap, Cloud, MapPin, User, Package, Shield, Sword, Gem, Footprints, Shirt, HardHat, Target, Star, History, Brain, BicepsFlexed, Heart, Clover, Wind, Lock, PawPrint, Trophy, Quote, BookOpen, Stethoscope, Bell, MessageSquare, Info, Beer, RefreshCw, UserPlus, Scroll, Clock, Battery, Crown, Tent } from 'lucide-react';
 import { Item, ItemType, Quality, QuestRank, SkillType, HeroState } from '@/app/lib/constants';
 
 // --- 全局辅助函数 ---
+
 const getQualityColor = (q: Quality) => {
   switch (q) {
     case 'legendary': return 'text-orange-900 font-bold';
@@ -35,8 +36,7 @@ const getStageColor = (stage: string) => {
 };
 
 const getJobIcon = (job: string) => {
-  if (!job) return <User size={24} className="text-stone-800"/>;
-  return <User size={24} className="text-stone-800"/>; // 简化
+  return <User size={24} className="text-stone-800"/>;
 };
 
 const getSkillLabel = (type: SkillType) => {
@@ -49,6 +49,8 @@ const getSkillLabel = (type: SkillType) => {
       default: return '技能';
   }
 };
+
+// --- 组件 ---
 
 const TypewriterText = memo(({ text, className }: { text: string, className?: string }) => {
   const [displayedText, setDisplayedText] = useState(text);
@@ -93,6 +95,7 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
     : 0;
   
   const isMainQuest = hero.currentQuest?.category === 'main';
+  const isExpedition = hero.state === 'expedition';
 
   return (
     <header className="p-4 pb-2 flex-none z-10 bg-[#fcf9f2]/90 backdrop-blur-sm border-b border-stone-200">
@@ -125,7 +128,23 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
         </div>
       </div>
       
-      {isMainQuest ? (
+      {/* 状态面板：探险 > 主线 > 普通 */}
+      {isExpedition ? (
+         <div className="bg-gradient-to-r from-stone-800 to-stone-600 border-l-4 border-stone-900 p-3 shadow-sm rounded-r mb-3 text-white animate-in slide-in-from-top duration-500">
+            <div className="flex justify-between items-center mb-1">
+               <span className="flex items-center gap-1.5 text-xs font-bold tracking-wide">
+                 <Tent size={14}/> 
+                 探险中: {hero.activeExpedition?.name}
+               </span>
+               <span className="text-[10px] font-mono opacity-80">
+                 剩余 {hero.activeExpedition ? Math.ceil((hero.activeExpedition.endTime! - Date.now())/60000) : 0} 分钟
+               </span>
+            </div>
+            <div className="text-[10px] opacity-60 italic border-t border-white/10 pt-1 mt-1">
+              正在深入未知区域...
+            </div>
+         </div>
+      ) : isMainQuest ? (
         <div className="bg-gradient-to-r from-amber-50 via-[#fcf9f2] to-white border-l-4 border-amber-700 p-3 shadow-sm rounded-r mb-3 animate-in slide-in-from-top duration-700">
            <div className="flex justify-between items-center mb-1">
               <span className="flex items-center gap-1.5 text-xs font-bold text-amber-900 tracking-wide font-serif">
@@ -137,13 +156,18 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
            <div className="h-1.5 w-full bg-amber-100 rounded-full overflow-hidden mb-2">
              <div className="h-full bg-amber-600 transition-all duration-1000 rounded-full" style={{ width: `${questPercent}%` }} />
            </div>
+           {hero.currentQuest?.script?.npc && hero.currentQuest.script.npc !== '无' && (
+             <div className="text-[10px] text-amber-800/80 font-serif italic border-t border-amber-100 pt-1 mt-1 flex items-center gap-1">
+               <User size={10}/> 关键人物: {hero.currentQuest.script.npc}
+             </div>
+           )}
         </div>
       ) : (
         <div className="bg-white border border-stone-200 rounded p-2 shadow-sm flex flex-col gap-1 mb-2">
            <div className="flex justify-between text-[10px] text-stone-500 mb-1">
               <span className="flex items-center gap-1 font-bold text-stone-700 truncate max-w-[200px]">
                 <Target size={10} className="text-stone-800 shrink-0"/> 
-                {hero.currentQuest ? hero.currentQuest.name : "自由探索"}
+                {hero.currentQuest ? hero.currentQuest.name : (hero.state==='idle'?'休息中...':'自由行动')}
               </span>
               <span className="font-mono">{hero.currentQuest ? `${questPercent}%` : ""}</span>
            </div>
@@ -211,9 +235,6 @@ const LogsView = memo(({ hero, godAction }: { hero: HeroState, godAction: (type:
 });
 LogsView.displayName = 'LogsView';
 
-// ... (EquipSlot, AttributeRow, HeroView, BagView, MessagesView, TavernView, Home 保持不变，请确保代码完整性) ...
-// (为节省篇幅，这里假设其他组件未变动，但你需要确保文件完整)
-// ⚠️ 重要：请确保将之前的 EquipSlot, AttributeRow 等组件也复制过来。
 const EquipSlot = ({label, item, icon}: {label: string, item: Item | null, icon: any}) => (
     <div className="flex flex-col items-center bg-white p-2 rounded border border-stone-100">
        <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${item ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-300'}`}>{icon}</div>
@@ -342,32 +363,65 @@ BagView.displayName = 'BagView';
 const MessagesView = memo(({ hero }: { hero: HeroState }) => { 
     const rumors = hero.messages.filter(m => m.type === 'rumor'); 
     const systems = hero.messages.filter(m => m.type === 'system'); 
-    return (<div className="p-4 h-full overflow-y-auto space-y-6"><div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><MessageSquare size={16}/> 无线电/信号</h3>{rumors.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无信号</div> : <div className="space-y-3">{rumors.map((msg)=><div key={msg.id} className="bg-amber-50 border border-amber-100 p-3 rounded-lg shadow-sm"><div className="flex justify-between items-start mb-1"><div className="font-bold text-amber-900 text-sm">{msg.title}</div><div className="text-[10px] text-amber-400">{msg.time}</div></div><div className="text-xs text-amber-800 leading-relaxed text-justify">{msg.content}</div></div>)}</div>}</div><div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><Info size={16}/> 生存记录</h3>{systems.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无记录</div> : <div className="bg-white border border-stone-100 rounded-lg overflow-hidden">{systems.map((msg,i)=><div key={msg.id} className={`p-3 border-b border-stone-50 last:border-0 ${i%2===0?'bg-white':'bg-stone-50/50'}`}><div className="flex justify-between mb-1"><span className="font-bold text-stone-700 text-xs">{msg.title}</span><span className="text-[10px] text-stone-400">{msg.time}</span></div><div className="text-xs text-stone-500">{msg.content}</div></div>)}</div>}</div></div>);
+    return (<div className="p-4 h-full overflow-y-auto space-y-6"><div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><MessageSquare size={16}/> 信号</h3>{rumors.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无信号</div> : <div className="space-y-3">{rumors.map((msg)=><div key={msg.id} className="bg-amber-50 border border-amber-100 p-3 rounded-lg shadow-sm"><div className="flex justify-between items-start mb-1"><div className="font-bold text-amber-900 text-sm">{msg.title}</div><div className="text-[10px] text-amber-400">{msg.time}</div></div><div className="text-xs text-amber-800 leading-relaxed text-justify">{msg.content}</div></div>)}</div>}</div><div><h3 className="font-bold text-stone-800 mb-3 flex items-center gap-2 px-1"><Info size={16}/> 生存记录</h3>{systems.length === 0 ? <div className="text-center text-stone-300 text-xs italic">暂无记录</div> : <div className="bg-white border border-stone-100 rounded-lg overflow-hidden">{systems.map((msg,i)=><div key={msg.id} className={`p-3 border-b border-stone-50 last:border-0 ${i%2===0?'bg-white':'bg-stone-50/50'}`}><div className="flex justify-between mb-1"><span className="font-bold text-stone-700 text-xs">{msg.title}</span><span className="text-[10px] text-stone-400">{msg.time}</span></div><div className="text-xs text-stone-500">{msg.content}</div></div>)}</div>}</div></div>);
 });
 MessagesView.displayName = 'MessagesView';
 
-const TavernView = memo(({ hero, hireCompanion, acceptQuest }: { hero: HeroState, hireCompanion: (id: string) => void, acceptQuest: (id: string) => void }) => {
-    const refreshTimeLeft = Math.max(0, 60 * 60 * 1000 - (Date.now() - (hero.lastQuestRefresh || 0)));
-    const mins = Math.floor(refreshTimeLeft / (1000 * 60));
+const TavernView = memo(({ hero, hireCompanion, acceptQuest, startExpedition }: { hero: HeroState, hireCompanion: (id: string) => void, acceptQuest: (id: string) => void, startExpedition: (id: string) => void }) => {
+    const refreshTimeLeft = Math.max(0, 4 * 60 * 60 * 1000 - (Date.now() - (hero.lastExpeditionRefresh || 0)));
+    const hours = Math.floor(refreshTimeLeft / (1000 * 60 * 60));
 
     return (
     <div className="p-4 h-full overflow-y-auto">
+       {/* 探险区域 */}
        <div className="mb-8">
            <div className="flex justify-between items-center mb-3 px-1">
-              <h3 className="font-bold text-stone-800 flex items-center gap-2"><Scroll size={16}/> 探索目标</h3>
-              <div className="text-[10px] text-stone-400 flex items-center gap-1"><Clock size={10}/> 刷新: {mins}分</div>
+              <h3 className="font-bold text-stone-800 flex items-center gap-2"><Tent size={16}/> 外出探险 (手动)</h3>
+              <div className="text-[10px] text-stone-400 flex items-center gap-1"><Clock size={10}/> {hours}小时后更新</div>
+           </div>
+           {hero.state === 'expedition' ? (
+               <div className="p-6 text-center border-2 border-dashed border-stone-300 rounded-lg bg-stone-50">
+                   <div className="animate-pulse text-stone-500 mb-2 font-bold flex flex-col items-center justify-center gap-2">
+                     <Tent size={24} className="text-stone-400"/>
+                     正在【{hero.activeExpedition?.name}】探险中...
+                   </div>
+                   <div className="text-xs text-stone-400">其他活动已暂停</div>
+               </div>
+           ) : (
+               <div className="space-y-3">
+                  {hero.expeditionBoard.map((exp) => (
+                     <div key={exp.id} className="bg-stone-800 text-white p-4 rounded-lg shadow-md relative overflow-hidden group transition-transform active:scale-[0.98]">
+                        <div className="absolute top-0 right-0 p-2 opacity-10"><MapPin size={64}/></div>
+                        <div className="font-bold text-lg mb-1">{exp.name}</div>
+                        <div className="text-xs text-stone-400 mb-3">{exp.desc}</div>
+                        <div className="flex justify-between items-center border-t border-stone-700 pt-2">
+                            <div className="text-[10px] bg-stone-700 px-2 py-1 rounded flex items-center gap-2">
+                              <span>难度: {exp.difficulty}星</span>
+                              <span className="text-stone-500">|</span>
+                              <span>时长: 30分</span>
+                            </div>
+                            <button onClick={() => startExpedition(exp.id)} className="bg-amber-600 text-white px-4 py-1.5 rounded text-xs font-bold hover:bg-amber-500 active:scale-95 shadow-lg transition-colors">出发</button>
+                        </div>
+                     </div>
+                  ))}
+               </div>
+           )}
+       </div>
+
+       <hr className="border-stone-200 mb-6"/>
+
+       {/* 日常委托区域 */}
+       <div className="mb-8">
+           <div className="flex justify-between items-center mb-3 px-1">
+              <h3 className="font-bold text-stone-800 flex items-center gap-2"><Scroll size={16}/> 日常委托</h3>
            </div>
            <div className="space-y-2">
               {hero.questBoard.map((quest) => (
-                 <div key={quest.id} className="bg-white border border-stone-200 p-3 rounded-lg shadow-sm relative overflow-hidden group">
+                 <div key={quest.id} className={`bg-white border border-stone-200 p-3 rounded-lg shadow-sm relative overflow-hidden group ${hero.state === 'expedition' ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
                     <div className="flex justify-between items-start mb-1">
                        <div className="flex items-center gap-2">
-                          <span className="text-stone-600 text-sm">
-                            {quest.category === 'main' ? <Crown size={14} className="text-amber-600"/> : <Scroll size={14}/>}
-                          </span>
-                          <span className={`text-sm ${quest.category === 'main' ? 'font-bold text-amber-800' : 'text-stone-700'}`}>
-                            {quest.name}
-                          </span>
+                          <span className="text-stone-600 text-sm"><Scroll size={14}/></span>
+                          <span className="text-sm font-bold text-stone-700">{quest.name}</span>
                        </div>
                        <div className="flex gap-0.5 text-stone-300">{[...Array(quest.rank)].map((_, i) => <Star key={i} size={8} fill="currentColor"/>)}</div>
                     </div>
@@ -375,43 +429,20 @@ const TavernView = memo(({ hero, hireCompanion, acceptQuest }: { hero: HeroState
                     <div className="flex justify-between items-center border-t border-stone-50 pt-2">
                        <div className="text-[10px] text-stone-500 font-mono flex items-center gap-2">
                          <span>获{quest.rewards.gold} / 验{quest.rewards.exp}</span>
-                         <span className="text-emerald-600 flex items-center gap-0.5"><Battery size={8}/> -{quest.staminaCost}</span>
                        </div>
-                       <button onClick={() => acceptQuest(quest.id)} disabled={!!hero.queuedQuest} className={`px-3 py-1 rounded text-[10px] font-bold transition-colors ${hero.queuedQuest ? 'bg-stone-100 text-stone-300' : 'bg-stone-800 text-white hover:bg-stone-700 active:scale-95'}`}>{hero.queuedQuest ? '队列已满' : '行动'}</button>
+                       <button onClick={() => acceptQuest(quest.id)} disabled={!!hero.queuedQuest || hero.state === 'expedition'} className={`px-3 py-1 rounded text-[10px] font-bold transition-colors ${hero.queuedQuest || hero.state === 'expedition' ? 'bg-stone-100 text-stone-300 cursor-not-allowed' : 'bg-stone-800 text-white hover:bg-stone-700 active:scale-95'}`}>{hero.queuedQuest ? '队列满' : '行动'}</button>
                     </div>
                  </div>
               ))}
-              {hero.questBoard.length === 0 && <div className="text-center text-[10px] text-stone-300 py-4 italic">暂无目标...</div>}
            </div>
        </div>
-
-       <div className="flex justify-between items-center mb-6 px-1">
-          <div><h3 className="font-bold text-stone-800 flex items-center gap-2 text-xl"><Beer size={20}/> 营地</h3><div className="text-[10px] text-stone-400">幸存者聚集地</div></div>
-       </div>
-       <div className="space-y-4">
-          {hero.tavern.visitors.map((visitor) => (
-             <div key={visitor.id} className={`bg-white border p-4 rounded-xl shadow-sm relative overflow-hidden group transition-all hover:shadow-md ${getQualityBadgeClass(visitor.quality).replace('bg-', 'border-').replace('text-', 'hover:border-')}`}>
-                <div className={`absolute top-0 right-0 px-2 py-1 text-[9px] font-bold rounded-bl-lg border-b border-l ${getQualityBadgeClass(visitor.quality)}`}>{visitor.quality.toUpperCase()}</div>
-                <div className="flex gap-4 mt-2">
-                   <div className="w-12 h-12 rounded-full bg-stone-50 flex items-center justify-center border border-stone-100 shrink-0">{getJobIcon(visitor.archetype)}</div>
-                   <div className="flex-1">
-                      <div className={`text-sm ${getQualityColor(visitor.quality)}`}>{visitor.title}</div>
-                      <div className="text-xs text-stone-500 mb-1">{visitor.name} <span className="font-serif italic text-stone-400">| {visitor.personality} ({visitor.gender})</span></div>
-                      <div className="text-[10px] text-stone-400 mb-3 line-clamp-2">{visitor.desc}</div>
-                      <div className="flex justify-between items-center"><div className="text-[10px] text-stone-400">加成: <span className="text-stone-700 font-bold">{visitor.buff.type.toUpperCase()} +{visitor.buff.val}</span></div><button onClick={() => hireCompanion(visitor.id)} disabled={!!hero.companion} className={`px-4 py-1.5 rounded text-xs font-bold active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-colors ${hero.companion ? 'bg-stone-200 text-stone-500' : 'bg-stone-800 text-white hover:bg-stone-700'}`}>{hero.companion ? '已有同伴' : `招募 (${visitor.price}资)`}</button></div>
-                   </div>
-                </div>
-             </div>
-          ))}
-       </div>
-       <div className="text-center text-[10px] text-stone-300 mt-8 mb-4">每1小时有新流浪者经过。</div>
     </div>
   );
 });
 TavernView.displayName = 'TavernView';
 
 export default function Home() {
-  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest } = useGame();
+  const { hero, login, godAction, loading, error, clearError, hireCompanion, acceptQuest, startExpedition } = useGame();
   const [inputName, setInputName] = useState('');
   const [inputPassword, setInputPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'logs' | 'hero' | 'bag' | 'messages' | 'tavern'>('logs');
@@ -441,7 +472,7 @@ export default function Home() {
         <div className={activeTab === 'hero' ? 'block h-full' : 'hidden'}><HeroView hero={hero} /></div>
         <div className={activeTab === 'bag' ? 'block h-full' : 'hidden'}><BagView hero={hero} /></div>
         <div className={activeTab === 'messages' ? 'block h-full' : 'hidden'}><MessagesView hero={hero} /></div>
-        <div className={activeTab === 'tavern' ? 'block h-full' : 'hidden'}><TavernView hero={hero} hireCompanion={hireCompanion} acceptQuest={acceptQuest} /></div>
+        <div className={activeTab === 'tavern' ? 'block h-full' : 'hidden'}><TavernView hero={hero} hireCompanion={hireCompanion} acceptQuest={acceptQuest} startExpedition={startExpedition} /></div>
       </main>
       <nav className="h-16 bg-white border-t border-stone-200 flex justify-around items-center px-1 flex-none z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
          <button onClick={() => setActiveTab('logs')} className={`flex flex-col items-center gap-1 p-2 min-w-[3.5rem] ${activeTab === 'logs' ? 'text-stone-800' : 'text-stone-400'}`}><ScrollText size={18} strokeWidth={activeTab === 'logs' ? 2.5 : 2} /><span className="text-[9px] font-bold">日记</span></button>
