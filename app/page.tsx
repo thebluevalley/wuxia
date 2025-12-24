@@ -97,6 +97,15 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
   const isMainQuest = hero.currentQuest?.category === 'main';
   const isExpedition = hero.state === 'expedition';
 
+  // 辅助状态文本逻辑
+  const getStatusText = () => {
+      if (hero.currentQuest) return hero.currentQuest.name;
+      if (hero.queuedQuest) return `准备出发: ${hero.queuedQuest.name}`;
+      if (hero.state === 'idle') return "休息中...";
+      if (hero.state === 'sleep') return "深度睡眠";
+      return "自由行动";
+  };
+
   return (
     <header className="p-4 pb-2 flex-none z-10 bg-[#fcf9f2]/90 backdrop-blur-sm border-b border-stone-200">
       <div className="flex justify-between items-start mb-3">
@@ -128,7 +137,7 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
         </div>
       </div>
       
-      {/* 状态面板：探险 > 主线 > 普通 */}
+      {/* 状态面板 */}
       {isExpedition ? (
          <div className="bg-gradient-to-r from-amber-100 via-[#fffdf7] to-white border-l-4 border-amber-500 p-3 shadow-sm rounded-r mb-3 text-amber-900 animate-in slide-in-from-top duration-500">
             <div className="flex justify-between items-center mb-1">
@@ -167,9 +176,9 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
            <div className="flex justify-between text-[10px] text-stone-500 mb-1">
               <span className="flex items-center gap-1 font-bold text-stone-700 truncate max-w-[200px]">
                 <Target size={10} className="text-stone-800 shrink-0"/> 
-                {hero.currentQuest ? hero.currentQuest.name : (hero.state==='idle'?'休息中...':'自由行动')}
+                {getStatusText()}
               </span>
-              <span className="font-mono">{hero.currentQuest ? `${questPercent}%` : ""}</span>
+              <span className="font-mono">{hero.currentQuest ? `${questPercent}%` : (hero.queuedQuest ? "等待" : "")}</span>
            </div>
            <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden mb-1">
              <div className={`h-full transition-all duration-700 rounded-full ${hero.currentQuest ? 'bg-stone-600' : 'bg-transparent'}`} style={{ width: `${questPercent}%` }} />
@@ -177,9 +186,9 @@ const Header = memo(({ hero }: { hero: HeroState }) => {
         </div>
       )}
 
-      {hero.queuedQuest && (
-           <div className="text-[9px] text-stone-400 flex items-center gap-1 border-t border-stone-50 pt-1 mt-1">
-             <Clock size={8}/> 计划: {hero.queuedQuest.name}
+      {hero.queuedQuest && !hero.currentQuest && (
+           <div className="text-[9px] text-amber-600 font-bold flex items-center gap-1 border-t border-stone-50 pt-1 mt-1 animate-pulse">
+             <Clock size={8}/> 正在前往: {hero.queuedQuest.name}...
            </div>
       )}
       <div className="space-y-1 mt-2">

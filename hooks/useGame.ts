@@ -9,7 +9,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
 const EXPEDITION_REFRESH_INTERVAL = 4 * 60 * 60 * 1000; 
 
-// --- 辅助函数 (保持不变) ---
+// --- 辅助函数 ---
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "幸存者";
@@ -17,7 +17,7 @@ const getStoryStage = (level: number) => {
 
 const calculateTags = (hero: HeroState): string[] => {
   const tags: Set<string> = new Set();
-  const { hp, maxHp, stamina, equipment } = hero;
+  const { hp, maxHp, stamina, gold, equipment } = hero;
   if (hp < maxHp * 0.3) tags.add("重伤");
   if (stamina < 30) tags.add("饥饿");
   if (equipment.weapon) tags.add("武装"); else tags.add("空手");
@@ -251,16 +251,15 @@ export function useGame() {
     const companionInfo = currentHero.companion ? `伙伴:${currentHero.companion.title}` : "独自";
     const mainSagaInfo = currentHero.mainStoryIndex < MAIN_SAGA.length ? MAIN_SAGA[currentHero.mainStoryIndex].title : "完结";
     
-    // ⚠️ 核心：提取任务具体目标，传给 AI
     let questTitle = "无";
-    let taskObjective = "休息/放松"; // 默认空闲状态
+    let taskObjective = "休息/放松"; 
 
     if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
         questTitle = currentHero.activeExpedition.name;
         taskObjective = `在${currentHero.activeExpedition.name}探索未知`;
     } else if (currentHero.currentQuest) {
         questTitle = currentHero.currentQuest.name;
-        taskObjective = currentHero.currentQuest.script.objective; // 例如 "寻找水源"
+        taskObjective = currentHero.currentQuest.script.objective; 
     }
 
     const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
@@ -271,7 +270,6 @@ export function useGame() {
         storyStage: getStoryStage(currentHero.level), 
         worldLore: WORLD_LORE, 
         mainSaga: mainSagaInfo,
-        // 传递明确的任务信息
         questTitle,
         taskObjective,
         questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
@@ -417,17 +415,17 @@ export function useGame() {
              addMessage('system', '探险', '发现了新的探索区域');
           }
 
-          // 智能休息/自动任务
+          // ⚠️ 修复：如果 queued 存在，绝对不许休息
           const needRest = managedHero.stamina < 30 || managedHero.hp < 50;
-          if (needRest && !newQuest) {
+          if (needRest && !newQuest && !queued) {
               managedHero.state = 'sleep';
-              aiEvent = 'idle_event'; // 触发休息描述
+              aiEvent = 'idle_event'; 
           } else if (!newQuest && !queued) {
-              if (Math.random() < 0.3) { // 30% 概率纯发呆
+              if (Math.random() < 0.3) { 
                   managedHero.state = 'idle';
                   aiEvent = 'idle_event'; 
               } else {
-                  // 70% 概率自动忙碌
+                  // Auto-Busy logic
                   const locationKey = AUTO_TASKS[managedHero.location as keyof typeof AUTO_TASKS] ? managedHero.location : "default";
                   // @ts-ignore
                   const autoPool = AUTO_TASKS[locationKey] || AUTO_TASKS["default"];
