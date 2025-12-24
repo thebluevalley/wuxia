@@ -111,8 +111,6 @@ export type HeroState = {
   
   strategy: StrategyState;
   currentSeed?: string;
-  
-  // ⚠️ 新增：休息倒计时。如果当前时间小于此值，说明正在长休息
   idleUntil?: number; 
 
   currentQuest: Quest | null;
@@ -136,6 +134,321 @@ export type HeroState = {
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
+// ⚠️ 剧本节点结构
+export type ScriptNode = {
+    id: string;
+    chapter: string; 
+    summary: string; 
+    objective: string; 
+    location: string; 
+    requirements?: { level?: number; item?: string }; 
+    rewards?: { gold: number; exp: number; item?: string };
+};
+
+// ⚠️⚠️⚠️ 核心数据：遗落群岛完整剧本 (全10章) ⚠️⚠️⚠️
+export const NOVEL_SCRIPT: ScriptNode[] = [
+    // --- 第一章：海之囚徒 ---
+    {
+        id: "1-1",
+        chapter: "第一章：海之囚徒",
+        location: "起始岛海滩",
+        objective: "寻找生命之源",
+        summary: "剧烈的头痛如重锤敲击，喉咙干渴得像吞了火炭。你俯卧在湿漉漉的沙滩上，周围是救生舱的残骸。脱水正在吞噬你的体力。必须深入岛屿腹地，寻找可饮用的淡水水源。"
+    },
+    {
+        id: "1-2",
+        chapter: "第一章：海之囚徒",
+        location: "防风岩壁",
+        objective: "升起第一堆篝火",
+        summary: "夜幕降临，气温骤降。没有火，你可能会失温而死。你尝试了无数次钻木取火，双手磨出了血泡。必须搜集枯木与椰子绒，引燃火种，并确保火堆整夜不灭。"
+    },
+    {
+        id: "1-3",
+        chapter: "第一章：海之囚徒",
+        location: "深夜营地",
+        objective: "猎杀监视者",
+        summary: "深夜，你听到了机械摩擦声。一只半掩在沙土中的机械螃蟹正死死盯着你。这是一场不对等的战斗。利用粗木棍和走位，避开它的金属钳，击碎它的核心电路。"
+    },
+    {
+        id: "1-4",
+        chapter: "第一章：海之囚徒",
+        location: "黑色礁石区",
+        objective: "石器时代的飞跃",
+        summary: "徒手无法生存。你利用铁皮和黑曜石，开始制作工具。你的目光望向了远方海平线上的阴影——铁锈岛。你需要制作一把石斧和一支尖锐的长矛。"
+    },
+
+    // --- 第二章：第一艘筏 ---
+    {
+        id: "2-1",
+        chapter: "第二章：第一艘筏",
+        location: "起始岛沙滩",
+        objective: "绘制木筏蓝图",
+        summary: "淡水和椰子枯竭。看着远处的铁锈岛，你决定离开。根据浮力原理，在沙滩上画下双层甲板木筏的图纸，计算所需的浮木和泡沫板。"
+    },
+    {
+        id: "2-2",
+        chapter: "第二章：第一艘筏",
+        location: "临时造船厂",
+        objective: "组装“希望号”",
+        summary: "烈日下，你赤膊挥舞石斧。将收集的原木利用藤蔓进行十字捆绑，完成木筏主体。利用破烂降落伞布制作风帆。每一根原木的倒下都代表着希望。"
+    },
+    {
+        id: "2-3",
+        chapter: "第二章：第一艘筏",
+        location: "浅水区",
+        objective: "驱逐鲨鱼",
+        summary: "试航时，血腥味引来了虎鲨。它封锁了出路。不能硬拼，制造内脏诱饵将其引开，或者站在礁石上用长矛刺击它的鼻头将其驱离。"
+    },
+    {
+        id: "2-4",
+        chapter: "第二章：第一艘筏",
+        location: "环礁死线",
+        objective: "穿越暗流区",
+        summary: "风向变了。你推船入海，海浪猛烈拍打木筏。驾驭风帆，利用潮汐的力量冲出被称为“死线”的暗礁带。在体力耗尽前，重重冲上铁锈岛的沙滩。"
+    },
+
+    // --- 第三章：铁与锈 ---
+    {
+        id: "3-1",
+        chapter: "第三章：铁与锈",
+        location: "工业岛废墟",
+        objective: "寻找急救包",
+        summary: "这里是钢铁丛林，到处是生锈的管道。你踩到废铁受伤了。必须潜入废弃的医务室废墟，在腐烂的骷髅旁寻找未过期的抗生素和急救包。"
+    },
+    {
+        id: "3-2",
+        chapter: "第三章：铁与锈",
+        location: "锻造车间",
+        objective: "打造金属砍刀",
+        summary: "在工厂深处发现了尚有余温的老式熔炉。清理通风口，寻找煤炭，将废钢熔炼锻打，制作一把锋利的金属砍刀。这是告别石器时代的关键。"
+    },
+    {
+        id: "3-3",
+        chapter: "第三章：铁与锈",
+        location: "空旷厂房",
+        objective: "击毁机械猎犬",
+        summary: "打铁声引来了几只失控的机械猎犬(K-9)。不要硬刚，利用狭窄地形游击，布置陷阱压碎它们，攻击背部电池仓弱点。"
+    },
+    {
+        id: "3-4",
+        chapter: "第三章：铁与锈",
+        location: "工厂主控室",
+        objective: "重启终端",
+        summary: "找到一本沾血的日志，记录了“方舟计划”。将电池串联启动主控电脑，读取加密文档。确认主大陆“伊甸园”在北方。下载海图，抉择去向。"
+    },
+
+    // --- 第四章：双人舞 ---
+    {
+        id: "4-1",
+        chapter: "第四章：双人舞",
+        location: "密林岛",
+        objective: "建立丛林哨站",
+        summary: "密林岛危机四伏，毒虫遍布。在远离沼泽的高地建立带栅栏的营地。利用泥浆涂满全身防蚊，收集树脂制作火把。"
+    },
+    {
+        id: "4-2",
+        chapter: "第四章：双人舞",
+        location: "密林深处",
+        objective: "绝境谈判",
+        summary: "你不慎踩中陷阱被倒吊。猎人赛斯手持复合弓出现。在被倒吊的状态下，通过对话和拿出身份卡，说服他你不是掠夺者，避免被射杀。"
+    },
+    {
+        id: "4-3",
+        chapter: "第四章：双人舞",
+        location: "赛斯营地",
+        objective: "击退变异森蚺",
+        summary: "一条15米长的变异森蚺袭击了营地，赛斯重伤。你必须利用落石陷阱和砍刀，攻击森蚺腹部，救下赛斯。这是建立信任的唯一机会。"
+    },
+    {
+        id: "4-4",
+        chapter: "第四章：双人舞",
+        location: "安全屋",
+        objective: "组建双人小队",
+        summary: "你救了赛斯。他坦白身世，你们正式结盟。修复他的复合弓，拼合海图，发现下一站是沉没的科研站。第一次有人与你分享烤肉。"
+    },
+
+    // --- 第五章：深海回响 ---
+    {
+        id: "5-1",
+        chapter: "第五章：深海回响",
+        location: "深海遗迹区",
+        objective: "修复潜水钟",
+        summary: "为了进入水下科研站，赛斯带你找到了一个生锈的潜水钟。利用橡胶密封缝隙，连接气泵。准备下潜。"
+    },
+    {
+        id: "5-2",
+        chapter: "第五章：深海回响",
+        location: "水下都市",
+        objective: "探索沉没实验室",
+        summary: "透过玻璃看到被淹没的摩天大楼。身穿简易潜水服游入地标大厦顶层实验室。时刻注意氧气，利用气泡室换气，避开锤头鲨。"
+    },
+    {
+        id: "5-3",
+        chapter: "第五章：深海回响",
+        location: "崩塌大楼",
+        objective: "生死逃脱",
+        summary: "巨型章鱼缠住了大楼，输气管断裂。窒息边缘，必须割断触手，启用备用气瓶，在赛斯的拉扯下拼命游回潜水钟。"
+    },
+    {
+        id: "5-4",
+        chapter: "第五章：深海回响",
+        location: "海面木筏",
+        objective: "解析星盘",
+        summary: "死里逃生带回了古代星盘。全息光束指向东方——谎言之港。阅读实验室文档，得知方舟计划失败是人祸。升级木筏底座。"
+    },
+
+    // --- 第六章：谎言之港 ---
+    {
+        id: "6-1",
+        chapter: "第六章：谎言之港",
+        location: "海上浮城",
+        objective: "寻找船用引擎",
+        summary: "巨大的海上贫民窟，鱼龙混杂。为了穿越风暴，必须在集市中寻找出售旧时代柴油引擎的商人。小心扒手。"
+    },
+    {
+        id: "6-2",
+        chapter: "第六章：谎言之港",
+        location: "废弃军舰",
+        objective: "高风险谈判",
+        summary: "中间人老杰克带你们交易。面对贪婪的商人和保镖，利用武力威慑压价，同时警惕暗处的埋伏。"
+    },
+    {
+        id: "6-3",
+        chapter: "第六章：谎言之港",
+        location: "水牢",
+        objective: "水牢求生",
+        summary: "被背叛了。老杰克是铁锈帮的人。你们被关在水位上涨的水牢里。安抚幽闭恐惧症发作的赛斯，在水底寻找铁丝撬锁越狱。"
+    },
+    {
+        id: "6-4",
+        chapter: "第六章：谎言之港",
+        location: "港口出口",
+        objective: "夺船大逃亡",
+        summary: "炸开牢门，抢夺一艘安装了引擎的快艇。操作鱼叉炮反击追兵，冲进库房夺回星盘，引爆燃油储备制造火墙，冲出港口。"
+    },
+
+    // --- 第七章：迷雾航路 ---
+    {
+        id: "7-1",
+        chapter: "第七章：迷雾航路",
+        location: "迷雾区",
+        objective: "登上幽灵船",
+        summary: "为了甩掉追兵驶入迷雾。登上死寂的豪华游轮寻找燃油。船上全是干尸。阅读日记，发现迷雾里有东西。"
+    },
+    {
+        id: "7-2",
+        chapter: "第七章：迷雾航路",
+        location: "游轮走廊",
+        objective: "分清虚实",
+        summary: "吸入孢子产生幻觉。看到了死去的亲人和说话的机械蟹。必须找到防毒面具恢复理智，唤醒发疯的赛斯。"
+    },
+    {
+        id: "7-3",
+        chapter: "第七章：迷雾航路",
+        location: "游轮甲板",
+        objective: "保卫船只",
+        summary: "巨型迷雾乌贼袭击。利用消防水炮喷射燃油，攻击乌贼眼球，砍断缠绕船体的触手。"
+    },
+    {
+        id: "7-4",
+        chapter: "第七章：迷雾航路",
+        location: "阳光海域",
+        objective: "升级复仇号",
+        summary: "冲出迷雾。利用游轮零件将快艇升级为半机械化战舰“复仇号”。安装雷达，清洗孢子。"
+    },
+
+    // --- 第八章：枯萎病 ---
+    {
+        id: "8-1",
+        chapter: "第八章：枯萎病",
+        location: "复仇号船舱",
+        objective: "寻找解药线索",
+        summary: "赛斯感染枯萎病，命悬一线。根据海图，附近的沼泽岛曾是医疗中心。必须独自登岛寻找血清。"
+    },
+    {
+        id: "8-2",
+        chapter: "第八章：枯萎病",
+        location: "沼泽生化岛",
+        objective: "收集原料",
+        summary: "岛上充满毒气和变异植物。深入腹地，采集三种稀有变异植物样本。维护防毒面具，制造除草剂开路。"
+    },
+    {
+        id: "8-3",
+        chapter: "第八章：枯萎病",
+        location: "地下实验室",
+        objective: "破解生物锁",
+        summary: "进入核心实验室，解开基因序列谜题。骇入自动炮塔防御系统。得知病毒是人造武器。"
+    },
+    {
+        id: "8-4",
+        chapter: "第八章：枯萎病",
+        location: "实验室出口",
+        objective: "突围与拯救",
+        summary: "合成血清，杀出丧尸包围圈。救治赛斯，并顺手救下机械师和医生，招募他们上船。净化岛屿水源。"
+    },
+
+    // --- 第九章：叹息之墙 ---
+    {
+        id: "9-1",
+        chapter: "第九章：叹息之墙",
+        location: "风暴边缘",
+        objective: "分析风暴眼",
+        summary: "伊甸园被超级风暴墙阻挡。计算风暴规律，寻找5分钟的进入窗口。全员动员，加固船体。"
+    },
+    {
+        id: "9-2",
+        chapter: "第九章：叹息之墙",
+        location: "风暴中心",
+        objective: "驾驭风暴",
+        summary: "冲入风暴。巨浪滔天。控制方向避开漩涡，清理卷上甲板的深海生物，扑灭机舱火灾。"
+    },
+    {
+        id: "9-3",
+        chapter: "第九章：叹息之墙",
+        location: "引擎室",
+        objective: "艰难的抉择",
+        summary: "冷却阀卡死。老机械师把你推出去，自己进入高温蒸汽室手动开启阀门。听着他的遗言，引擎轰鸣，你含泪冲破最后一道浪墙。"
+    },
+    {
+        id: "9-4",
+        chapter: "第九章：叹息之墙",
+        location: "大陆滩头",
+        objective: "插上旗帜",
+        summary: "风暴骤停，搁浅登陆。双脚终于踩在大陆上。为牺牲者立碑。眺望远处的废弃宏伟城市。"
+    },
+
+    // --- 第十章：新黎明 ---
+    {
+        id: "10-1",
+        chapter: "第十章：新黎明",
+        location: "中央废墟都市",
+        objective: "前往中央尖塔",
+        summary: "城市空无一人。伊甸园只是个传说。穿过废墟，前往世界树大厦。拼凑人类灭亡真相，重启区域电力。"
+    },
+    {
+        id: "10-2",
+        chapter: "第十章：新黎明",
+        location: "大厦顶层",
+        objective: "对话AI盖亚",
+        summary: "见到守护者量子主机盖亚。它解释风暴是筛选机制。利用星盘和身份卡进行最高权限验证。"
+    },
+    {
+        id: "10-3",
+        chapter: "第十章：新黎明",
+        location: "核心控制台",
+        objective: "按下重启按钮",
+        summary: "面临抉择：毁灭还是重启。看着身边的伙伴，回想起一路的艰辛，坚定选择重启文明。解锁基因库和科技蓝图。"
+    },
+    {
+        id: "10-4",
+        chapter: "第十章：新黎明",
+        location: "大厦露台",
+        objective: "种下希望",
+        summary: "防御风暴消散，向全海域发送广播。你在废墟缝隙中种下第一章带来的椰子。海面上千帆竞发。这不是终点，是新文明的第一天。"
+    }
+];
+
+// --- 其他静态配置 (保持不变) ---
 export const FLAVOR_TEXTS = {
   environment: ["潮湿的海风带着盐粒", "丛林深处未知的嘶吼", "暴雨打在芭蕉叶上的闷响", "远处火山腾起的黑烟", "腐烂植物的刺鼻气味", "刺骨的海风像刀割一样"],
   action: ["用力磨尖手中的木棍", "用浑浊的雨水清洗伤口", "强忍恶心生吃螃蟹", "警惕地环顾四周动静", "在树皮上刻下生存天数", "检查水源是否被污染"],
@@ -151,24 +464,7 @@ export const EVENT_SEEDS: Record<string, string[]> = {
   "深邃丛林": ["头顶传来树枝折断的脆响。", "这该死的湿度，衣服紧紧贴在身上。", "误触了一种带刺的植物，半条手臂瞬间麻木。", "在树根下发现了一个废弃的土著图腾。"]
 };
 
-export const EXPEDITION_LOCATIONS = [
-  { name: "被遗忘的二战掩体", desc: "混凝土裂缝中透出阴森的风。", diff: 4 },
-  { name: "食人族圣地", desc: "空气中弥漫着腐肉的气味。", diff: 5 },
-  { name: "迷雾沼泽", desc: "每一步都可能陷入致命的泥潭。", diff: 3 },
-  { name: "沉船湾", desc: "生锈的钢铁巨兽发出悲鸣。", diff: 4 },
-  { name: "蝙蝠岩洞", desc: "黑暗中无数红色的眼睛。", diff: 2 },
-  { name: "神秘灯塔", desc: "塔顶似乎还在闪烁微光。", diff: 3 }
-];
-
-export const AUTO_TASKS: any = {}; 
-
-export const MAIN_SAGA = [
-  { title: "第一章：苏醒", goal: "活过头三天，稳定生命体征。", phase: "survival", desc: "痛。全身都痛。", tasks: ["寻找淡水", "收集干草", "捡拾贝壳", "包扎伤口"], location: "荒芜海滩", reqLevel: 1 },
-  { title: "第二章：建立营地", goal: "搭建一个能遮风挡雨的庇护所。", phase: "survival", desc: "暴风雨要来了。", tasks: ["收集漂流木", "编织藤蔓", "寻找山洞", "搬运石头"], location: "椰林边缘", reqLevel: 3 },
-  { title: "第三章：探索内陆", goal: "查明岛屿深处的怪声来源。", phase: "exploration", desc: "海滩的资源枯竭了。", tasks: ["制作长矛", "绘制地图", "追踪兽径", "采集野果"], location: "深邃丛林", reqLevel: 5 },
-  { title: "第四章：旧日幽灵", goal: "调查二战遗迹，寻找逃生线索。", phase: "mystery", desc: "我在山顶看到了金属的反光。", tasks: ["搜寻废墟", "解读日记", "寻找无线电", "拆解零件"], location: "坠机山顶", reqLevel: 10 },
-  { title: "第五章：绝地求生", goal: "建造木筏，在这个雨季结束前离开。", phase: "escape", desc: "只要风向改变，我就有机会。", tasks: ["伐木", "储备干粮", "加固木筏", "观测星象"], location: "荒芜海滩", reqLevel: 15 }
-];
+export const MAIN_SAGA = [{ title: "遗落群岛", goal: "重启文明", phase: "survival", desc: "活下去。", tasks: [], location: "起始岛", reqLevel: 1 }]; // 占位符，实际逻辑走 NOVEL_SCRIPT
 
 export const SIDE_QUESTS = {
   "荒芜海滩": [{ title: "抓捕沙蟹", desc: "储备食物。", obj: "寻找", antagonist: "螃蟹" }, { title: "收集漂流木", desc: "优质木材。", obj: "收集", antagonist: "沉重" }],
@@ -190,3 +486,4 @@ export const MAP_LOCATIONS = { common: ["沙滩"], search: ["残骸"], hunt: ["�
 export const WORLD_MAP = [{ name: "荒芜海滩", type: "life", minLv: 1 }, { name: "深邃丛林", type: "hunt", minLv: 5 }, { name: "坠机山顶", type: "search", minLv: 10 }];
 export const STORY_STAGES = [{ level: 1, name: "幸存者" }];
 export const STATIC_LOGS = { idle: ["海浪拍打礁石。", "擦拭伤口。", "空气有土腥味。", "远处野兽嚎叫。", "盯着铁片发呆。"] };
+export const EXPEDITION_LOCATIONS = [{ name: "遗忘掩体", desc: "阴森。", diff: 4, duration: 1800000, rewards: {gold: 100, exp: 200, lootChance: 0.5} }];
