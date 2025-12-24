@@ -1,3 +1,6 @@
+// ... (保留之前的 import 和 辅助函数，确保 autoManageInventory 等在 useGame 前定义) ...
+// ⚠️ 只需要修改 autoDirector 函数部分，为了全量覆盖安全，我提供完整 useGame.ts 结构
+
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QuestCategory, Quest, QuestRank, Faction, MAIN_SAGA, SIDE_QUESTS, AUTO_TASKS, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_MALE, NPC_NAMES_FEMALE, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, WORLD_MAP, PERSONALITIES, EXPEDITION_LOCATIONS, Expedition, EVENT_SEEDS } from '@/app/lib/constants';
@@ -9,7 +12,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
 const EXPEDITION_REFRESH_INTERVAL = 4 * 60 * 60 * 1000; 
 
-// --- 辅助函数 (组件外) ---
+// --- 辅助函数定义 ---
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "幸存者";
@@ -30,7 +33,7 @@ const pickEventSeed = (location: string, objective: string): string => {
     const actionSeeds = EVENT_SEEDS[actionKey] || [];
     const locationSeeds = EVENT_SEEDS[location] || [];
     const pool = [...actionSeeds, ...locationSeeds];
-    if (pool.length === 0) return "观察周围的环境"; 
+    if (pool.length === 0) return "观察周围环境"; 
     return pool[Math.floor(Math.random() * pool.length)];
 };
 
@@ -203,7 +206,54 @@ export function useGame() {
   };
 
   const addMessage = (type: 'rumor' | 'system', title: string, content: string) => { setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; }); };
-  
+  const acceptQuest = (questId: string) => { if(!heroRef.current) return; const hero=heroRef.current; if(hero.activeExpedition) return; const quest=hero.questBoard.find(q=>q.id===questId); if(!quest) return; const newBoard=hero.questBoard.filter(q=>q.id!==questId); let newLocation=hero.location; if(quest.category==='main'){ const saga=MAIN_SAGA.find(s=>s.title===quest.script.title); if(saga) newLocation=saga.location; } const isBusy=hero.currentQuest&&hero.currentQuest.category!=='auto'; if(isBusy){ if(hero.queuedQuest) return; setHero(p=>p?{...p,queuedQuest:quest,questBoard:newBoard}:null); triggerAI('quest_start','','accept',{...hero,queuedQuest:quest}); }else{ const ns:HeroState={...hero,stamina:hero.stamina-quest.staminaCost,currentQuest:quest,queuedQuest:null,questBoard:newBoard,location:newLocation,state:'fight'}; setHero(ns); triggerAI('quest_journey','','start',ns); } };
+  const startExpedition = (expeditionId: string) => { if(!heroRef.current) return; const hero=heroRef.current; const exp=hero.expeditionBoard.find(e=>e.id===expeditionId); if(!exp) return; const ns:HeroState={...hero,activeExpedition:{...exp,startTime:Date.now(),endTime:Date.now()+exp.duration},state:'expedition',stamina:hero.stamina-30,location:exp.location,expeditionBoard:hero.expeditionBoard.filter(e=>e.id!==expeditionId),currentQuest:null,queuedQuest:null}; setHero(ns); triggerAI('expedition_start','','start',ns); };
+  const hireCompanion = (visitorId: string) => { if(!hero) return; const v=hero.tavern.visitors.find(v=>v.id===visitorId); if(!v) return; setHero(p=>p?{...p,gold:p.gold-v.price,companion:v,companionExpiry:Date.now()+86400000,tavern:{...p.tavern,visitors:p.tavern.visitors.filter(x=>x.id!==visitorId)}}:null); triggerAI("recruit_companion","", "recruit",{...hero,companion:v}); };
+  const godAction = async (type: 'bless'|'punish') => { if(!hero) return; if(type==='bless'){setHero(h=>h?{...h,hp:h.maxHp,godPower:h.godPower-25}:null); triggerAI('god_action','');} else {setHero(h=>h?{...h,hp:Math.max(1,h.hp-20),exp:h.exp+50,godPower:h.godPower-25}:null); triggerAI('god_action','');} };
+
+  const autoManageInventory = (currentHero: HeroState): { hero: HeroState, logs: string[], tagsChanged: boolean } => {
+    let hero = { ...currentHero };
+    const logs: string[] = []; 
+    let updated = false;
+    let equipChanged = false;
+    const newTags = calculateTags(hero);
+    const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(hero.tags);
+    if (tagsChanged) { hero.tags = newTags; updated = true; }
+
+    hero.inventory.forEach(item => {
+        if (item.type === 'weapon' && (!hero.equipment.weapon || (item.power||0) > (hero.equipment.weapon.power||0))) {
+            hero.equipment.weapon = item; updated = true; equipChanged = true;
+        }
+    });
+
+    if (hero.hp < hero.maxHp * 0.5) {
+       const potion = hero.inventory.find(i => i.type === 'consumable' && !i.desc.includes("热量"));
+       if (potion) {
+          const heal = Number(potion.effect) || 0;
+          hero.hp = Math.min(hero.maxHp, hero.hp + heal);
+          logs.push(`使用: ${potion.name}`);
+          const idx = hero.inventory.findIndex(i => i.id === potion.id);
+          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
+          updated = true;
+       }
+    }
+
+    if (hero.stamina < hero.maxStamina * 0.2) {
+       const food = hero.inventory.find(i => i.type === 'consumable' && (i.desc.includes("热量") || i.name.includes("椰子") || i.name.includes("饼干")));
+       if (food) {
+          const regen = Number(food.effect) || 0;
+          hero.stamina = Math.min(hero.maxStamina, hero.stamina + regen);
+          logs.push(`食用: ${food.name}`);
+          const idx = hero.inventory.findIndex(i => i.id === food.id);
+          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
+          updated = true;
+       }
+    }
+
+    if (equipChanged) { setTimeout(() => triggerAI('generate_equip_desc', '', undefined, hero), 100); }
+    return { hero: updated ? hero : currentHero, logs, tagsChanged };
+  };
+
   const triggerAI = async (eventType: string, suffix: string = "", action?: string, explicitHero?: HeroState, forceSeed?: string) => {
     if (Date.now() < aiCooldownRef.current) return false;
     if (isRequestingRef.current) return false;
@@ -226,12 +276,13 @@ export function useGame() {
         questCategory = "expedition";
     } else if (currentHero.currentQuest) {
         questTitle = currentHero.currentQuest.name;
-        taskObjective = currentHero.currentQuest.name; 
+        // ⚠️ 核心修正：使用 script.objective (如 "收集漂流木以加固营地") 而不是 name
+        // 确保 autoDirector 生成的丰富 objective 被传递给 AI
+        taskObjective = currentHero.currentQuest.script.objective || currentHero.currentQuest.name; 
         questCategory = currentHero.currentQuest.category;
     }
 
     let seedEvent = forceSeed || currentHero.currentSeed || "";
-    
     if (!seedEvent && (eventType === 'quest_journey' || eventType === 'idle_event')) {
         seedEvent = pickEventSeed(currentHero.location, taskObjective);
     }
@@ -292,98 +343,6 @@ export function useGame() {
     return true;
   };
 
-  const godAction = async (type: 'bless'|'punish') => { if(!hero) return; if(type==='bless'){setHero(h=>h?{...h,hp:h.maxHp,godPower:h.godPower-25}:null); triggerAI('god_action','');} else {setHero(h=>h?{...h,hp:Math.max(1,h.hp-20),exp:h.exp+50,godPower:h.godPower-25}:null); triggerAI('god_action','');} };
-
-  const acceptQuest = (questId: string) => { 
-    if(!heroRef.current) return; 
-    const hero=heroRef.current; 
-    if(hero.activeExpedition) return; 
-    
-    const quest=hero.questBoard.find(q=>q.id===questId); 
-    if(!quest) return; 
-    
-    const newBoard=hero.questBoard.filter(q=>q.id!==questId); 
-    let newLocation=hero.location; 
-    if(quest.category==='main'){ 
-        const saga=MAIN_SAGA.find(s=>s.title===quest.script.title); 
-        if(saga) newLocation=saga.location; 
-    } 
-    
-    const isBusy=hero.currentQuest&&hero.currentQuest.category!=='auto'; 
-    
-    if(isBusy){ 
-        if(hero.queuedQuest) return; 
-        setHero(p=>p?{...p,queuedQuest:quest,questBoard:newBoard}:null); 
-        triggerAI('quest_start','','accept',{...hero,queuedQuest:quest}); 
-    }else{ 
-        const ns:HeroState={...hero,stamina:hero.stamina-quest.staminaCost,currentQuest:quest,queuedQuest:null,questBoard:newBoard,location:newLocation,state:'fight'}; 
-        setHero(ns); 
-        triggerAI('quest_journey','','start',ns); 
-    } 
-  };
-
-  const startExpedition = (expeditionId: string) => { 
-      if(!heroRef.current) return; 
-      const hero=heroRef.current; 
-      const exp=hero.expeditionBoard.find(e=>e.id===expeditionId); 
-      if(!exp) return; 
-      const ns:HeroState={...hero,activeExpedition:{...exp,startTime:Date.now(),endTime:Date.now()+exp.duration},state:'expedition',stamina:hero.stamina-30,location:exp.location,expeditionBoard:hero.expeditionBoard.filter(e=>e.id!==expeditionId),currentQuest:null,queuedQuest:null}; 
-      setHero(ns); 
-      triggerAI('expedition_start','','start',ns); 
-  };
-
-  const hireCompanion = (visitorId: string) => { 
-      if(!hero) return; 
-      const v=hero.tavern.visitors.find(v=>v.id===visitorId); 
-      if(!v) return; 
-      setHero(p=>p?{...p,gold:p.gold-v.price,companion:v,companionExpiry:Date.now()+86400000,tavern:{...p.tavern,visitors:p.tavern.visitors.filter(x=>x.id!==visitorId)}}:null); 
-      triggerAI("recruit_companion","", "recruit",{...hero,companion:v}); 
-  };
-
-  // ⚠️ 关键函数：必须在 useEffect 之前定义
-  const autoManageInventory = (currentHero: HeroState): { hero: HeroState, logs: string[], tagsChanged: boolean } => {
-    let hero = { ...currentHero };
-    const logs: string[] = []; 
-    let updated = false;
-    let equipChanged = false;
-    const newTags = calculateTags(hero);
-    const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(hero.tags);
-    if (tagsChanged) { hero.tags = newTags; updated = true; }
-
-    hero.inventory.forEach(item => {
-        if (item.type === 'weapon' && (!hero.equipment.weapon || (item.power||0) > (hero.equipment.weapon.power||0))) {
-            hero.equipment.weapon = item; updated = true; equipChanged = true;
-        }
-    });
-
-    if (hero.hp < hero.maxHp * 0.5) {
-       const potion = hero.inventory.find(i => i.type === 'consumable' && !i.desc.includes("热量"));
-       if (potion) {
-          const heal = Number(potion.effect) || 0;
-          hero.hp = Math.min(hero.maxHp, hero.hp + heal);
-          logs.push(`使用: ${potion.name}`);
-          const idx = hero.inventory.findIndex(i => i.id === potion.id);
-          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
-          updated = true;
-       }
-    }
-
-    if (hero.stamina < hero.maxStamina * 0.2) {
-       const food = hero.inventory.find(i => i.type === 'consumable' && (i.desc.includes("热量") || i.name.includes("椰子") || i.name.includes("饼干")));
-       if (food) {
-          const regen = Number(food.effect) || 0;
-          hero.stamina = Math.min(hero.maxStamina, hero.stamina + regen);
-          logs.push(`食用: ${food.name}`);
-          const idx = hero.inventory.findIndex(i => i.id === food.id);
-          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
-          updated = true;
-       }
-    }
-
-    if (equipChanged) { setTimeout(() => triggerAI('generate_equip_desc', '', undefined, hero), 100); }
-    return { hero: updated ? hero : currentHero, logs, tagsChanged };
-  };
-
   const autoDirector = (currentHero: HeroState) => {
       const isHurt = currentHero.hp < currentHero.maxHp * 0.4;
       const isHungry = currentHero.stamina < 30;
@@ -413,8 +372,9 @@ export function useGame() {
           faction: 'nature',
           script: { 
               title: chosenTaskTitle, 
+              // ⚠️ 核心修正：这里构建带动机的 objective
               description: `为了${newStrategy.currentFocus}，我必须${chosenTaskTitle}。`, 
-              objective: chosenTaskTitle, 
+              objective: `${chosenTaskTitle}以${newStrategy.currentFocus}`, // 传递给 AI 的是"动词+目的"
               antagonist: "自然环境", 
               twist: seedEvent 
           },
@@ -518,10 +478,8 @@ export function useGame() {
       } finally {
           const currentHero = heroRef.current;
           const isDanger = currentHero ? (currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3) : false;
-          
           const minTick = isDanger ? 15000 : 25000;
           const maxTick = isDanger ? 25000 : 45000;
-          
           const nextTick = Math.floor(Math.random() * (maxTick - minTick) + minTick); 
           timerRef.current = setTimeout(gameLoop, nextTick);
       }

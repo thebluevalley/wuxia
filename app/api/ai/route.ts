@@ -6,130 +6,131 @@ import { FLAVOR_TEXTS } from "@/app/lib/constants";
 const PROVIDER_CONFIG = {
   baseURL: "https://api.siliconflow.cn/v1",
   apiKey: process.env.SILICONFLOW_API_KEY, 
-  // ⚠️ 修正：使用免费版 7B 模型
   model: "Qwen/Qwen2.5-7B-Instruct", 
 };
 
 export async function POST(req: Request) {
-  // 1. 检查 Key 是否配置
   if (!PROVIDER_CONFIG.apiKey) {
-      console.error("Error: Missing SILICONFLOW_API_KEY in .env.local");
       return NextResponse.json({ text: null, error: "Server Config Error: Missing API Key" }, { status: 500 });
   }
 
   try {
     const { context, eventType } = await req.json();
 
-    // 2. 初始化 OpenAI 客户端 (连接到 SiliconFlow)
     const openai = new OpenAI({
       baseURL: PROVIDER_CONFIG.baseURL,
       apiKey: PROVIDER_CONFIG.apiKey,
     });
 
-    // 3. 解构上下文
     const isDanger = context.isDanger;
     const isMainQuest = context.questCategory === 'main';
     const isSideTask = context.questCategory === 'side' || context.questCategory === 'auto';
+    
+    // ⚠️ 增强：任务目标描述
     const taskTarget = context.taskObjective || "生存"; 
-    const strategy = context.strategy || { longTermGoal: "活着", currentFocus: "生存" };
+    
+    // ⚠️ 增强：策略与动机
+    const strategy = context.strategy || { longTermGoal: "活下去", currentFocus: "维持生命体征" };
+    
     const seedEvent = context.seedEvent || "";
     const recentLogs = context.recentLogs || [];
     const recentLogsText = recentLogs.join(" | ");
     const location = context.location || "荒野";
-    
-    // 随机环境氛围
     const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
 
-    // 4. 构建风格指令
     let styleInstruction = "";
     if (isDanger) {
-        styleInstruction = "【生死时刻】：极度紧迫。短句为主。描写肾上腺素、疼痛、本能反应。";
+        styleInstruction = "【生死时刻】：极度紧迫。必须描写具体的应对动作（躲闪、反击、逃跑），而不仅仅是描写恐惧。";
     } else if (isSideTask) {
-        styleInstruction = `【以小见大】：描写具体的物理动作【${taskTarget}】。同时，在潜台词中透露出这个动作是为了实现长期目标【${strategy.longTermGoal}】。`;
+        // ⚠️ 核心修正：强制动作与结果
+        styleInstruction = `【剧情推进】：禁止只描写环境（如风沙、天气）。必须描写主角为了【${strategy.currentFocus}】而执行【${taskTarget}】的具体过程。动作 -> 阻碍 -> 结果。`;
     } else {
-        styleInstruction = "【生存日记】：充满画面感和文学性的微型小说片段。";
+        styleInstruction = "【生存日记】：记录关键的生存决策。";
     }
 
     // 5. 构建 System Prompt
     const systemPrompt = `
       你是一个硬核荒野求生游戏的叙事引擎。
-      你的任务是根据玩家的状态和行为，实时生成一段简短但极具沉浸感的中文日记。
+      你的任务是推动剧情，而不是单纯描写风景。
       
-      【核心规则】：
-      1. **字数控制**：30-80字。保持精炼。
-      2. **拒绝重复**：绝对不要写和以下内容相似的句子：[${recentLogsText}]。
-      3. **拒绝废话**：不要写"我正在努力"、"这很难"这种空洞的心理描写。每一句话都要有实质的物理反馈（触觉、听觉、视觉）。
-      4. **逻辑连贯**：主角当前专注于【${strategy.currentFocus}】。
-      5. **种子扩写**：必须基于给定的【事件种子】进行文学润色，不要生硬地翻译种子。
+      【绝对禁令】：
+      1. **禁止**重复描写"风"、"沙"、"痛"、"冷"，除非它们直接阻碍了当前的行动。
+      2. **禁止**写无意义的心理活动（如"我希望能活下去"）。
+      3. **禁止**重复以下内容：[${recentLogsText}]。
+
+      【写作公式】：
+      1. **动作 (Action)**：主角具体在做什么？(例如：弯腰挖掘、用力拉扯、打磨)
+      2. **目的 (Goal)**：为什么要做这个？(为了${strategy.longTermGoal})
+      3. **反馈 (Result)**：环境或物品给了什么反馈？(木头断了、发现水珠、工具磨损)
+      
+      请用简练、冷峻的笔触（30-80字）生成一段内容。
     `;
 
     // 6. 构建 User Prompt
     let userPrompt = "";
-    const baseInfo = `当前地点：${location}。环境氛围：${envFlavor}。`;
+    const baseInfo = `地点：${location}。环境：${envFlavor}。`;
 
     switch (eventType) {
       case 'start_game':
-        userPrompt = `${baseInfo} 任务：写第一篇日记。内容：我刚醒来。感官细节（沙子的粗糙、海水的咸腥、身体的剧痛）。迷茫与恐惧。目标：${strategy.longTermGoal}。`;
+        userPrompt = `${baseInfo} 任务：写第一篇日记。内容：刚醒来。身体的剧痛让我意识到这不是梦。我必须立刻检查伤势并寻找水源。`;
         break;
       
       case 'quest_start':
-        userPrompt = `${baseInfo} 事件：开始任务【${context.questTitle}】。指令：写一句准备动作。比如检查工具，或者深呼吸确认目标。`;
+        userPrompt = `${baseInfo} 事件：决定开始任务【${context.questTitle}】。
+        指令：写一句具体的准备动作。例如："整理好行囊，确认匕首还在腰间，我向${location}深处走去，为了${strategy.currentFocus}。"`;
         break;
 
       case 'quest_journey':
-        userPrompt = `${baseInfo} 当前动作：【${taskTarget}】。事件种子："${seedEvent}"。指令：详细描写这个动作的过程。强调物理反馈（重量、质感、疼痛）。`;
+        // ⚠️ 核心修正：强制关联任务
+        userPrompt = `${baseInfo} 
+        当前状态：正在执行【${taskTarget}】。
+        微观事件："${seedEvent}"。
+        指令：**扩写这个微观事件**。
+        要求：
+        1. 必须体现主角的主观能动性（是我在做，不是风在吹）。
+        2. 必须体现这个动作对【${strategy.currentFocus}】的微小贡献。
+        示例（如果任务是找水）："扒开潮湿的苔藓，手指触碰到了冰凉的泥土，虽然只有几滴浑浊的水渗出，但这至少是活下去的希望。"`;
         break;
 
       case 'quest_climax':
-        userPrompt = `${baseInfo} 事件：任务遭遇小意外！指令：极短的危机描写！例如工具断裂、毒虫叮咬、脚下游动。`;
+        userPrompt = `${baseInfo} 事件：执行【${taskTarget}】时遭遇突发阻碍！指令：描写这个具体的物理阻碍（如工具断裂、脚下踏空）。`;
         break;
 
       case 'quest_end':
-        userPrompt = `${baseInfo} 事件：任务【${context.questTitle}】完成。指令：描写看着成果的瞬间。感到离【${strategy.longTermGoal}】又近了一步。`;
+        userPrompt = `${baseInfo} 事件：任务【${context.questTitle}】完成。指令：看着手中的成果（${context.questTitle}的产物），虽然身体疲惫，但离【${strategy.longTermGoal}】又近了一步。`;
         break;
       
       case 'expedition_start':
-        userPrompt = `${baseInfo} 整理好行囊，为了寻找${strategy.longTermGoal}的线索，毅然踏入【${location}】。`;
+        userPrompt = `${baseInfo} 毅然踏入【${location}】。虽然前路未卜，但为了寻找${strategy.longTermGoal}的线索，别无选择。`;
         break;
       
       case 'expedition_event':
-        userPrompt = `${baseInfo} 探险中发现了一个惊人的东西。事件种子："${seedEvent}"。描写它的外观和给主角带来的震撼。`;
+        userPrompt = `${baseInfo} 探险发现：${seedEvent}。描写这个发现的细节，以及它对生存的潜在价值。`;
         break;
       
       case 'expedition_end':
-        userPrompt = `${baseInfo} 探险结束。虽然满身泥泞，但收获颇丰。`;
+        userPrompt = `${baseInfo} 探险结束。满载而归。`;
         break;
 
       case 'idle_event':
-        userPrompt = `${baseInfo} 状态：短暂休息。事件种子："${seedEvent}"。指令：写一个放松的细节。但在内心深处，依然挂念着【${strategy.longTermGoal}】。`;
-        break;
-        
-      case 'recruit_companion':
-        userPrompt = `${baseInfo} 遇到幸存者。描写他衣衫褴褛的细节和警惕的眼神。`;
-        break;
-        
-      case 'god_action':
-        userPrompt = `${baseInfo} 突发意外。描写运气好或坏的具体表现。`;
+        userPrompt = `${baseInfo} 状态：短暂休息。指令：利用这片刻时间整理装备或规划下一步，哪怕在休息，脑子里想的也是${strategy.currentFocus}。`;
         break;
         
       default:
-        userPrompt = `${baseInfo} 记录这一刻的生存状态。`;
+        userPrompt = `${baseInfo} 记录当下的生存状态。`;
     }
 
-    // 7. 发送请求
     const completion = await openai.chat.completions.create({
       messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
       ],
       model: PROVIDER_CONFIG.model,
-      temperature: 0.8, 
+      temperature: 0.85, 
       max_tokens: 150, 
     });
 
     let text = completion.choices[0]?.message?.content || "";
-    
-    // 8. 后处理
     text = text.replace(/^(Task:|Context:|Response:|Here is|Scene:|Day 1|日记|【.*?】).*/gi, '').trim();
     text = text.replace(/^["']|["']$/g, ''); 
     text = text.replace(/\*\*/g, ''); 
@@ -139,10 +140,8 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("AI API Error:", error);
     let msg = error.message;
-    if (error.status === 401) msg = "API Key 无效，请检查配置。";
-    if (error.status === 429) msg = "请求太快了 (429)，请稍候。";
-    if (error.status === 500) msg = "SiliconFlow 服务器繁忙。";
-    
+    if (error.status === 401) msg = "API Key 无效。";
+    if (error.status === 429) msg = "请求过快，AI 正在思考...";
     return NextResponse.json({ text: null, error: msg }, { status: 500 });
   }
 }
