@@ -6,7 +6,7 @@ import { FLAVOR_TEXTS } from "@/app/lib/constants";
 const PROVIDER_CONFIG = {
   baseURL: "https://api.siliconflow.cn/v1",
   apiKey: process.env.SILICONFLOW_API_KEY, 
-  model: "Qwen/Qwen2.5-7B-Instruct", 
+  model: "deepseek-ai/DeepSeek-V3", 
 };
 
 export async function POST(req: Request) {
@@ -25,13 +25,8 @@ export async function POST(req: Request) {
     const isDanger = context.isDanger;
     const isMainQuest = context.questCategory === 'main';
     const isSideTask = context.questCategory === 'side' || context.questCategory === 'auto';
-    
-    // ⚠️ 增强：任务目标描述
     const taskTarget = context.taskObjective || "生存"; 
-    
-    // ⚠️ 增强：策略与动机
-    const strategy = context.strategy || { longTermGoal: "活下去", currentFocus: "维持生命体征" };
-    
+    const strategy = context.strategy || { longTermGoal: "活着", currentFocus: "生存" };
     const seedEvent = context.seedEvent || "";
     const recentLogs = context.recentLogs || [];
     const recentLogsText = recentLogs.join(" | ");
@@ -42,89 +37,84 @@ export async function POST(req: Request) {
     if (isDanger) {
         styleInstruction = "【生死时刻】：极度紧迫。必须描写具体的应对动作（躲闪、反击、逃跑），而不仅仅是描写恐惧。";
     } else if (isSideTask) {
-        // ⚠️ 核心修正：强制动作与结果
-        styleInstruction = `【剧情推进】：禁止只描写环境（如风沙、天气）。必须描写主角为了【${strategy.currentFocus}】而执行【${taskTarget}】的具体过程。动作 -> 阻碍 -> 结果。`;
+        // ⚠️ 核心修正：强调动作细节和情感反馈
+        styleInstruction = `【紧扣主题】：必须围绕【${taskTarget}】这个具体任务展开。
+        1. **过程描写**：如何执行动作？(例如：弯腰、挖掘、追逐)
+        2. **遇到阻碍**：发生了什么困难？(例如：猎物逃跑、工具卡住、身体疲惫)
+        3. **情感反馈**：主角的感受如何？(例如：气喘吁吁但很兴奋、失望、肌肉酸痛)
+        禁止写与任务无关的环境描写。`;
     } else {
         styleInstruction = "【生存日记】：记录关键的生存决策。";
     }
 
-    // 5. 构建 System Prompt
-    const systemPrompt = `
+    const baseInstruction = `
       你是一个硬核荒野求生游戏的叙事引擎。
-      你的任务是推动剧情，而不是单纯描写风景。
+      你的任务是推动剧情，确保每一句话都与主角当前的行动紧密相关。
       
       【绝对禁令】：
-      1. **禁止**重复描写"风"、"沙"、"痛"、"冷"，除非它们直接阻碍了当前的行动。
-      2. **禁止**写无意义的心理活动（如"我希望能活下去"）。
-      3. **禁止**重复以下内容：[${recentLogsText}]。
+      1. **禁止**单纯描写风景（如"风很冷"），除非它直接阻碍了行动。
+      2. **禁止**重复以下内容：[${recentLogsText}]。
 
-      【写作公式】：
-      1. **动作 (Action)**：主角具体在做什么？(例如：弯腰挖掘、用力拉扯、打磨)
-      2. **目的 (Goal)**：为什么要做这个？(为了${strategy.longTermGoal})
-      3. **反馈 (Result)**：环境或物品给了什么反馈？(木头断了、发现水珠、工具磨损)
-      
-      请用简练、冷峻的笔触（30-80字）生成一段内容。
+      请用简练、冷峻但充满细节的笔触（30-90字）生成一段内容。
     `;
 
-    // 6. 构建 User Prompt
-    let userPrompt = "";
+    let prompt = "";
     const baseInfo = `地点：${location}。环境：${envFlavor}。`;
 
     switch (eventType) {
       case 'start_game':
-        userPrompt = `${baseInfo} 任务：写第一篇日记。内容：刚醒来。身体的剧痛让我意识到这不是梦。我必须立刻检查伤势并寻找水源。`;
+        prompt = `${baseInfo} ${baseInstruction} 任务：写第一篇日记。内容：刚醒来。剧痛。迷茫。检查伤势。`;
         break;
       
       case 'quest_start':
-        userPrompt = `${baseInfo} 事件：决定开始任务【${context.questTitle}】。
-        指令：写一句具体的准备动作。例如："整理好行囊，确认匕首还在腰间，我向${location}深处走去，为了${strategy.currentFocus}。"`;
+        prompt = `${baseInfo} ${baseInstruction} 
+        事件：开始任务【${context.questTitle}】。
+        指令：写一句具体的准备动作。
+        潜台词：为了${strategy.currentFocus}，我必须完成它。`;
         break;
 
       case 'quest_journey':
-        // ⚠️ 核心修正：强制关联任务
-        userPrompt = `${baseInfo} 
-        当前状态：正在执行【${taskTarget}】。
+        prompt = `${baseInfo} ${baseInstruction} 
+        当前专注：正在全力【${taskTarget}】。
         微观事件："${seedEvent}"。
-        指令：**扩写这个微观事件**。
+        指令：**扩写这个过程**。
         要求：
-        1. 必须体现主角的主观能动性（是我在做，不是风在吹）。
-        2. 必须体现这个动作对【${strategy.currentFocus}】的微小贡献。
-        示例（如果任务是找水）："扒开潮湿的苔藓，手指触碰到了冰凉的泥土，虽然只有几滴浑浊的水渗出，但这至少是活下去的希望。"`;
+        1. 描写具体的动作细节（手部动作、身体姿态）。
+        2. 描写任务带来的生理感受（累、痛、饿）。
+        3. 如果成功了一小步，描写那种微小的成就感；如果受阻，描写沮丧。
+        示例（任务是抓蟹）："手指刚触碰到沙蟹冰凉的外壳，它猛地夹住了我的虎口，钻心的疼让我差点叫出声，但我死死按住了它。"`;
         break;
 
       case 'quest_climax':
-        userPrompt = `${baseInfo} 事件：执行【${taskTarget}】时遭遇突发阻碍！指令：描写这个具体的物理阻碍（如工具断裂、脚下踏空）。`;
+        prompt = `${baseInfo} ${baseInstruction} 事件：执行【${taskTarget}】时遭遇突发阻碍！指令：描写这个具体的物理危机。`;
         break;
 
       case 'quest_end':
-        userPrompt = `${baseInfo} 事件：任务【${context.questTitle}】完成。指令：看着手中的成果（${context.questTitle}的产物），虽然身体疲惫，但离【${strategy.longTermGoal}】又近了一步。`;
+        prompt = `${baseInfo} ${baseInstruction} 事件：任务【${context.questTitle}】完成。指令：看着手中的成果，描写身体的疲惫感散去，取而代之的是生存下去的希望。`;
         break;
       
       case 'expedition_start':
-        userPrompt = `${baseInfo} 毅然踏入【${location}】。虽然前路未卜，但为了寻找${strategy.longTermGoal}的线索，别无选择。`;
+        prompt = `${baseInfo} ${baseInstruction} 整理行囊，为了寻找${strategy.longTermGoal}，毅然踏入未知。`;
         break;
       
       case 'expedition_event':
-        userPrompt = `${baseInfo} 探险发现：${seedEvent}。描写这个发现的细节，以及它对生存的潜在价值。`;
+        prompt = `${baseInfo} ${baseInstruction} 探险发现：${seedEvent}。描写这个发现的细节和给主角带来的震撼。`;
         break;
       
       case 'expedition_end':
-        userPrompt = `${baseInfo} 探险结束。满载而归。`;
+        prompt = `${baseInfo} ${baseInstruction} 探险结束。满身泥泞但满载而归。`;
         break;
 
       case 'idle_event':
-        userPrompt = `${baseInfo} 状态：短暂休息。指令：利用这片刻时间整理装备或规划下一步，哪怕在休息，脑子里想的也是${strategy.currentFocus}。`;
+        prompt = `${baseInfo} ${baseInstruction} 状态：短暂休息。指令：利用这片刻时间整理装备，脑子里盘算着下一步计划。`;
         break;
         
       default:
-        userPrompt = `${baseInfo} 记录当下的生存状态。`;
+        prompt = `${baseInfo} ${baseInstruction} 记录这一刻。`;
     }
 
     const completion = await openai.chat.completions.create({
-      messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-      ],
+      messages: [{ role: "user", content: prompt }],
       model: PROVIDER_CONFIG.model,
       temperature: 0.85, 
       max_tokens: 150, 

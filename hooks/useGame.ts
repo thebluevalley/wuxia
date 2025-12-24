@@ -1,6 +1,3 @@
-// ... (保留之前的 import 和 辅助函数，确保 autoManageInventory 等在 useGame 前定义) ...
-// ⚠️ 只需要修改 autoDirector 函数部分，为了全量覆盖安全，我提供完整 useGame.ts 结构
-
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { HeroState, LogEntry, STATIC_LOGS, Item, LOOT_TABLE, ItemType, Equipment, QuestCategory, Quest, QuestRank, Faction, MAIN_SAGA, SIDE_QUESTS, AUTO_TASKS, STORY_STAGES, WORLD_LORE, SKILL_LIBRARY, Skill, Message, Quality, NPC_NAMES_MALE, NPC_NAMES_FEMALE, NPC_NAMES_LAST, NPC_ARCHETYPES, NPC_TRAITS, Companion, WORLD_MAP, PERSONALITIES, EXPEDITION_LOCATIONS, Expedition, EVENT_SEEDS } from '@/app/lib/constants';
@@ -12,7 +9,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
 const EXPEDITION_REFRESH_INTERVAL = 4 * 60 * 60 * 1000; 
 
-// --- 辅助函数定义 ---
+// --- 辅助函数 ---
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "幸存者";
@@ -28,12 +25,13 @@ const calculateTags = (hero: HeroState): string[] => {
   return Array.from(tags).slice(0, 5);
 };
 
+// 种子选择器
 const pickEventSeed = (location: string, objective: string): string => {
     const actionKey = objective.substring(0, 2); 
     const actionSeeds = EVENT_SEEDS[actionKey] || [];
     const locationSeeds = EVENT_SEEDS[location] || [];
     const pool = [...actionSeeds, ...locationSeeds];
-    if (pool.length === 0) return "观察周围环境"; 
+    if (pool.length === 0) return "观察周围的环境"; 
     return pool[Math.floor(Math.random() * pool.length)];
 };
 
@@ -53,7 +51,15 @@ const generateQuestBoard = (hero: HeroState): Quest[] => {
           category: 'side',
           rank,
           faction: 'nature',
-          script: { title: template.title, description: template.desc, objective: template.obj, antagonist: template.antagonist, twist: "无", npc: "无" },
+          script: { 
+              title: template.title, 
+              description: template.desc, 
+              // ⚠️ 核心修正：这里必须传具体的任务名 (如 "抓捕沙蟹")，而不是抽象动词 ("寻找")
+              objective: template.title, 
+              antagonist: template.antagonist, 
+              twist: "无", 
+              npc: "无" 
+          },
           desc: template.desc,
           stage: 'start',
           progress: 0,
@@ -276,8 +282,7 @@ export function useGame() {
         questCategory = "expedition";
     } else if (currentHero.currentQuest) {
         questTitle = currentHero.currentQuest.name;
-        // ⚠️ 核心修正：使用 script.objective (如 "收集漂流木以加固营地") 而不是 name
-        // 确保 autoDirector 生成的丰富 objective 被传递给 AI
+        // ⚠️ 关键：确保传给 AI 的 objective 是具体的任务名
         taskObjective = currentHero.currentQuest.script.objective || currentHero.currentQuest.name; 
         questCategory = currentHero.currentQuest.category;
     }
@@ -372,9 +377,8 @@ export function useGame() {
           faction: 'nature',
           script: { 
               title: chosenTaskTitle, 
-              // ⚠️ 核心修正：这里构建带动机的 objective
               description: `为了${newStrategy.currentFocus}，我必须${chosenTaskTitle}。`, 
-              objective: `${chosenTaskTitle}以${newStrategy.currentFocus}`, // 传递给 AI 的是"动词+目的"
+              objective: `${chosenTaskTitle}以${newStrategy.currentFocus}`, 
               antagonist: "自然环境", 
               twist: seedEvent 
           },
