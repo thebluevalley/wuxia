@@ -9,7 +9,6 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
 const EXPEDITION_REFRESH_INTERVAL = 4 * 60 * 60 * 1000; 
 
-// --- 辅助函数 ---
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "幸存者";
@@ -176,12 +175,21 @@ export function useGame() {
     const finalType: LogEntry['type'] = 'highlight'; 
     setHero(prev => {
       if (!prev) return null;
-      const lastLog = prev.logs[0]?.text;
-      if (lastLog === text) return prev; 
+      // ⚠️ 严格的客户端防重：如果新文本已存在于最近 5 条日志中，拒绝添加
+      const recentTexts = prev.logs.slice(0, 5).map(l => l.text);
+      if (recentTexts.includes(text)) {
+          return prev;
+      }
+
       const timeStr = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
       const newHistory = (prev.narrativeHistory + " " + text).slice(-800); 
       const newLog: LogEntry = { id: Date.now().toString(), text, type: finalType, time: timeStr };
-      return { ...prev, logs: [newLog, ...prev.logs].slice(0, 50), narrativeHistory: newHistory };
+      const newLogs = [newLog, ...prev.logs].slice(0, 50);
+      
+      // 更新 ref 供 AI 使用
+      recentLogsRef.current = newLogs.slice(0, 5).map(l => l.text);
+      
+      return { ...prev, logs: newLogs, narrativeHistory: newHistory };
     });
   };
 
@@ -273,7 +281,7 @@ export function useGame() {
     
     let questTitle = "无";
     let taskObjective = "休息/放松"; 
-    let questCategory = "none"; // ⚠️ 新增：明确传递任务类型
+    let questCategory = "none";
 
     if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
         questTitle = currentHero.activeExpedition.name;
@@ -282,10 +290,13 @@ export function useGame() {
     } else if (currentHero.currentQuest) {
         questTitle = currentHero.currentQuest.name;
         taskObjective = currentHero.currentQuest.name; 
-        questCategory = currentHero.currentQuest.category; // 'main', 'side', 'auto'
+        questCategory = currentHero.currentQuest.category;
     }
 
     const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
+
+    // ⚠️ 发送最近的日志给后端，用于防重
+    const recentLogs = recentLogsRef.current || [];
 
     try {
       const context = { 
@@ -295,11 +306,11 @@ export function useGame() {
         mainSaga: mainSagaInfo,
         questTitle,
         taskObjective,
-        questCategory, // ⚠️ 传入后端
+        questCategory,
         questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
         questStage: currentHero.currentQuest?.stage,
         companionInfo: companionInfo, 
-        recentLogs: recentLogsRef.current, 
+        recentLogs: recentLogs, // ⚠️ 关键字段
         tags: currentHero.tags || [],
         equipment: currentHero.equipment,
         isDanger: isDanger 
@@ -322,7 +333,14 @@ export function useGame() {
       }
     } catch (e) { 
         console.error(e); 
-        const fallback = STATIC_LOGS.idle[Math.floor(Math.random() * STATIC_LOGS.idle.length)];
+        // ⚠️ 智能兜底 V2：确保不重复
+        const lastLog = currentHero.logs[0]?.text;
+        let fallback = "";
+        let attempts = 0;
+        do {
+            fallback = STATIC_LOGS.idle[Math.floor(Math.random() * STATIC_LOGS.idle.length)];
+            attempts++;
+        } while ((fallback === lastLog || recentLogs.includes(fallback)) && attempts < 10);
         addLog(fallback, "highlight");
     }
     return false;
@@ -446,7 +464,8 @@ export function useGame() {
               managedHero.state = 'sleep';
               aiEvent = 'idle_event'; 
           } else if (!newQuest && !queued) {
-              if (Math.random() < 0.3) { 
+              // ⚠️ 关键修改：大幅降低随机发呆概率 (30% -> 5%)，强制忙碌
+              if (Math.random() < 0.05) { 
                   managedHero.state = 'idle';
                   aiEvent = 'idle_event'; 
               } else {

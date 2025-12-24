@@ -10,24 +10,27 @@ export async function POST(req: Request) {
     const { context, eventType, userAction } = await req.json();
     const groq = new Groq({ apiKey });
 
-    // ⚠️ 任务类型判断
+    const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
+    const isDanger = context.isDanger;
     const isMainQuest = context.questCategory === 'main';
     const isSideTask = context.questCategory === 'side' || context.questCategory === 'auto';
     const taskTarget = context.taskObjective || "生存"; 
+    
+    // ⚠️ 防重核心：获取最近日志
+    const recentLogs = context.recentLogs || [];
+    const recentLogsText = recentLogs.join(" | ");
 
-    // 环境氛围：如果是做支线/自动任务，忽略环境，专注动作
-    const envFlavor = isSideTask ? "专注手头工作，无视环境" : FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
+    const envFlavorText = isSideTask ? "专注手头工作，无视环境" : envFlavor;
     
     let styleInstruction = "";
     if (context.isDanger) {
         styleInstruction = "【危急】：极短句。只有动作。心跳感。";
     } else if (isSideTask) {
-        // ⚠️ 核心：支线任务屏蔽主线剧情
-        styleInstruction = "【物理动作模式】：主线剧情已暂停。禁止提及回忆、未来或世界观。只描写执行【" + taskTarget + "】的具体物理动作。";
+        styleInstruction = `【物理动作模式】：只描写执行【${taskTarget}】的**具体微观动作**。例如手的触感、工具的声音。`;
     } else if (isMainQuest) {
-        styleInstruction = "【主线剧情】：第一人称日记。可以包含心理活动、回忆和对未来的思考。";
+        styleInstruction = "【剧情日记】：可以包含心理活动和世界观。";
     } else {
-        styleInstruction = "【生存日记】：记录当下的状态。";
+        styleInstruction = "【生存快照】：记录当下的状态。";
     }
 
     const baseInstruction = `
@@ -36,9 +39,14 @@ export async function POST(req: Request) {
       风格：${styleInstruction}
       字数限制：40字以内。
       
+      【绝对禁令】：
+      1. **严禁重复**：绝对不要写和以下内容相似的句子：[${recentLogsText}]。
+      2. 严禁废话：不要写"我正在努力工作"、"这很难"这种空话。
+      3. 必须写新的细节。
+      
       背景：
       - 地点：${context.location}。
-      - 氛围：${envFlavor}。
+      - 氛围：${envFlavorText}。
     `;
 
     let prompt = "";
@@ -49,33 +57,23 @@ export async function POST(req: Request) {
         break;
       
       case 'quest_start':
-        prompt = `${baseInstruction} 
-        事件：开始任务【${context.questTitle}】。
-        指令：${isSideTask ? "写一句准备工具的动作。" : "写下决心和出发前的心理。"}
-        `;
+        prompt = `${baseInstruction} 事件：开始任务【${context.questTitle}】。写一句准备动作。`;
         break;
 
       case 'quest_journey':
         prompt = `${baseInstruction} 
-        当前专注：正在进行【${taskTarget}】。
-        ${isSideTask ? 
-            `指令：写一个**具体的物理动作**。例如"弯腰捡起..."、"用力拉扯..."。禁止写"我正在做任务"。` : 
-            `指令：描写路途中的发现、心理变化或环境细节。`
-        }
-        `;
+        当前任务：【${taskTarget}】。
+        指令：写一个**此前没写过的**具体动作细节。
+        比如：如果任务是砍树，这次写"木屑溅到了眼睛里"或者"手掌被树皮磨破了"。
+        不要写重复的动作！`;
         break;
 
       case 'quest_climax':
-        prompt = `${baseInstruction} 
-        事件：遭遇阻碍！
-        指令：极短的动作描写！例如工具断了、脚滑了、被虫子咬了。`;
+        prompt = `${baseInstruction} 任务遭遇小意外！极短动作描写！`;
         break;
 
       case 'quest_end':
-        prompt = `${baseInstruction} 
-        事件：任务【${context.questTitle}】完成。
-        指令：${isSideTask ? "描写看着劳动成果的满足感。" : "描写这对生存意味着什么。"}
-        `;
+        prompt = `${baseInstruction} 任务【${context.questTitle}】完成。描写成果。`;
         break;
       
       case 'expedition_start':
@@ -85,7 +83,7 @@ export async function POST(req: Request) {
       case 'expedition_event':
         prompt = `${baseInstruction} 
         事件：在【${context.location}】探险中。
-        指令：描写一个惊险的片段或发现。比如：发现旧时代的遗物、听到奇怪的嘶吼。
+        指令：描写一个惊险的片段或发现。
         `;
         break;
       
@@ -95,8 +93,8 @@ export async function POST(req: Request) {
 
       case 'idle_event':
         prompt = `${baseInstruction} 
-        状态：没有任务，正在休息。
-        指令：写一个放松的瞬间。比如：看着海浪发呆、在沙滩上画画、打盹、清理指甲。
+        状态：正在休息。
+        指令：写一个从未写过的放松细节。禁止写哼歌、打盹（如果最近写过）。
         `;
         break;
 
@@ -122,7 +120,7 @@ export async function POST(req: Request) {
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 0.7, 
+      temperature: 0.9, // 提高随机性以避免重复
       max_tokens: 150, 
     });
 
