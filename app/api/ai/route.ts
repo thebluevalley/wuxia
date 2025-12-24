@@ -23,105 +23,128 @@ export async function POST(req: Request) {
     });
 
     const isDanger = context.isDanger;
-    const isMainQuest = context.questCategory === 'main';
-    const isSideTask = context.questCategory === 'side' || context.questCategory === 'auto';
+    // 任务类型判断
+    const questCategory = context.questCategory || 'none';
+    const isMainQuest = questCategory === 'main';
+    const isSideTask = questCategory === 'side' || questCategory === 'auto';
+    const isExpedition = questCategory === 'expedition' || eventType.includes('expedition');
+
     const taskTarget = context.taskObjective || "生存"; 
-    
-    // ⚠️ 获取任务详细描述
-    const questDesc = context.questScript?.description || "为了生存而行动";
-    
+    // 仅在主线时使用策略目标，支线时屏蔽
     const strategy = context.strategy || { longTermGoal: "活着", currentFocus: "生存" };
+    const questDesc = context.questScript?.description || "";
+    
     const seedEvent = context.seedEvent || "";
     const recentLogs = context.recentLogs || [];
     const recentLogsText = recentLogs.join(" | ");
     const location = context.location || "荒野";
     const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
 
+    // ⚠️ 核心：动态风格指令 (叙事隔离)
     let styleInstruction = "";
+    
     if (isDanger) {
-        styleInstruction = "【生死时刻】：极度紧迫。必须描写具体的应对动作。";
+        styleInstruction = "【生死时刻】：极度紧迫。短句。只关注当下的生存动作（逃跑、反击、包扎）。";
+    } else if (isExpedition) {
+        styleInstruction = `【探险模式】：
+        1. **聚焦环境**：描写${location}的阴森、未知和细节。
+        2. **悬疑感**：强调“发现”和“未知的恐惧”。
+        3. **隔离主线**：不要提及主角的身世或长远目标，只关注眼前的探索。`;
     } else if (isSideTask) {
-        styleInstruction = `【紧扣任务】：必须基于任务描述【${questDesc}】来展开。描写动作细节、遇到的物理阻碍以及主角的心理活动。`;
+        // ⚠️ 支线强力隔离：禁止升华主题
+        styleInstruction = `【特写模式 (Side Quest)】：
+        1. **绝对聚焦**：只描写执行【${taskTarget}】的具体过程。
+        2. **物理反馈**：描写手部的触感、工具的阻力、肌肉的酸痛。
+        3. **禁止升华**：**严禁**提及“为了${strategy.longTermGoal}”或“为了生存”这种大道理。只写干活！
+        4. **禁止回忆**：不要写过去，只写现在。`;
+    } else if (isMainQuest) {
+        styleInstruction = "【剧情模式 (Main Quest)】：允许描写心理活动、回忆、以及当前行动对长远目标（" + strategy.longTermGoal + "）的意义。";
     } else {
         styleInstruction = "【生存日记】：充满画面感和文学性的微型小说片段。";
     }
 
-    // ⚠️ 核心修正：字数控制在 50-160 字
     const baseInstruction = `
       你是一个硬核荒野求生游戏的叙事引擎。
-      你的任务是根据玩家的任务目标和描述，实时生成一段极具沉浸感的中文日记。
       
-      【核心规则】：
-      1. **字数控制**：50-160字。请在这个区间内随机浮动，有时简练有力(50字)，有时细腻详尽(160字)，不要总是固定长度。
-      2. **拒绝重复**：绝对不要写和以下内容相似的句子：[${recentLogsText}]。
-      3. **拒绝废话**：不要写"我正在努力"这种空话。每一句话都要有实质的物理反馈（触觉、听觉、视觉）。
-      4. **紧扣描述**：你的描写必须符合当前任务的具体描述："${questDesc}"。
-      5. **种子扩写**：必须基于给定的【事件种子】进行文学润色。
-
-      请用冷峻、真实、充满颗粒感的笔触生成内容。
+      【全局约束】：
+      1. **字数**：50-160字 (长短结合，拒绝流水账)。
+      2. **拒绝重复**：避开以下内容：[${recentLogsText}]。
+      3. **风格**：${styleInstruction}
+      
+      背景：${location} | ${envFlavor}
     `;
 
     let prompt = "";
-    const baseInfo = `地点：${location}。环境：${envFlavor}。`;
-
+    
     switch (eventType) {
       case 'start_game':
-        prompt = `${baseInfo} ${baseInstruction} 任务：写第一篇日记。内容：刚醒来。感官细节（沙子的粗糙、海水的咸腥、身体的剧痛）。迷茫与恐惧。目标：${strategy.longTermGoal}。`;
+        prompt = `${baseInstruction} 任务：写第一篇日记。内容：刚醒来。感官细节（沙子的粗糙、剧痛）。迷茫。目标：${strategy.longTermGoal}。`;
         break;
       
       case 'quest_start':
-        prompt = `${baseInfo} ${baseInstruction} 
+        prompt = `${baseInstruction} 
         事件：开始任务【${context.questTitle}】。
         任务描述：${questDesc}。
-        指令：写一句具体的准备动作。比如检查装备、观察地形，或者深呼吸调整状态。`;
+        指令：写一句具体的准备动作。检查装备或观察目标。`;
         break;
 
       case 'quest_journey':
-        prompt = `${baseInfo} ${baseInstruction} 
-        当前任务：【${context.questTitle}】。
-        任务具体描述：${questDesc}。
-        微观事件："${seedEvent}"。
-        指令：**扩写这个过程**。
-        要求：
-        1. 结合任务描述中的背景，描写具体的动作细节。
-        2. 描写任务带来的生理感受（累、痛、饿）。
-        3. 情感反馈：成功时的微小庆幸，或受阻时的焦躁。
-        示例（任务是抓蟹）："按照计划，我趴在潮湿的沙坑旁一动不动。手指刚触碰到沙蟹冰凉的外壳，它猛地夹住了我的虎口，钻心的疼让我差点叫出声，但我死死按住了它，为了晚餐。"`;
+        // 根据任务类型分流 Prompt
+        if (isSideTask) {
+            prompt = `${baseInstruction} 
+            当前动作：【${taskTarget}】。
+            微观事件："${seedEvent}"。
+            指令：**扩写这个微观动作**。
+            要求：
+            1. 就像摄影机的特写镜头，聚焦于手部动作和物品细节。
+            2. 描写具体的物理阻碍（滑脱、卡住、沉重）。
+            3. 结尾只写生理反馈（手疼、喘气、流汗）。
+            示例："手中的撬棍卡在岩石缝隙里，锈迹摩擦发出刺耳的声响。我咬牙用力一扳，指关节因为用力而发白，岩石终于松动了。"`;
+        } else {
+            prompt = `${baseInstruction} 
+            当前主线：【${context.questTitle}】。
+            微观事件："${seedEvent}"。
+            指令：描写任务过程，并将其与主线目标【${strategy.currentFocus}】联系起来。描写心理活动。`;
+        }
         break;
 
       case 'quest_climax':
-        prompt = `${baseInfo} ${baseInstruction} 事件：执行任务【${context.questTitle}】时遭遇突发阻碍！指令：描写这个具体的物理危机。`;
+        prompt = `${baseInstruction} 事件：执行【${taskTarget}】时遭遇突发阻碍！指令：描写这个具体的物理危机（断裂、坍塌、袭击）。`;
         break;
 
       case 'quest_end':
-        prompt = `${baseInfo} ${baseInstruction} 事件：任务【${context.questTitle}】完成。指令：看着手中的成果，回顾刚才${questDesc}的过程，虽然身体疲惫，但离【${strategy.longTermGoal}】又近了一步。`;
+        if (isSideTask) {
+            prompt = `${baseInstruction} 事件：任务【${context.questTitle}】完成。指令：看着手中的具体成果（物资），描写单纯的收获感或身体的放松。不要写人生感悟。`;
+        } else {
+            prompt = `${baseInstruction} 事件：主线【${context.questTitle}】完成。指令：回顾过程，感到离【${strategy.longTermGoal}】更近了一步。`;
+        }
         break;
       
       case 'expedition_start':
-        prompt = `${baseInfo} ${baseInstruction} 整理行囊，为了寻找${strategy.longTermGoal}，毅然踏入未知。`;
+        prompt = `${baseInstruction} 整理行囊，毅然踏入【${location}】的阴影中。空气中弥漫着危险的气息。`;
         break;
       
       case 'expedition_event':
-        prompt = `${baseInfo} ${baseInstruction} 探险发现：${seedEvent}。描写这个发现的细节和给主角带来的震撼。`;
+        prompt = `${baseInstruction} 探险发现：${seedEvent}。描写这个发现的细节（外观、气味、位置），以及它带来的惊悚或神秘感。`;
         break;
       
       case 'expedition_end':
-        prompt = `${baseInfo} ${baseInstruction} 探险结束。满身泥泞但满载而归。`;
+        prompt = `${baseInstruction} 探险结束。描写满身泥泞、伤痕累累但活着回来的狼狈模样。`;
         break;
 
       case 'idle_event':
-        prompt = `${baseInfo} ${baseInstruction} 状态：短暂休息。指令：利用这片刻时间整理装备，脑子里盘算着下一步计划（${strategy.currentFocus}）。`;
+        prompt = `${baseInstruction} 状态：短暂休息。指令：利用这片刻时间整理装备，或者处理伤口。描写一个静态的生存细节。`;
         break;
         
       default:
-        prompt = `${baseInfo} ${baseInstruction} 记录这一刻。`;
+        prompt = `${baseInstruction} 记录这一刻。`;
     }
 
     const completion = await openai.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: PROVIDER_CONFIG.model,
-      temperature: 0.9, // 提高一点随机性，让字数波动更自然
-      max_tokens: 250, // 放宽 Token 限制以支持 160 字
+      temperature: 0.9, 
+      max_tokens: 250, 
     });
 
     let text = completion.choices[0]?.message?.content || "";
