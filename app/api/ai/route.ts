@@ -13,30 +13,32 @@ export async function POST(req: Request) {
     const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
     const loreSnippet = WORLD_ARCHIVE[Math.floor(Math.random() * WORLD_ARCHIVE.length)];
 
-    // ⚠️ 关键：根据危险程度调整输出风格
+    // ⚠️ 核心调整：根据状态严格控制字数和语气
     const isDanger = context.isDanger;
-    let styleInstruction = "";
+    let lengthLimit = "50字以内";
+    let styleInstruction = "【日记风格】：短句。碎片化。不要写作文。";
+
     if (isDanger) {
-        styleInstruction = "【紧急状态】：句子必须极其简短、急促。像是一个人在奔跑时喘着气写下的。强调心跳、疼痛、恐惧。禁止长篇大论。";
-    } else {
-        styleInstruction = "【日记风格】：第一人称沉浸式写作。记录身体的感受（饥饿、寒冷）、对周围环境的细腻观察。";
+        lengthLimit = "20字以内";
+        styleInstruction = "【紧急状态】：极短。急促。只有动作和痛感。像是在奔跑中写下的。";
+    } else if (['start_game', 'quest_start', 'quest_end'].includes(eventType)) {
+        lengthLimit = "80-120字"; // 关键剧情稍长一点点，但也不要太长
+        styleInstruction = "【叙事风格】：冷静、客观、记录关键信息。";
     }
 
     const baseInstruction = `
-      你是一个荒野求生文字游戏的 AI 叙事者。
+      你是一个荒野求生游戏的文字引擎。
       语言：简体中文。
-      视角：【第一人称】 ("我")。
-      ${styleInstruction}
       
-      背景：
-      - 主角状态：${context.hp < 30 ? "重伤流血" : "健康"}，${context.stamina < 30 ? "极度饥饿" : "精力充沛"}。
+      【绝对指令】：
+      1. 字数严格限制在 **${lengthLimit}**。
+      2. **禁止废话**。不要写"原本...但是..."的复杂从句。
+      3. 用词粗粝、真实。多用动词和名词。
+      
+      当前背景：
+      - 状态：${context.hp < 30 ? "濒死" : "存活"}。
       - 地点：${context.location}。
-      - 环境氛围：${envFlavor}。
-      
-      规则：
-      1. 严禁出现英文。
-      2. 像写日记一样真实。不要上帝视角。
-      3. 如果是战斗，描写动作的凶险。如果是闲逛，描写生存的艰难。
+      - 氛围：${envFlavor}。
     `;
 
     let prompt = "";
@@ -44,83 +46,92 @@ export async function POST(req: Request) {
     switch (eventType) {
       case 'start_game':
         prompt = `
-          任务：写下【第一篇日记】。
-          场景：我刚刚在 ${context.location} 醒来。
-          内容：描写我身体的疼痛、嘴里的沙子、迷茫感。我是谁？这是哪里？我要活下去。
-          字数：100-150字。
+          任务：写第一篇日记。
+          内容：我醒了。疼。这是哪？
+          要求：简短有力，交代环境荒凉。100字左右。
         `;
         break;
       
       case 'quest_start':
         prompt = `${baseInstruction} 
-        事件：决定去 "${context.questScript?.title}"。
-        目标：${context.questScript?.objective}。
-        指令：写下我出发前的心理活动。检查装备，深吸一口气，踏入未知。
+        事件：决定前往 "${context.questScript?.title}"。
+        指令：一句话记录出发前的准备。检查装备，深吸一口气。
         `;
         break;
 
       case 'quest_journey':
         prompt = `${baseInstruction} 
-        事件：前往目标的路上。
-        指令：写一段路途遭遇。也许是发现了野兽的粪便，也许是踩到了尖锐的石头，或者只是单纯的累。
-        ${isDanger ? "强调危机感，草丛里好像有动静。" : "描写环境的荒凉。"}
+        事件：赶路中。
+        指令：${isDanger ? "听到异响。心跳加速。有什么东西在靠近。" : "记录一个路途细节。脚泡、荆棘、或者远处的鸟叫。"}
         `;
         break;
 
       case 'quest_climax':
         prompt = `${baseInstruction} 
-        事件：遭遇强敌【${context.questScript?.antagonist}】。
-        指令：战斗爆发！描写肾上腺素飙升的感觉。躲避、攻击、受伤的痛感。
-        要求：极短的句子。节奏极快。
+        事件：遭遇【${context.questScript?.antagonist}】！
+        指令：${context.questScript?.twist || "战斗爆发！"}
+        要求：极短！如："它扑过来了！闪避！匕首刺入！"
         `;
         break;
 
       case 'quest_end':
         prompt = `${baseInstruction} 
-        事件：活下来了。任务完成。
-        指令：描写劫后余生的虚脱感。虽然完成了目标，但身体已经透支。
+        事件：活下来了。目标达成。
+        指令：一句话总结。累。但是值得。
         `;
         break;
         
       case 'idle_event':
         prompt = `${baseInstruction} 
-        事件：在 ${context.location} 休息/生存。
-        指令：写一个生存细节。比如挑破脚上的水泡，整理收集来的露水，或者看着天空发呆。
+        事件：原地休整。
+        指令：写一个极小的生存动作。比如：挤干衣服的水、挑出指甲里的泥、嚼一根草根。
         `;
         break;
 
       case 'recruit_companion':
         prompt = `${baseInstruction} 
-        事件：遇到了一个幸存者。
-        指令：描写这个人的惨状。他/她为什么能活到现在？眼神里是疯狂还是希望？
+        事件：遇到幸存者。
+        指令：一句话描述他的惨状和眼神。
         `;
         break;
 
       case 'god_action':
         prompt = `${baseInstruction} 
-        事件：意外发生。
-        指令：也许是好运（捡到食物），也许是厄运（伤口裂开）。
+        事件：意外。
+        指令：突然发生的幸事或倒霉事。一句话带过。
         `;
         break;
         
       case 'generate_rumor':
-        prompt = `写一条在幸存者之间流传的传闻（如“北方有军队”、“海里有怪物”）。格式：“【信号】...”。`;
+        prompt = `写一句简短的求生信号或涂鸦（如“北方有水”、“别去山洞”）。15字以内。`;
+        break;
+
+      case 'generate_description':
+        prompt = `用一句话形容主角现在的狼狈模样。30字以内。`;
+        break;
+
+      case 'generate_equip_desc':
+        prompt = `一句话描述身上的装备。20字以内。`;
         break;
 
       default:
-        prompt = `${baseInstruction} 记录这一刻的生存状态。`;
+        prompt = `${baseInstruction} 记录这一刻。`;
     }
 
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 0.9, 
-      max_tokens: 800, 
+      temperature: 0.8, // 稍微降低随机性，让回答更受控
+      max_tokens: 300,  // ⚠️ 物理限制 Token 上限，防止话痨
     });
 
     let text = completion.choices[0]?.message?.content || "";
-    text = text.replace(/^(Task:|Context:|Response:|Here is|Scene:|Day 1).*:[\s\n]*/i, '').trim();
+    text = text.replace(/^(Task:|Context:|Response:|Here is|Scene:|Day 1|日记|【.*?】).*/gi, '').trim();
     text = text.replace(/^["']|["']$/g, ''); 
+    // 再次暴力截断，防止 AI 真的写作文
+    if (text.length > 150 && !['start_game'].includes(eventType)) {
+        text = text.substring(0, 140) + "...";
+    }
 
     return NextResponse.json({ text });
 
