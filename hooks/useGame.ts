@@ -9,7 +9,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 const REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
 const EXPEDITION_REFRESH_INTERVAL = 4 * 60 * 60 * 1000; 
 
-// --- 辅助函数 (保持不变) ---
+// --- 辅助函数 ---
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "幸存者";
@@ -273,14 +273,16 @@ export function useGame() {
     
     let questTitle = "无";
     let taskObjective = "休息/放松"; 
+    let questCategory = "none"; // ⚠️ 新增：明确传递任务类型
 
     if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
         questTitle = currentHero.activeExpedition.name;
         taskObjective = `在${currentHero.activeExpedition.name}探索未知`;
+        questCategory = "expedition";
     } else if (currentHero.currentQuest) {
         questTitle = currentHero.currentQuest.name;
-        // ⚠️ 核心：传递明确的任务名，例如 "收集漂流木"
         taskObjective = currentHero.currentQuest.name; 
+        questCategory = currentHero.currentQuest.category; // 'main', 'side', 'auto'
     }
 
     const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
@@ -293,6 +295,7 @@ export function useGame() {
         mainSaga: mainSagaInfo,
         questTitle,
         taskObjective,
+        questCategory, // ⚠️ 传入后端
         questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
         questStage: currentHero.currentQuest?.stage,
         companionInfo: companionInfo, 

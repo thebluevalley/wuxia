@@ -10,24 +10,28 @@ export async function POST(req: Request) {
     const { context, eventType, userAction } = await req.json();
     const groq = new Groq({ apiKey });
 
-    // ⚠️ 任务模式下，忽略环境氛围，专注于动作
-    const isTaskActive = eventType === 'quest_journey' || eventType === 'quest_start' || eventType === 'quest_climax';
-    const envFlavor = isTaskActive ? "忽略环境，专注动作" : FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
-    
-    // 获取具体的任务动作 (例如 "收集漂流木")
+    // ⚠️ 任务类型判断
+    const isMainQuest = context.questCategory === 'main';
+    const isSideTask = context.questCategory === 'side' || context.questCategory === 'auto';
     const taskTarget = context.taskObjective || "生存"; 
 
+    // 环境氛围：如果是做支线/自动任务，忽略环境，专注动作
+    const envFlavor = isSideTask ? "专注手头工作，无视环境" : FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
+    
     let styleInstruction = "";
     if (context.isDanger) {
-        styleInstruction = "【危急状态】：极短句。只有动作。心跳感。";
-    } else if (isTaskActive) {
-        styleInstruction = "【特写镜头】：只描写手部动作和物品细节。禁止描写风景和心情。";
+        styleInstruction = "【危急】：极短句。只有动作。心跳感。";
+    } else if (isSideTask) {
+        // ⚠️ 核心：支线任务屏蔽主线剧情
+        styleInstruction = "【物理动作模式】：主线剧情已暂停。禁止提及回忆、未来或世界观。只描写执行【" + taskTarget + "】的具体物理动作。";
+    } else if (isMainQuest) {
+        styleInstruction = "【主线剧情】：第一人称日记。可以包含心理活动、回忆和对未来的思考。";
     } else {
-        styleInstruction = "【第一人称日记】：描写环境、身体感受和心理活动。";
+        styleInstruction = "【生存日记】：记录当下的状态。";
     }
 
     const baseInstruction = `
-      你是一个求生游戏的文字引擎。
+      你是一个荒野求生文字游戏引擎。
       语言：简体中文。
       风格：${styleInstruction}
       字数限制：40字以内。
@@ -47,31 +51,31 @@ export async function POST(req: Request) {
       case 'quest_start':
         prompt = `${baseInstruction} 
         事件：开始任务【${context.questTitle}】。
-        指令：写一句准备动作。比如拿起工具，或者确认方向。`;
+        指令：${isSideTask ? "写一句准备工具的动作。" : "写下决心和出发前的心理。"}
+        `;
         break;
 
       case 'quest_journey':
-        // ⚠️ 核心修改：特写镜头模式
         prompt = `${baseInstruction} 
-        【绝对指令】：
-        1. 主角正在全神贯注地做：【${taskTarget}】。
-        2. 只写动作细节！比如手的触感、工具的声音、物品的重量。
-        3. **严禁**写"我正在做任务"、"风景很美"、"心情很沉重"。
-        4. 示例：(任务是砍树) -> "石斧一次次砍在树干上，震得虎口发麻，木屑飞溅。"
-        5. 示例：(任务是找水) -> "扒开腐烂的落叶，下面湿润的泥土里渗出了一点水。"
-        6. 当前任务是：${taskTarget}。请写一个具体的动作画面。`;
+        当前专注：正在进行【${taskTarget}】。
+        ${isSideTask ? 
+            `指令：写一个**具体的物理动作**。例如"弯腰捡起..."、"用力拉扯..."。禁止写"我正在做任务"。` : 
+            `指令：描写路途中的发现、心理变化或环境细节。`
+        }
+        `;
         break;
 
       case 'quest_climax':
         prompt = `${baseInstruction} 
-        事件：任务遭遇阻碍！
+        事件：遭遇阻碍！
         指令：极短的动作描写！例如工具断了、脚滑了、被虫子咬了。`;
         break;
 
       case 'quest_end':
         prompt = `${baseInstruction} 
         事件：任务【${context.questTitle}】完成。
-        指令：描写看着成果的瞬间。`;
+        指令：${isSideTask ? "描写看着劳动成果的满足感。" : "描写这对生存意味着什么。"}
+        `;
         break;
       
       case 'expedition_start':
@@ -118,7 +122,7 @@ export async function POST(req: Request) {
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 0.7, // 降低随机性，让 AI 更听话
+      temperature: 0.7, 
       max_tokens: 150, 
     });
 
