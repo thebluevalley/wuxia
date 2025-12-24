@@ -7,9 +7,9 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
   : null;
 
 const REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
-const EXPEDITION_REFRESH_INTERVAL = 4 * 60 * 60 * 1000; // 4小时刷新探险
+const EXPEDITION_REFRESH_INTERVAL = 4 * 60 * 60 * 1000; 
 
-// --- 辅助函数 ---
+// --- 辅助函数 (保持不变) ---
 const getStoryStage = (level: number) => {
   const stage = [...STORY_STAGES].reverse().find(s => level >= s.level);
   return stage ? stage.name : "幸存者";
@@ -17,7 +17,7 @@ const getStoryStage = (level: number) => {
 
 const calculateTags = (hero: HeroState): string[] => {
   const tags: Set<string> = new Set();
-  const { hp, maxHp, stamina, gold, equipment } = hero;
+  const { hp, maxHp, stamina, equipment } = hero;
   if (hp < maxHp * 0.3) tags.add("重伤");
   if (stamina < 30) tags.add("饥饿");
   if (equipment.weapon) tags.add("武装"); else tags.add("空手");
@@ -25,7 +25,6 @@ const calculateTags = (hero: HeroState): string[] => {
   return Array.from(tags).slice(0, 5);
 };
 
-// 生成 4 个支线
 const generateQuestBoard = (hero: HeroState): Quest[] => {
   const quests: Quest[] = [];
   const { location } = hero;
@@ -55,12 +54,10 @@ const generateQuestBoard = (hero: HeroState): Quest[] => {
   return quests;
 };
 
-// ⚠️ 生成探险任务 (3个)
 const generateExpeditions = (level: number): Expedition[] => {
     const expeditions: Expedition[] = [];
     for (let i = 0; i < 3; i++) {
         const template = EXPEDITION_LOCATIONS[Math.floor(Math.random() * EXPEDITION_LOCATIONS.length)];
-        // 时长固定 30 分钟 (1800000ms)
         const duration = 30 * 60 * 1000; 
         expeditions.push({
             id: `exp_${Date.now()}_${i}`,
@@ -85,13 +82,16 @@ const getInitialLifeSkills = (): Skill[] => [{ name: "采集", type: 'survival',
 
 const generateVisitors = (): Companion[] => {
   const visitors: Companion[] = [];
-  for (let i = 0; i < 2; i++) { 
-      const rand = Math.random(); let tier: Quality = 'common'; if (rand < 0.1) tier = 'epic'; else if (rand < 0.3) tier = 'rare'; else tier = 'common';
-      const templates = NPC_ARCHETYPES[tier]; const template = templates[Math.floor(Math.random() * templates.length)];
-      const trait = NPC_TRAITS[Math.floor(Math.random() * NPC_TRAITS.length)];
-      const name = NPC_NAMES_MALE[Math.floor(Math.random() * NPC_NAMES_MALE.length)];
-      visitors.push({ id: Date.now() + i + Math.random().toString(), name: `${trait}${name}`, gender: '男', title: template.job, archetype: template.job, personality: trait, desc: template.desc, quality: tier, price: 100, buff: { type: template.buff as any, val: 10 } });
-  }
+  const tiers: Quality[] = [];
+  for (let i = 0; i < 2; i++) { const rand = Math.random(); let tier: Quality = 'common'; if (rand < 0.1) tier = 'epic'; else if (rand < 0.3) tier = 'rare'; else tier = 'common'; tiers.push(tier); }
+  tiers.forEach((tier, i) => {
+    const templates = NPC_ARCHETYPES[tier]; const template = templates[Math.floor(Math.random() * templates.length)];
+    let gender: '男' | '女' = Math.random() > 0.5 ? '男' : '女';
+    const firstNameList = gender === '男' ? NPC_NAMES_MALE : NPC_NAMES_FEMALE;
+    const firstName = firstNameList[Math.floor(Math.random() * firstNameList.length)];
+    const trait = NPC_TRAITS[Math.floor(Math.random() * NPC_TRAITS.length)];
+    visitors.push({ id: Date.now() + i + Math.random().toString(), name: `${trait}${firstName}`, gender: '男', title: template.job, archetype: template.job, personality: trait, desc: template.desc, quality: tier, price: 100, buff: { type: template.buff as any, val: 10 } });
+  });
   return visitors;
 };
 
@@ -138,11 +138,7 @@ export function useGame() {
       actionCounts: { kills: 0, retreats: 0, gambles: 0, charity: 0, betrayals: 0, shopping: 0, drinking: 0 },
       description: "一个衣衫褴褛的幸存者。",
       equipmentDescription: "湿透的衬衫。",
-      
-      // 探险初始化
-      activeExpedition: null,
-      expeditionBoard: [],
-      lastExpeditionRefresh: 0
+      activeExpedition: null, expeditionBoard: [], lastExpeditionRefresh: 0
     };
     
     newHero.questBoard = generateQuestBoard(newHero);
@@ -157,7 +153,6 @@ export function useGame() {
         const mergedData = { ...newHero, ...user.data };
         if (mergedData.mainStoryIndex === undefined) mergedData.mainStoryIndex = 0;
         if (!mergedData.expeditionBoard) mergedData.expeditionBoard = generateExpeditions(mergedData.level);
-        
         mergedData.questBoard = generateQuestBoard(mergedData);
         setHero(mergedData);
         setTimeout(() => triggerAI('resume_game', undefined, undefined, mergedData), 500);
@@ -183,7 +178,6 @@ export function useGame() {
       if (!prev) return null;
       const lastLog = prev.logs[0]?.text;
       if (lastLog === text) return prev; 
-
       const timeStr = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
       const newHistory = (prev.narrativeHistory + " " + text).slice(-800); 
       const newLog: LogEntry = { id: Date.now().toString(), text, type: finalType, time: timeStr };
@@ -198,7 +192,7 @@ export function useGame() {
   const acceptQuest = (questId: string) => {
     if (!heroRef.current) return;
     const hero = heroRef.current;
-    if (hero.activeExpedition) { addMessage('system', '无法行动', '正在探险中，无法接任务！'); return; }
+    if (hero.activeExpedition) { addMessage('system', '无法行动', '正在探险中！'); return; }
     
     const quest = hero.questBoard.find(q => q.id === questId);
     if (!quest) return;
@@ -218,32 +212,25 @@ export function useGame() {
     triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest, location: newLocation }); 
   };
 
-  // ⚠️ 开启探险
   const startExpedition = (expeditionId: string) => {
       if (!heroRef.current) return;
       const hero = heroRef.current;
       const exp = hero.expeditionBoard.find(e => e.id === expeditionId);
       if (!exp) return;
       
-      if (hero.currentQuest || hero.queuedQuest) {
-          addMessage('system', '繁忙', '必须先完成当前手头的工作。');
-          return;
-      }
-      if (hero.stamina < 30) {
-          addMessage('system', '疲惫', '体力不足以支撑长途探险。');
-          return;
-      }
+      if (hero.currentQuest || hero.queuedQuest) { addMessage('system', '繁忙', '先完成手头工作。'); return; }
+      if (hero.stamina < 30) { addMessage('system', '疲惫', '体力不足。'); return; }
 
       setHero(prev => prev ? {
           ...prev,
           activeExpedition: { ...exp, startTime: Date.now(), endTime: Date.now() + exp.duration },
           state: 'expedition',
           stamina: prev.stamina - 30,
-          location: exp.location, // 移动到探险地
+          location: exp.location,
           expeditionBoard: prev.expeditionBoard.filter(e => e.id !== expeditionId)
       } : null);
 
-      addMessage('system', '出发', `前往【${exp.name}】探险 (需${exp.duration / 60000}分钟)`);
+      addMessage('system', '出发', `前往【${exp.name}】探险`);
       triggerAI('expedition_start', '', 'start', { ...hero, activeExpedition: exp, location: exp.location });
   };
 
@@ -264,11 +251,16 @@ export function useGame() {
     const companionInfo = currentHero.companion ? `伙伴:${currentHero.companion.title}` : "独自";
     const mainSagaInfo = currentHero.mainStoryIndex < MAIN_SAGA.length ? MAIN_SAGA[currentHero.mainStoryIndex].title : "完结";
     
-    let currentTaskInfo = "休息";
+    // ⚠️ 核心：提取任务具体目标，传给 AI
+    let questTitle = "无";
+    let taskObjective = "休息/放松"; // 默认空闲状态
+
     if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
-        currentTaskInfo = `探险中：${currentHero.activeExpedition.name}。充满危险与机遇。`;
+        questTitle = currentHero.activeExpedition.name;
+        taskObjective = `在${currentHero.activeExpedition.name}探索未知`;
     } else if (currentHero.currentQuest) {
-        currentTaskInfo = `任务：${currentHero.currentQuest.name}。目标：${currentHero.currentQuest.script.objective}`;
+        questTitle = currentHero.currentQuest.name;
+        taskObjective = currentHero.currentQuest.script.objective; // 例如 "寻找水源"
     }
 
     const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
@@ -279,7 +271,9 @@ export function useGame() {
         storyStage: getStoryStage(currentHero.level), 
         worldLore: WORLD_LORE, 
         mainSaga: mainSagaInfo,
-        taskInfo: currentTaskInfo, 
+        // 传递明确的任务信息
+        questTitle,
+        taskObjective,
         questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
         questStage: currentHero.currentQuest?.stage,
         companionInfo: companionInfo, 
@@ -312,7 +306,6 @@ export function useGame() {
     return false;
   };
 
-  // ... (godAction, autoManageInventory 保持不变) ...
   const godAction = async (type: 'bless' | 'punish') => {
     if (!hero) return;
     if (hero.godPower < 25) { addMessage('system', '意志', "精神力不足。"); return; }
@@ -337,11 +330,9 @@ export function useGame() {
     if (tagsChanged) { hero.tags = newTags; updated = true; }
 
     hero.inventory.forEach(item => {
-        // ... (装备逻辑)
         if (item.type === 'weapon' && (!hero.equipment.weapon || (item.power||0) > (hero.equipment.weapon.power||0))) {
             hero.equipment.weapon = item; updated = true; equipChanged = true;
         }
-        // ... (简化写法，实际应保留完整逻辑)
     });
 
     if (hero.hp < hero.maxHp * 0.5) {
@@ -380,20 +371,18 @@ export function useGame() {
           const currentHero = heroRef.current;
           if (!currentHero) return;
 
-          // ⚠️ 探险逻辑优先处理
           if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
               const exp = currentHero.activeExpedition;
               const now = Date.now();
               const timeLeft = (exp.endTime || 0) - now;
 
-              // 探险完成
               if (timeLeft <= 0) {
                   const lootItem = rollLoot(currentHero.level + 2, 20);
                   setHero(h => h ? {
                       ...h,
                       state: 'idle',
                       activeExpedition: null,
-                      location: '临时营地', // 回家
+                      location: '临时营地', 
                       gold: h.gold + exp.rewards.gold,
                       exp: h.exp + exp.rewards.exp,
                       inventory: lootItem ? [...h.inventory, { ...lootItem, id: Date.now().toString(), count: 1 } as Item] : h.inventory
@@ -401,18 +390,15 @@ export function useGame() {
                   addMessage('system', '归来', `探险完成！获得大量物资。`);
                   triggerAI('expedition_end', '', 'end');
               } else {
-                  // 探险中... 每隔一阵触发一个事件
                   if (Math.random() < 0.3) {
                       await triggerAI('expedition_event');
                   }
               }
-              // 探险时不处理普通任务
               const nextTick = 10000 + Math.random() * 5000;
               timerRef.current = setTimeout(gameLoop, nextTick);
               return;
           }
 
-          // 常规逻辑
           const { hero: managedHero, logs: autoLogs, tagsChanged } = autoManageInventory(currentHero);
           if (autoLogs.length > 0) { setHero(managedHero); autoLogs.forEach(l => addMessage('system', '记录', l)); } 
           
@@ -420,33 +406,28 @@ export function useGame() {
           let newQuest = managedHero.currentQuest;
           let queued = managedHero.queuedQuest;
 
-          // 任务刷新
           if (Date.now() - (managedHero.lastQuestRefresh || 0) > REFRESH_INTERVAL) {
              managedHero.questBoard = generateQuestBoard(managedHero);
              managedHero.lastQuestRefresh = Date.now();
              addMessage('system', '消息', '任务已刷新');
           }
-          // 探险刷新 (4小时)
           if (Date.now() - (managedHero.lastExpeditionRefresh || 0) > EXPEDITION_REFRESH_INTERVAL) {
              managedHero.expeditionBoard = generateExpeditions(managedHero.level);
              managedHero.lastExpeditionRefresh = Date.now();
              addMessage('system', '探险', '发现了新的探索区域');
           }
 
-          // ⚠️ 智能休息逻辑 (Smart Relax)
-          // 只有在非主线、非探险时才判断
+          // 智能休息/自动任务
           const needRest = managedHero.stamina < 30 || managedHero.hp < 50;
           if (needRest && !newQuest) {
-              // 强制休息
               managedHero.state = 'sleep';
               aiEvent = 'idle_event'; // 触发休息描述
           } else if (!newQuest && !queued) {
-              // 状态好，但也可能随机休息 (30%)
-              if (Math.random() < 0.3) {
+              if (Math.random() < 0.3) { // 30% 概率纯发呆
                   managedHero.state = 'idle';
-                  aiEvent = 'idle_event'; // 闲逛/发呆
+                  aiEvent = 'idle_event'; 
               } else {
-                  // 否则自动找事做 (Auto Task)
+                  // 70% 概率自动忙碌
                   const locationKey = AUTO_TASKS[managedHero.location as keyof typeof AUTO_TASKS] ? managedHero.location : "default";
                   // @ts-ignore
                   const autoPool = AUTO_TASKS[locationKey] || AUTO_TASKS["default"];
@@ -473,7 +454,6 @@ export function useGame() {
               }
           }
 
-          // ... (Quest progression logic unchanged) ...
           if (newQuest) {
             let progressInc = 5 + Math.floor(Math.random() * 5); 
             newQuest.progress += progressInc;
