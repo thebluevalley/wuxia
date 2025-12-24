@@ -13,16 +13,24 @@ export async function POST(req: Request) {
     const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
     
     const isDanger = context.isDanger;
-    let styleInstruction = "";
+    // 获取当前任务的“动词”和“名词”，用于强制 AI 聚焦
+    const taskInfo = context.taskInfo || "探索";
     
+    let styleInstruction = "";
     if (isDanger) {
         styleInstruction = "【危机】：极短。急促。只有动作。禁止形容词。";
     } else {
-        styleInstruction = "【生存细节】：具体的动作。禁止写'发呆'、'整理背包'、'看风景'。写比如：'用石头磨刀'、'挑出指甲里的泥'、'挤干衣服'。";
+        styleInstruction = `
+        【关键指令】：
+        1. 必须描写与任务【${taskInfo}】相关的具体动作。
+        2. 例如：如果任务是'找水'，写'扒开阔叶植物寻找露水'。
+        3. **绝对禁止**写'整理背包'、'检查物资'、'发呆'、'看风景'等通用废话。
+        4. 每次生成的动作必须不同。
+        `;
     }
 
     const baseInstruction = `
-      你是一个荒野求生文字游戏引擎。
+      你是一个求生游戏的文字引擎。
       语言：简体中文。
       风格：${styleInstruction}
       限制：50字以内。
@@ -40,22 +48,22 @@ export async function POST(req: Request) {
         prompt = `写第一篇日记。我醒了。浑身疼。这是哪？(100字左右)`;
         break;
       case 'quest_start':
-        prompt = `${baseInstruction} 决定去 "${context.questScript?.title}"。一句话记录出发前的心理。`;
+        prompt = `${baseInstruction} 刚开始任务：${taskInfo}。写一句具体的准备动作。`;
         break;
       case 'quest_journey':
-        prompt = `${baseInstruction} 赶路中。${isDanger ? "听到异响。心跳加速。" : "路上的一个具体发现（脚印、粪便、植被）。"}`;
+        prompt = `${baseInstruction} 正在进行任务：${taskInfo}。写一个过程中的细节动作（如弯腰捡起、用力拉扯、仔细观察）。`;
         break;
       case 'quest_climax':
-        prompt = `${baseInstruction} 遭遇【${context.questScript?.antagonist}】！战斗！极短！`;
+        prompt = `${baseInstruction} 任务高潮！遭遇阻碍！极短的动作描写！`;
         break;
       case 'quest_end':
-        prompt = `${baseInstruction} 活下来了。目标达成。身体的感觉。`;
+        prompt = `${baseInstruction} 任务完成。写出成果（如：手里的贝壳沉甸甸的）。`;
         break;
       case 'idle_event':
-        prompt = `${baseInstruction} 原地休整。写一个极小的、具体的生存动作（不要写整理背包）。`;
+        prompt = `${baseInstruction} 原地生存动作。写一个极小的细节（如：挑出指甲里的泥）。禁止写整理背包。`;
         break;
       case 'recruit_companion':
-        prompt = `${baseInstruction} 遇到幸存者。外貌描写。`;
+        prompt = `${baseInstruction} 遇到幸存者。一句话外貌。`;
         break;
       case 'god_action':
         prompt = `${baseInstruction} 意外发生。运气好或坏。`;
@@ -76,7 +84,7 @@ export async function POST(req: Request) {
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile", 
-      temperature: 0.9, 
+      temperature: 0.9, // 提高随机性
       max_tokens: 150, 
     });
 
