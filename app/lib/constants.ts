@@ -110,9 +110,10 @@ export type HeroState = {
   equipmentDescription: string; 
   
   strategy: StrategyState;
-  
-  // ⚠️ 新增：当前正在发生的微观事件种子 (修复 Type Error)
   currentSeed?: string;
+  
+  // ⚠️ 新增：休息倒计时。如果当前时间小于此值，说明正在长休息
+  idleUntil?: number; 
 
   currentQuest: Quest | null;
   queuedQuest: Quest | null;

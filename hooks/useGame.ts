@@ -25,7 +25,6 @@ const calculateTags = (hero: HeroState): string[] => {
   return Array.from(tags).slice(0, 5);
 };
 
-// 种子选择器
 const pickEventSeed = (location: string, objective: string): string => {
     const actionKey = objective.substring(0, 2); 
     const actionSeeds = EVENT_SEEDS[actionKey] || [];
@@ -54,7 +53,6 @@ const generateQuestBoard = (hero: HeroState): Quest[] => {
           script: { 
               title: template.title, 
               description: template.desc, 
-              // ⚠️ 核心修正：这里必须传具体的任务名 (如 "抓捕沙蟹")，而不是抽象动词 ("寻找")
               objective: template.title, 
               antagonist: template.antagonist, 
               twist: "无", 
@@ -160,7 +158,8 @@ export function useGame() {
       description: "一个衣衫褴褛的幸存者。",
       equipmentDescription: "湿透的衬衫。",
       activeExpedition: null, expeditionBoard: [], lastExpeditionRefresh: 0,
-      strategy: { longTermGoal: initialSaga.goal, currentFocus: "生存", urgency: 'high', narrativePhase: 'survival' }
+      strategy: { longTermGoal: initialSaga.goal, currentFocus: "生存", urgency: 'high', narrativePhase: 'survival' },
+      idleUntil: 0 // 初始化为0，表示未在休息
     };
     
     newHero.questBoard = generateQuestBoard(newHero);
@@ -212,10 +211,63 @@ export function useGame() {
   };
 
   const addMessage = (type: 'rumor' | 'system', title: string, content: string) => { setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; }); };
-  const acceptQuest = (questId: string) => { if(!heroRef.current) return; const hero=heroRef.current; if(hero.activeExpedition) return; const quest=hero.questBoard.find(q=>q.id===questId); if(!quest) return; const newBoard=hero.questBoard.filter(q=>q.id!==questId); let newLocation=hero.location; if(quest.category==='main'){ const saga=MAIN_SAGA.find(s=>s.title===quest.script.title); if(saga) newLocation=saga.location; } const isBusy=hero.currentQuest&&hero.currentQuest.category!=='auto'; if(isBusy){ if(hero.queuedQuest) return; setHero(p=>p?{...p,queuedQuest:quest,questBoard:newBoard}:null); triggerAI('quest_start','','accept',{...hero,queuedQuest:quest}); }else{ const ns:HeroState={...hero,stamina:hero.stamina-quest.staminaCost,currentQuest:quest,queuedQuest:null,questBoard:newBoard,location:newLocation,state:'fight'}; setHero(ns); triggerAI('quest_journey','','start',ns); } };
-  const startExpedition = (expeditionId: string) => { if(!heroRef.current) return; const hero=heroRef.current; const exp=hero.expeditionBoard.find(e=>e.id===expeditionId); if(!exp) return; const ns:HeroState={...hero,activeExpedition:{...exp,startTime:Date.now(),endTime:Date.now()+exp.duration},state:'expedition',stamina:hero.stamina-30,location:exp.location,expeditionBoard:hero.expeditionBoard.filter(e=>e.id!==expeditionId),currentQuest:null,queuedQuest:null}; setHero(ns); triggerAI('expedition_start','','start',ns); };
-  const hireCompanion = (visitorId: string) => { if(!hero) return; const v=hero.tavern.visitors.find(v=>v.id===visitorId); if(!v) return; setHero(p=>p?{...p,gold:p.gold-v.price,companion:v,companionExpiry:Date.now()+86400000,tavern:{...p.tavern,visitors:p.tavern.visitors.filter(x=>x.id!==visitorId)}}:null); triggerAI("recruit_companion","", "recruit",{...hero,companion:v}); };
-  const godAction = async (type: 'bless'|'punish') => { if(!hero) return; if(type==='bless'){setHero(h=>h?{...h,hp:h.maxHp,godPower:h.godPower-25}:null); triggerAI('god_action','');} else {setHero(h=>h?{...h,hp:Math.max(1,h.hp-20),exp:h.exp+50,godPower:h.godPower-25}:null); triggerAI('god_action','');} };
+  
+  const acceptQuest = (questId: string) => { 
+    if(!heroRef.current) return; 
+    const hero=heroRef.current; 
+    if(hero.activeExpedition) { addMessage('system', '无法行动', '正在探险中！'); return; }
+    
+    const quest=hero.questBoard.find(q=>q.id===questId); 
+    if(!quest) return; 
+    
+    const newBoard=hero.questBoard.filter(q=>q.id!==questId); 
+    let newLocation=hero.location; 
+    if(quest.category==='main'){ 
+        const saga=MAIN_SAGA.find(s=>s.title===quest.script.title); 
+        if(saga) newLocation=saga.location; 
+    } 
+    
+    // 只要当前有任务，就排队
+    const isBusy = !!hero.currentQuest;
+    
+    if(isBusy){ 
+        if(hero.queuedQuest) { addMessage('system', '繁忙', `队列已满`); return; }
+        setHero(prev => prev ? { ...prev, queuedQuest: quest, questBoard: newBoard } : null); 
+        addMessage('system', '计划', `已列入计划：${quest.name}`);
+    } else { 
+        // ⚠️ 关键修正：手动接任务，强制打断休息
+        const ns:HeroState={
+            ...hero,
+            stamina:hero.stamina-quest.staminaCost,
+            currentQuest:quest,
+            queuedQuest:null,
+            questBoard:newBoard,
+            location:newLocation,
+            state:'fight',
+            idleUntil: 0 // 强制归零，立刻干活
+        }; 
+        setHero(ns); 
+        triggerAI('quest_journey','','start',ns); 
+    } 
+  };
+
+  const startExpedition = (expeditionId: string) => { 
+      if(!heroRef.current) return; 
+      const hero=heroRef.current; 
+      const exp=hero.expeditionBoard.find(e=>e.id===expeditionId); 
+      if(!exp) return; 
+      const ns:HeroState={...hero,activeExpedition:{...exp,startTime:Date.now(),endTime:Date.now()+exp.duration},state:'expedition',stamina:hero.stamina-30,location:exp.location,expeditionBoard:hero.expeditionBoard.filter(e=>e.id!==expeditionId),currentQuest:null,queuedQuest:null}; 
+      setHero(ns); 
+      triggerAI('expedition_start','','start',ns); 
+  };
+
+  const hireCompanion = (visitorId: string) => { 
+      if(!hero) return; 
+      const v=hero.tavern.visitors.find(v=>v.id===visitorId); 
+      if(!v) return; 
+      setHero(p=>p?{...p,gold:p.gold-v.price,companion:v,companionExpiry:Date.now()+86400000,tavern:{...p.tavern,visitors:p.tavern.visitors.filter(x=>x.id!==visitorId)}}:null); 
+      triggerAI("recruit_companion","", "recruit",{...hero,companion:v}); 
+  };
 
   const autoManageInventory = (currentHero: HeroState): { hero: HeroState, logs: string[], tagsChanged: boolean } => {
     let hero = { ...currentHero };
@@ -282,7 +334,6 @@ export function useGame() {
         questCategory = "expedition";
     } else if (currentHero.currentQuest) {
         questTitle = currentHero.currentQuest.name;
-        // ⚠️ 关键：确保传给 AI 的 objective 是具体的任务名
         taskObjective = currentHero.currentQuest.script.objective || currentHero.currentQuest.name; 
         questCategory = currentHero.currentQuest.category;
     }
@@ -439,18 +490,42 @@ export function useGame() {
           let queued = managedHero.queuedQuest;
           let seedEvent = "";
 
-          if (!newQuest && !queued) {
-              if (Math.random() < 0.05) { 
-                  managedHero.state = 'idle';
-                  aiEvent = 'idle_event'; 
-              } else {
-                  const { newQuest: autoQuest, newStrategy, seedEvent: seed } = autoDirector(managedHero);
-                  newQuest = autoQuest;
-                  managedHero.strategy = newStrategy; 
+          // ⚠️ 核心重构：任务调度逻辑
+          if (!newQuest) {
+              // 1. 检查是否有排队任务
+              if (queued) {
+                  newQuest = queued;
+                  managedHero.queuedQuest = null; // 出列
                   managedHero.currentQuest = newQuest;
-                  managedHero.currentSeed = seed; 
-                  seedEvent = seed;
+                  
+                  // 生成种子并保存
+                  seedEvent = pickEventSeed(managedHero.location, newQuest.name);
+                  managedHero.currentSeed = seedEvent;
+                  
                   aiEvent = 'quest_start';
+                  addMessage('system', '执行', `按计划执行：${newQuest.name}`);
+              } 
+              // 2. 如果没有排队，检查是否在休息
+              else {
+                  // 休息检查
+                  const isResting = managedHero.idleUntil && Date.now() < managedHero.idleUntil;
+                  
+                  if (isResting) {
+                      // 休息中：偶尔发发呆，不接新活
+                      if (Math.random() < 0.3) { 
+                          managedHero.state = 'idle';
+                          aiEvent = 'idle_event'; 
+                      }
+                  } else {
+                      // 休息结束，导演介入
+                      const { newQuest: autoQuest, newStrategy, seedEvent: seed } = autoDirector(managedHero);
+                      newQuest = autoQuest;
+                      managedHero.strategy = newStrategy; 
+                      managedHero.currentQuest = newQuest;
+                      managedHero.currentSeed = seed; 
+                      seedEvent = seed;
+                      aiEvent = 'quest_start';
+                  }
               }
           }
 
@@ -462,11 +537,20 @@ export function useGame() {
                managedHero.gold += newQuest.rewards.gold;
                managedHero.exp += newQuest.rewards.exp;
                if (!newQuest.isAuto) addMessage('system', '完成', `${newQuest.name}`);
-               newQuest = null; 
+               
+               managedHero.currentQuest = null; // 清空当前任务
                managedHero.state = 'idle'; 
                managedHero.currentSeed = undefined; 
+               
+               // ⚠️ 任务完成后，如果队列为空，强制进入贤者时间 (2-15分钟)
+               if (!queued) {
+                   const idleMins = Math.floor(Math.random() * (15 - 2) + 2);
+                   managedHero.idleUntil = Date.now() + idleMins * 60 * 1000;
+                   // 不发系统消息，让玩家自己感觉节奏慢下来了
+               }
+            } else {
+                managedHero.currentQuest = newQuest;
             }
-            managedHero.currentQuest = newQuest;
           }
 
           if (aiEvent) {
