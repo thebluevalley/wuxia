@@ -17,26 +17,32 @@ const getStoryStage = (level: number) => {
 
 const calculateTags = (hero: HeroState): string[] => {
   const tags: Set<string> = new Set();
-  const { hp, maxHp, stamina, gold, attributes, equipment, stats } = hero;
+  const { hp, maxHp, stamina, gold, attributes, actionCounts, inventory, equipment, level, companion, stats } = hero;
 
-  if (hp < maxHp * 0.2) tags.add("重伤濒死");
-  else if (hp < maxHp * 0.5) tags.add("受伤");
+  if (hp < maxHp * 0.1) tags.add("濒死");
+  else if (hp < maxHp * 0.3) tags.add("重伤");
   
-  if (stamina < 20) tags.add("极度饥饿");
-  else if (stamina < 50) tags.add("饥饿");
+  if (stamina < 20) tags.add("力竭");
+  else if (stamina > 100) tags.add("精力充沛");
 
-  if (gold > 1000) tags.add("物资充足");
-  else if (gold < 50) tags.add("一无所有");
+  if (gold > 50000) tags.add("巨富");
+  else if (gold < 50) tags.add("赤贫");
 
-  if (attributes.strength > 20) tags.add("强壮");
-  if (attributes.intelligence > 20) tags.add("机智");
+  if (actionCounts.kills > 100) tags.add("屠夫");
+  if (actionCounts.drinking > 20) tags.add("酒鬼");
+
+  if (attributes.strength > 20) tags.add("魔山之力");
+  if (attributes.intelligence > 20) tags.add("小恶魔之智");
 
   const weaponName = equipment.weapon?.name || "";
-  if (weaponName.includes("矛")) tags.add("猎人");
-  else if (weaponName.includes("弓")) tags.add("射手");
+  if (weaponName.includes("剑")) tags.add("剑客");
+  else if (weaponName.includes("锤")) tags.add("战士");
+  else if (weaponName.includes("匕首")) tags.add("刺客");
   else if (!equipment.weapon) tags.add("赤手空拳");
   
-  return Array.from(tags).slice(0, 8);
+  if (stats.arenaWins > 50) tags.add("竞技场之王");
+
+  return Array.from(tags).slice(0, 10);
 };
 
 const generateQuestBoard = (hero: HeroState): Quest[] => {
@@ -65,10 +71,10 @@ const generateQuestBoard = (hero: HeroState): Quest[] => {
           desc: template.desc,
           stage: 'start',
           progress: 0,
-          total: rank * 100, // 缩短任务流程
+          total: rank * 120, 
           reqLevel: Math.max(1, level - 2),
-          staminaCost: rank * 5,
-          rewards: { gold: rank * 20, exp: rank * 50 }
+          staminaCost: rank * 8,
+          rewards: { gold: rank * 50, exp: rank * 80 }
       });
   }
   return quests;
@@ -79,14 +85,15 @@ const getLocationByQuest = (questType: any, level: number): string => {
   return map.name;
 };
 
-const getInitialSkills = (): Skill[] => [{ name: "基础求生", type: 'survival', level: 1, exp: 0, maxExp: 100, desc: "在荒野中活下去的本能" }];
-const getInitialLifeSkills = (): Skill[] => [{ name: "采集", type: 'survival', level: 1, exp: 0, maxExp: 100, desc: "识别能吃的东西" }];
+const getInitialSkills = (): Skill[] => [{ name: "基础剑术", type: 'combat', level: 1, exp: 0, maxExp: 100, desc: "维斯特洛通用的防身剑术" }];
+const getInitialLifeSkills = (): Skill[] => [{ name: "伤口处理", type: 'survival', level: 1, exp: 0, maxExp: 100, desc: "在乱世中活下去的必备技能" }];
 
 const generateVisitors = (): Companion[] => {
   const visitors: Companion[] = [];
   const tiers: Quality[] = [];
-  for (let i = 0; i < 4; i++) { const rand = Math.random(); let tier: Quality = 'common'; if (rand < 0.05) tier = 'epic'; else if (rand < 0.3) tier = 'rare'; else tier = 'common'; tiers.push(tier); }
-  
+  for (let i = 0; i < 5; i++) { const rand = Math.random(); let tier: Quality = 'common'; if (rand < 0.02) tier = 'legendary'; else if (rand < 0.10) tier = 'epic'; else if (rand < 0.35) tier = 'rare'; else tier = 'common'; tiers.push(tier); }
+  const commonCount = tiers.filter(t => t === 'common').length;
+  if (commonCount === 5) { const luckyIndex = Math.floor(Math.random() * 5); const pityRoll = Math.random(); if (pityRoll < 0.1) tiers[luckyIndex] = 'legendary'; else if (pityRoll < 0.4) tiers[luckyIndex] = 'epic'; else tiers[luckyIndex] = 'rare'; }
   tiers.forEach((tier, i) => {
     const templates = NPC_ARCHETYPES[tier]; const template = templates[Math.floor(Math.random() * templates.length)];
     let gender: '男' | '女' = Math.random() > 0.5 ? '男' : '女';
@@ -94,9 +101,9 @@ const generateVisitors = (): Companion[] => {
     const firstName = firstNameList[Math.floor(Math.random() * firstNameList.length)];
     const lastName = NPC_NAMES_LAST[Math.floor(Math.random() * NPC_NAMES_LAST.length)];
     const trait = NPC_TRAITS[Math.floor(Math.random() * NPC_TRAITS.length)];
-    const priceMap = { common: 50, rare: 200, epic: 1000, legendary: 5000 }; // 资源点价格
+    const priceMap = { common: 200, rare: 1000, epic: 5000, legendary: 20000 };
     const buffVal = { common: 5, rare: 15, epic: 30, legendary: 80 };
-    visitors.push({ id: Date.now() + i + Math.random().toString(), name: `${trait}${firstName}`, gender, title: template.job, archetype: template.job, personality: trait, desc: template.desc, quality: tier, price: priceMap[tier], buff: { type: template.buff as any, val: buffVal[tier] } });
+    visitors.push({ id: Date.now() + i + Math.random().toString(), name: `${firstName}·${lastName}`, gender, title: template.job, archetype: template.job, personality: trait, desc: template.desc, quality: tier, price: priceMap[tier], buff: { type: template.buff as any, val: buffVal[tier] } });
   });
   return visitors;
 };
@@ -104,7 +111,13 @@ const generateVisitors = (): Companion[] => {
 const rollLoot = (level: number, luck: number): Partial<Item> | null => {
     const validItems = LOOT_TABLE.filter(i => (i.minLevel || 1) <= level);
     if (validItems.length === 0) return null;
-    return validItems[Math.floor(Math.random() * validItems.length)];
+    let targetQuality: Quality = 'common';
+    const rand = Math.random() * 100 - (luck * 0.5);
+    if (rand < 2) targetQuality = 'legendary'; else if (rand < 10) targetQuality = 'epic'; else if (rand < 30) targetQuality = 'rare'; 
+    let pool = validItems.filter(i => i.quality === targetQuality);
+    if (pool.length === 0) pool = validItems.filter(i => i.quality === 'common');
+    if (pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
 };
 
 // --- Main Hook ---
@@ -134,7 +147,7 @@ export function useGame() {
       stamina: 100, maxStamina: 100,
       hp: 100, maxHp: 100, exp: 0, maxExp: 100, gold: 0, 
       alignment: 0, location: "荒芜海滩", state: 'idle', 
-      logs: [], // 初始日志留空，由 start_game 生成
+      logs: [], 
       messages: [], majorEvents: [`第1天：${name} 在海滩醒来。`],
       inventory: [], equipment: { weapon: null, head: null, body: null, legs: null, feet: null, accessory: null },
       martialArts: getInitialSkills(), lifeSkills: getInitialLifeSkills(),
@@ -143,7 +156,8 @@ export function useGame() {
       lastQuestRefresh: 0, 
       tavern: { visitors: generateVisitors(), lastRefresh: Date.now() },
       companion: null, companionExpiry: 0,
-      reputation: { stark: 0, lannister: 0, targaryen: 0, baratheon: 0, watch: 0, wildling: 0, citadel: 0, neutral: 0, faith: 0 },
+      // ⚠️ 修复：reputation 使用正确的 Faction 键
+      reputation: { nature: 0, survivor: 0, savage: 0, ruins: 0, beast: 0, unknown: 0, neutral: 0, faith: 0, watch: 0 },
       narrativeHistory: "海难幸存。",
       tags: ["幸存者", "湿透"], 
       actionCounts: { kills: 0, retreats: 0, gambles: 0, charity: 0, betrayals: 0, shopping: 0, drinking: 0 },
@@ -184,7 +198,6 @@ export function useGame() {
     const finalType: LogEntry['type'] = 'highlight'; 
     setHero(prev => {
       if (!prev) return null;
-      // 这里的 time 改为游戏内天数可能更好，但暂时保持时间
       const timeStr = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
       const newHistory = (prev.narrativeHistory + " " + text).slice(-1500); 
       const newLog: LogEntry = { id: Date.now().toString(), text, type: finalType, time: timeStr };
@@ -253,7 +266,6 @@ export function useGame() {
         currentMainQuestInfo = `主线: ${currentHero.currentQuest.name}。目标: ${currentHero.currentQuest.script.objective}。危机: ${currentHero.currentQuest.script.antagonist}`;
     }
 
-    // ⚠️ 核心：动态危机感判断
     const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3;
 
     try {
@@ -275,7 +287,7 @@ export function useGame() {
         lastLogLen: recentLogsRef.current[0]?.length || 0,
         tags: currentHero.tags || [],
         equipment: currentHero.equipment,
-        isDanger: isDanger // 传给后端
+        isDanger: isDanger 
       };
       const res = await fetch('/api/ai', { method: 'POST', body: JSON.stringify({ context, eventType, userAction: action }) });
       if (!res.ok) return false;
@@ -349,7 +361,6 @@ export function useGame() {
       }
     });
     
-    // Auto-Consume logic
     if (hero.hp < hero.maxHp * 0.5) {
        const potion = hero.inventory.find(i => i.type === 'consumable' && !i.desc.includes("热量"));
        if (potion) {
@@ -503,7 +514,6 @@ export function useGame() {
          }
       }
 
-      // ⚠️ 核心：100% 触发事件
       if (aiEvent) {
          setHero(managedHero);
          await triggerAI(aiEvent);
@@ -517,7 +527,6 @@ export function useGame() {
          setHero(managedHero);
       }
       
-      // ⚠️ 动态心跳：危险时极快 (3s)，平时中等 (8s)
       const isDanger = managedHero.state === 'fight' || managedHero.hp < managedHero.maxHp * 0.3;
       const minTick = isDanger ? 3000 : 8000;
       const maxTick = isDanger ? 6000 : 12000;
