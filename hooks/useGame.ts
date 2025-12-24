@@ -82,14 +82,14 @@ const generateExpeditions = (level: number): Expedition[] => {
     return expeditions;
 };
 
-// ... (省略未变动的辅助函数以节省空间，实际部署请保留完整代码，或确保上方import引用正确) ...
-// 为保证全量覆盖不出错，这里提供完整的辅助函数存根，如果之前已有，请保持原样
 const getLocationByQuest = (questType: any, level: number): string => {
   const map = WORLD_MAP[Math.floor(Math.random() * WORLD_MAP.length)];
   return map.name;
 };
+
 const getInitialSkills = (): Skill[] => [{ name: "基础求生", type: 'survival', level: 1, exp: 0, maxExp: 100, desc: "本能" }];
 const getInitialLifeSkills = (): Skill[] => [{ name: "采集", type: 'survival', level: 1, exp: 0, maxExp: 100, desc: "识别" }];
+
 const generateVisitors = (): Companion[] => {
   const visitors: Companion[] = [];
   const tiers: Quality[] = [];
@@ -104,6 +104,7 @@ const generateVisitors = (): Companion[] => {
   });
   return visitors;
 };
+
 const rollLoot = (level: number, luck: number): Partial<Item> | null => {
     const validItems = LOOT_TABLE.filter(i => (i.minLevel || 1) <= level);
     if (validItems.length === 0) return null;
@@ -202,86 +203,14 @@ export function useGame() {
     });
   };
 
-  const addMessage = (type: 'rumor' | 'system', title: string, content: string) => {
-    setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; });
-  };
+  const addMessage = (type: 'rumor' | 'system', title: string, content: string) => { setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; }); };
+  const acceptQuest = (questId: string) => { if(!heroRef.current) return; const hero=heroRef.current; if(hero.activeExpedition) return; const quest=hero.questBoard.find(q=>q.id===questId); if(!quest) return; const newBoard=hero.questBoard.filter(q=>q.id!==questId); let newLocation=hero.location; if(quest.category==='main'){ const saga=MAIN_SAGA.find(s=>s.title===quest.script.title); if(saga) newLocation=saga.location; } const isBusy=hero.currentQuest&&hero.currentQuest.category!=='auto'; if(isBusy){ if(hero.queuedQuest) return; setHero(p=>p?{...p,queuedQuest:quest,questBoard:newBoard}:null); triggerAI('quest_start','','accept',{...hero,queuedQuest:quest}); }else{ const ns:HeroState={...hero,stamina:hero.stamina-quest.staminaCost,currentQuest:quest,queuedQuest:null,questBoard:newBoard,location:newLocation,state:'fight'}; setHero(ns); triggerAI('quest_journey','','start',ns); } };
+  const startExpedition = (expeditionId: string) => { if(!heroRef.current) return; const hero=heroRef.current; const exp=hero.expeditionBoard.find(e=>e.id===expeditionId); if(!exp) return; const ns:HeroState={...hero,activeExpedition:{...exp,startTime:Date.now(),endTime:Date.now()+exp.duration},state:'expedition',stamina:hero.stamina-30,location:exp.location,expeditionBoard:hero.expeditionBoard.filter(e=>e.id!==expeditionId),currentQuest:null,queuedQuest:null}; setHero(ns); triggerAI('expedition_start','','start',ns); };
+  const hireCompanion = (visitorId: string) => { if(!hero) return; const v=hero.tavern.visitors.find(v=>v.id===visitorId); if(!v) return; setHero(p=>p?{...p,gold:p.gold-v.price,companion:v,companionExpiry:Date.now()+86400000,tavern:{...p.tavern,visitors:p.tavern.visitors.filter(x=>x.id!==visitorId)}}:null); triggerAI("recruit_companion","", "recruit",{...hero,companion:v}); };
+  const godAction = async (type: 'bless'|'punish') => { if(!hero) return; if(type==='bless'){setHero(h=>h?{...h,hp:h.maxHp,godPower:h.godPower-25}:null); triggerAI('god_action','');} else {setHero(h=>h?{...h,hp:Math.max(1,h.hp-20),exp:h.exp+50,godPower:h.godPower-25}:null); triggerAI('god_action','');} };
 
-  const acceptQuest = (questId: string) => {
-    if (!heroRef.current) return;
-    const hero = heroRef.current;
-    if (hero.activeExpedition) { addMessage('system', '无法行动', '正在探险中！'); return; }
-    
-    const quest = hero.questBoard.find(q => q.id === questId);
-    if (!quest) return;
-    if (hero.level < quest.reqLevel) { addMessage('system', '拒绝', `需Lv.${quest.reqLevel}`); return; }
-    
-    const newBoard = hero.questBoard.filter(q => q.id !== questId); 
-    
-    let newLocation = hero.location;
-    if (quest.category === 'main') {
-        const saga = MAIN_SAGA.find(s => s.title === quest.script.title);
-        if (saga && saga.location) newLocation = saga.location;
-    }
-
-    const isBusy = hero.currentQuest && hero.currentQuest.category !== 'auto';
-
-    if (isBusy) {
-        if (hero.queuedQuest) { addMessage('system', '繁忙', `队列已满`); return; }
-        setHero(prev => prev ? { ...prev, queuedQuest: quest, questBoard: newBoard } : null);
-        addMessage('system', '计划', `已列入计划：${quest.name}`);
-        triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest }); 
-    } else {
-        const newHeroState: HeroState = { 
-            ...hero, 
-            stamina: hero.stamina - quest.staminaCost, 
-            currentQuest: quest, 
-            queuedQuest: null,   
-            questBoard: newBoard, 
-            location: newLocation,
-            state: 'fight' 
-        };
-        setHero(newHeroState);
-        addMessage('system', '执行', `立即开始：${quest.name}`);
-        triggerAI('quest_journey', '', 'start', newHeroState); 
-    }
-  };
-
-  const startExpedition = (expeditionId: string) => {
-      if (!heroRef.current) return;
-      const hero = heroRef.current;
-      const exp = hero.expeditionBoard.find(e => e.id === expeditionId);
-      if (!exp) return;
-      
-      if (hero.currentQuest && hero.currentQuest.category !== 'auto') { addMessage('system', '繁忙', '先完成手头工作。'); return; }
-      if (hero.stamina < 30) { addMessage('system', '疲惫', '体力不足。'); return; }
-
-      const newHeroState: HeroState = {
-          ...hero,
-          activeExpedition: { ...exp, startTime: Date.now(), endTime: Date.now() + exp.duration },
-          state: 'expedition',
-          stamina: hero.stamina - 30,
-          location: exp.location,
-          expeditionBoard: hero.expeditionBoard.filter(e => e.id !== expeditionId),
-          currentQuest: null, 
-          queuedQuest: null
-      };
-
-      setHero(newHeroState);
-      addMessage('system', '出发', `前往【${exp.name}】探险`);
-      triggerAI('expedition_start', '', 'start', newHeroState);
-  };
-
-  const hireCompanion = (visitorId: string) => {
-    if (!hero) return;
-    const visitor = hero.tavern.visitors.find(v => v.id === visitorId);
-    if (!visitor) return;
-    if (hero.gold < visitor.price) { addMessage('system', '穷困', "物资不足。"); return; }
-    setHero(prev => prev ? { ...prev, gold: prev.gold - visitor.price, companion: visitor, companionExpiry: Date.now() + 24 * 60 * 60 * 1000, tavern: { ...prev.tavern, visitors: prev.tavern.visitors.filter(v => v.id !== visitorId) } } : null);
-    addMessage('system', '结盟', `【${visitor.name}】加入。`);
-    triggerAI("recruit_companion", "", "recruit", { ...hero, companion: visitor });
-  };
-
-  const triggerAI = async (eventType: string, suffix: string = "", action?: string, explicitHero?: HeroState) => {
+  // ⚠️ 修复：增加可选参数 forceSeed，并优先使用它
+  const triggerAI = async (eventType: string, suffix: string = "", action?: string, explicitHero?: HeroState, forceSeed?: string) => {
     if (Date.now() < aiCooldownRef.current) return false;
     if (isRequestingRef.current) return false;
 
@@ -307,10 +236,13 @@ export function useGame() {
         questCategory = currentHero.currentQuest.category;
     }
 
-    let seedEvent = ""; 
-    // 事件种子生成逻辑移到外部 gameLoop 统一处理，这里仅接收 context 里的 seed
-    // 或者我们可以在 triggerAI 内部补充 (如果外部没传)
-    // 为保持一致性，我们假设 seed 已经在上下文中，或者为空（AI 自由发挥）
+    // ⚠️ 核心：确定当前种子
+    let seedEvent = forceSeed || currentHero.currentSeed || "";
+    
+    // 如果没有种子，且是旅途或休息，尝试生成一个
+    if (!seedEvent && (eventType === 'quest_journey' || eventType === 'idle_event')) {
+        seedEvent = pickEventSeed(currentHero.location, taskObjective);
+    }
 
     const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
     const recentLogs = recentLogsRef.current || [];
@@ -325,7 +257,7 @@ export function useGame() {
         questTitle,
         taskObjective,
         questCategory,
-        seedEvent: currentHero['seedEvent'] || "", // 需要一种方式传递 seedEvent，暂时 hack 
+        seedEvent, // ⚠️ 正确传递种子
         questScript: currentHero.currentQuest?.script || currentHero.queuedQuest?.script, 
         questStage: currentHero.currentQuest?.stage,
         companionInfo: companionInfo, 
@@ -336,16 +268,11 @@ export function useGame() {
         strategy: strategy 
       };
       
-      // 传递 seedEvent 的一种临时方式，或者我们直接在这里生成
-      if (eventType === 'quest_journey' || eventType === 'idle_event') {
-          context.seedEvent = pickEventSeed(currentHero.location, taskObjective);
-      }
-
       const res = await fetch('/api/ai', { method: 'POST', body: JSON.stringify({ context, eventType, userAction: action }) });
       
       if (!res.ok) {
           const errorText = await res.text();
-          throw new Error(`API Error: ${res.status} - ${errorText.substring(0, 100)}`);
+          throw new Error(`API Error: ${res.status} - ${errorText.substring(0, 50)}`);
       }
       
       const data = await res.json();
@@ -373,64 +300,6 @@ export function useGame() {
     return true;
   };
 
-  const godAction = async (type: 'bless' | 'punish') => {
-    if (!hero) return;
-    if (hero.godPower < 25) { addMessage('system', '意志', "精神力不足。"); return; }
-    if (type === 'bless') { 
-      setHero(h => h ? {...h, hp: h.maxHp, godPower: h.godPower - 25} : null); 
-      addMessage('system', '幸运', "发现了一些草药。");
-      triggerAI('god_action', ''); 
-    } else { 
-      setHero(h => h ? {...h, hp: Math.max(1, h.hp - 20), exp: h.exp + 50, godPower: h.godPower - 25} : null); 
-      addMessage('system', '磨难', "虽然受伤了，但你学到了教训。");
-      triggerAI('god_action', ''); 
-    }
-  };
-
-  const autoManageInventory = (currentHero: HeroState): { hero: HeroState, logs: string[], tagsChanged: boolean } => {
-    let hero = { ...currentHero };
-    const logs: string[] = []; 
-    let updated = false;
-    let equipChanged = false;
-    const newTags = calculateTags(hero);
-    const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(hero.tags);
-    if (tagsChanged) { hero.tags = newTags; updated = true; }
-
-    hero.inventory.forEach(item => {
-        if (item.type === 'weapon' && (!hero.equipment.weapon || (item.power||0) > (hero.equipment.weapon.power||0))) {
-            hero.equipment.weapon = item; updated = true; equipChanged = true;
-        }
-    });
-
-    if (hero.hp < hero.maxHp * 0.5) {
-       const potion = hero.inventory.find(i => i.type === 'consumable' && !i.desc.includes("热量"));
-       if (potion) {
-          const heal = Number(potion.effect) || 0;
-          hero.hp = Math.min(hero.maxHp, hero.hp + heal);
-          logs.push(`使用: ${potion.name}`);
-          const idx = hero.inventory.findIndex(i => i.id === potion.id);
-          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
-          updated = true;
-       }
-    }
-
-    if (hero.stamina < hero.maxStamina * 0.2) {
-       const food = hero.inventory.find(i => i.type === 'consumable' && (i.desc.includes("热量") || i.name.includes("椰子") || i.name.includes("饼干")));
-       if (food) {
-          const regen = Number(food.effect) || 0;
-          hero.stamina = Math.min(hero.maxStamina, hero.stamina + regen);
-          logs.push(`食用: ${food.name}`);
-          const idx = hero.inventory.findIndex(i => i.id === food.id);
-          if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); }
-          updated = true;
-       }
-    }
-
-    if (equipChanged) { setTimeout(() => triggerAI('generate_equip_desc', '', undefined, hero), 100); }
-    return { hero: updated ? hero : currentHero, logs, tagsChanged };
-  };
-
-  // ⚠️ 核心：AI 导演逻辑 (自动决策)
   const autoDirector = (currentHero: HeroState) => {
       const isHurt = currentHero.hp < currentHero.maxHp * 0.4;
       const isHungry = currentHero.stamina < 30;
@@ -450,7 +319,8 @@ export function useGame() {
           chosenTaskTitle = tasks[Math.floor(Math.random() * tasks.length)];
       }
 
-      // 生成任务 (种子逻辑现在在 triggerAI 内统一处理，这里只生成任务结构)
+      const seedEvent = pickEventSeed(currentHero.location, chosenTaskTitle); // 生成种子
+
       const newQuest: Quest = {
           id: `auto_${Date.now()}`,
           name: chosenTaskTitle,
@@ -462,7 +332,7 @@ export function useGame() {
               description: `为了${newStrategy.currentFocus}，我必须${chosenTaskTitle}。`, 
               objective: chosenTaskTitle, 
               antagonist: "自然环境", 
-              twist: "无"
+              twist: seedEvent 
           },
           desc: `为了${newStrategy.longTermGoal}而努力。`,
           stage: 'start',
@@ -474,7 +344,7 @@ export function useGame() {
           isAuto: true
       };
 
-      return { newQuest, newStrategy };
+      return { newQuest, newStrategy, seedEvent };
   };
 
   useEffect(() => {
@@ -519,17 +389,19 @@ export function useGame() {
           let aiEvent: string | null = null;
           let newQuest = managedHero.currentQuest;
           let queued = managedHero.queuedQuest;
+          let seedEvent = "";
 
-          // ⚠️ 智能分配任务
           if (!newQuest && !queued) {
               if (Math.random() < 0.05) { 
                   managedHero.state = 'idle';
                   aiEvent = 'idle_event'; 
               } else {
-                  const { newQuest: autoQuest, newStrategy } = autoDirector(managedHero);
+                  const { newQuest: autoQuest, newStrategy, seedEvent: seed } = autoDirector(managedHero);
                   newQuest = autoQuest;
                   managedHero.strategy = newStrategy; 
                   managedHero.currentQuest = newQuest;
+                  managedHero.currentSeed = seed; // ⚠️ 保存种子到状态
+                  seedEvent = seed;
                   aiEvent = 'quest_start';
               }
           }
@@ -544,13 +416,15 @@ export function useGame() {
                if (!newQuest.isAuto) addMessage('system', '完成', `${newQuest.name}`);
                newQuest = null; 
                managedHero.state = 'idle'; 
+               managedHero.currentSeed = undefined; // 任务结束清空种子
             }
             managedHero.currentQuest = newQuest;
           }
 
           if (aiEvent) {
              setHero({...managedHero}); 
-             await triggerAI(aiEvent);
+             // ⚠️ 传递种子给 triggerAI (无论是刚生成的，还是状态里存的)
+             await triggerAI(aiEvent, "", undefined, undefined, seedEvent);
           } else if (managedHero.currentQuest) { 
              setHero({...managedHero});
              await triggerAI('quest_journey'); 
@@ -561,13 +435,8 @@ export function useGame() {
       } finally {
           const currentHero = heroRef.current;
           const isDanger = currentHero ? (currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3) : false;
-          
-          // ⚠️ 慢节奏设定：降低频率，沉浸感优先，同时节省 Token
-          // 危险状态：15秒 ~ 25秒
-          // 平时状态：25秒 ~ 45秒
           const minTick = isDanger ? 15000 : 25000;
           const maxTick = isDanger ? 25000 : 45000;
-          
           const nextTick = Math.floor(Math.random() * (maxTick - minTick) + minTick); 
           timerRef.current = setTimeout(gameLoop, nextTick);
       }
