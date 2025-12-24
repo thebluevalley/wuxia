@@ -24,7 +24,8 @@ export type Equipment = {
   accessory: Item | null;
 };
 
-export type Faction = 'stark' | 'lannister' | 'targaryen' | 'baratheon' | 'watch' | 'wildling' | 'citadel' | 'neutral' | 'faith';
+// 阵营改为：自然、幸存者、野蛮人、旧文明遗迹
+export type Faction = 'nature' | 'survivor' | 'savage' | 'ruins' | 'beast' | 'unknown' | 'neutral' | 'faith' | 'watch'; 
 
 export type QuestCategory = 'main' | 'side'; 
 export type QuestRank = 1 | 2 | 3 | 4 | 5;
@@ -78,13 +79,15 @@ export type Pet = { name: string; type: string; level: number; desc: string; };
 
 export type HeroState = {
   name: string; level: number; gender: '男' | '女'; age: number; personality: string; title: string; motto: string;
-  godPower: number; 
+  godPower: number; // 这里的 GodPower 改名为 "意志力/San值" 的概念（在UI上显示不变，逻辑上理解为意志）
   unlockedFeatures: string[]; storyStage: string;
   mainStoryIndex: number; 
   pet: Pet | null;
   attributes: { constitution: number; strength: number; dexterity: number; intelligence: number; luck: number; };
   stamina: number; maxStamina: number;
-  hp: number; maxHp: number; exp: number; maxExp: number; gold: number; alignment: number;
+  hp: number; maxHp: number; exp: number; maxExp: number; 
+  gold: number; // 这里的 Gold 理解为 "资源点"
+  alignment: number;
   reputation: Record<Faction, number>;
   tags: string[]; 
   actionCounts: { kills: number; retreats: number; gambles: number; charity: number; betrayals: number; shopping: number; drinking: number; }; 
@@ -106,203 +109,183 @@ export type HeroState = {
 
 export type LogEntry = { id: string; text: string; type: 'normal' | 'highlight' | 'bad' | 'system' | 'ai'; time: string; };
 
+// ⚠️ 核心重构：生存氛围文本
 export const FLAVOR_TEXTS = {
-  environment: ["凛冬的寒风呼啸", "君临城的腐臭味", "学士塔的乌鸦叫声", "铁王座的阴影", "狭海的咸湿海风", "北境的皑皑白雪"],
-  action: ["擦拭瓦雷利亚钢剑", "喝了一口酸涩的红酒", "把玩着金龙币", "在神木林中祈祷", "低声密谋", "裹紧了毛皮斗篷"],
-  object: ["龙晶匕首", "学士的项链", "无面者的硬币", "族谱", "半个洋葱", "染血的白袍"]
+  environment: ["海浪拍打礁石的轰鸣", "丛林深处未知的嘶吼", "暴雨打在芭蕉叶上的声音", "远处火山的黑烟", "腐烂植物的气味", "刺骨的海风"],
+  action: ["磨尖手中的木棍", "用雨水清洗伤口", "生吃了一只螃蟹", "警惕地环顾四周", "在树皮上刻下记号", "整理破烂的行囊"],
+  object: ["生锈的铁片", "奇怪的动物骨头", "被冲上岸的漂流瓶", "燧石", "干枯的椰子", "半截旧时代的塑料"]
 };
 
-// 兼容旧逻辑
-export const QUEST_SCRIPTS = {
-  "default": [
-    { title: "巡逻", desc: "日常巡逻。", obj: "巡逻", antagonist: "无", twist: "无" }
-  ]
-};
-
+// ⚠️ 核心重构：进化史诗 (The Evolution Saga)
 export const MAIN_SAGA = [
   {
-    title: "序章：凛冬将至",
-    npc: "艾德·史塔克",
-    desc: "劳勃国王的车队即将抵达临冬城。公爵大人命令你协助罗德利克爵士加强城防，并准备迎接皇室。",
-    obj: "迎接国王",
-    antagonist: "严寒与忙碌",
-    twist: "你在神木林看到了瑟曦王后和詹姆爵士在争吵，但你不敢出声。",
-    location: "临冬城",
+    title: "第一章：搁浅",
+    npc: "无",
+    desc: "我在冰冷的海水中醒来，肺部像火烧一样。四周是陌生的沙滩和茂密的丛林。我必须先检查身体状况，确认自己还活着。",
+    obj: "确认存活",
+    antagonist: "失温与脱水",
+    twist: "沙滩上有一串巨大的、不像人类的脚印。",
+    location: "荒芜海滩",
     reqLevel: 1
   },
   {
-    title: "国王大道",
-    npc: "琼恩·雪诺",
-    desc: "艾德公爵决定南下担任首相，而琼恩将前往长城。你决定护送雪诺一程，直到国王大道的分岔口。",
-    obj: "护送雪诺",
-    antagonist: "路上的强盗",
-    twist: "临别时，雪诺把他的冰原狼白灵托付给你照看了一晚。",
-    location: "国王大道",
+    title: "第二章：第一团火",
+    npc: "求生本能",
+    desc: "夜幕降临，丛林里的声音让人毛骨悚然。我需要光和热。我需要火。我的双手已经磨出了血泡。",
+    obj: "钻木取火",
+    antagonist: "黑暗与恐惧",
+    twist: "火光引来了一些不该来的东西。",
+    location: "海边岩洞",
     reqLevel: 3
   },
   {
-    title: "狮狼之争",
-    npc: "凯特琳·徒利",
-    desc: "在十字路口客栈，凯特琳夫人认出了“小恶魔”提利昂。她命令在场的所有封臣协助她逮捕这个兰尼斯特。",
-    obj: "逮捕小恶魔",
-    antagonist: "兰尼斯特卫兵",
-    twist: "提利昂即使被绑着，嘴巴也像刀子一样锋利。",
-    location: "十字路口客栈",
+    title: "第三章：猎杀时刻",
+    npc: "丛林法则",
+    desc: "椰子和贝壳已经无法满足身体的消耗。我必须制作武器，进入丛林深处。要么狩猎，要么被猎。",
+    obj: "狩猎野猪",
+    antagonist: "丛林野猪王",
+    twist: "这只野猪身上插着一支断箭，这里还有其他人！",
+    location: "深邃丛林",
     reqLevel: 5
   },
   {
-    title: "首相的比武大会",
-    npc: "培提尔·贝里席",
-    desc: "君临城正在举办盛大的比武大会。小指头暗示你，如果能在比武中制造一点“意外”，会有丰厚的回报。",
-    obj: "参加比武",
-    antagonist: "魔山格雷果",
-    twist: "魔山一剑砍下了他坐骑的头，鲜血溅了你一身。",
-    location: "君临城",
+    title: "第四章：神秘信号",
+    npc: "无线电噪音",
+    desc: "我在山顶发现了一架坠毁的老式飞机残骸。无线电里似乎传出断断续续的人声。我必须修复它。",
+    obj: "修复无线电",
+    antagonist: "守护残骸的豹子",
+    twist: "信号不是求救，而是警告：'不要靠近'。",
+    location: "坠机山顶",
     reqLevel: 10
   },
   {
-    title: "权力的游戏",
-    npc: "瓦里斯",
-    desc: "劳勃国王狩猎归来身受重伤。八爪蜘蛛瓦里斯在深夜找到了你，让你把一封密信送给史坦尼斯。",
-    obj: "送信",
-    antagonist: "金袍子",
-    twist: "当你回来时，艾德·史塔克已经被捕了。",
-    location: "红堡",
-    reqLevel: 15
+    title: "第五章：野蛮接触",
+    npc: "被俘的探险家",
+    desc: "我发现了一个野人部落的营地，笼子里关着一个现代装束的人。是救他，还是看着他被吃掉？",
+    obj: "劫营",
+    antagonist: "食人族酋长",
+    twist: "那个探险家竟然知道我的名字。",
+    location: "食人族营地",
+    reqLevel: 20
   },
   {
-    title: "黑水河之战",
-    npc: "提利昂·兰尼斯特",
-    desc: "史坦尼斯的舰队逼近君临。作为代理首相，提利昂命令你负责点燃野火。",
-    obj: "守卫泥门",
-    antagonist: "史坦尼斯的大军",
-    twist: "绿色的火焰吞噬了一切，包括你的战友。",
-    location: "君临城墙",
-    reqLevel: 25
-  },
-  {
-    title: "血色婚礼",
-    npc: "罗柏·史塔克",
-    desc: "少狼主将在孪河城参加婚礼。虽然是不祥之地，但他必须去。你是护卫之一。",
-    obj: "参加婚宴",
-    antagonist: "弗雷家族的弩手",
-    twist: "卡斯特梅的雨季响起，你拼死杀出重围，但国王死了。",
-    location: "孪河城",
-    reqLevel: 40
-  },
-  {
-    title: "长夜守望",
-    npc: "守夜人总司令",
-    desc: "绝境长城告急。野人王曼斯·雷德集结了十万大军。不论之前的恩怨，你必须北上支援。",
-    obj: "死守长城",
-    antagonist: "野人与猛犸象",
-    twist: "野人只是在逃命，真正的威胁在他们身后——异鬼。",
-    location: "黑城堡",
-    reqLevel: 60
+    title: "第六章：造船",
+    npc: "季风",
+    desc: "这个岛是个监狱。我收集了足够的木材和藤蔓。是时候离开这里，去寻找大陆了。",
+    obj: "建造木筏",
+    antagonist: "海洋风暴",
+    twist: "海平线下，一座巨大的黑色金字塔缓缓升起。",
+    location: "离岛港湾",
+    reqLevel: 30
   }
 ];
 
+// ⚠️ 支线任务：生存委托
 export const SIDE_QUESTS = {
-  "临冬城": [
-    { title: "清理狼林", desc: "狼林里的强盗最近越来越猖狂了。", obj: "剿匪", antagonist: "强盗首领" },
-    { title: "铁匠的委托", desc: "微肯师傅需要一些上好的铁矿石。", obj: "采集", antagonist: "严寒" }
+  "荒芜海滩": [
+    { title: "收集淡水", desc: "没有水，我活不过三天。", obj: "寻找水源", antagonist: "干渴" },
+    { title: "捡拾海货", desc: "退潮了，去礁石区看看有什么吃的。", obj: "赶海", antagonist: "海蛇" }
   ],
-  "君临城": [
-    { title: "跳蚤窝的讨债人", desc: "小指头的妓院有一笔烂账要收。", obj: "讨债", antagonist: "赖账的佣兵" },
-    { title: "下水道的秘密", desc: "有人说在下水道看到了坦格利安的旧物。", obj: "探索", antagonist: "食人鼠" }
-  ],
-  "绝境长城": [
-    { title: "鬼影森林巡逻", desc: "游骑兵需要人手去先民拳峰侦查。", obj: "巡逻", antagonist: "尸鬼" },
-    { title: "修缮长城", desc: "东海望的城墙塌了一角。", obj: "苦力", antagonist: "高空坠落" }
+  "深邃丛林": [
+    { title: "采集草药", desc: "伤口开始发炎了，我需要止血草。", obj: "采药", antagonist: "毒虫" },
+    { title: "伐木", desc: "需要更坚固的庇护所。", obj: "伐木", antagonist: "劳累" }
   ],
   "default": [
-    { title: "护送商队", desc: "一队来自自由贸易城邦的商人需要护卫。", obj: "护送", antagonist: "多斯拉克强盗" },
-    { title: "比武招亲", desc: "某个小领主为了嫁女儿举办的比武。", obj: "决斗", antagonist: "流浪骑士" }
+    { title: "探索周边", desc: "绘制这片区域的地图。", obj: "探索", antagonist: "迷路" },
+    { title: "制作陷阱", desc: "希望能抓到兔子或者老鼠。", obj: "狩猎", antagonist: "狡猾的动物" }
   ]
 };
 
 export const WORLD_ARCHIVE = [
-  "【疯王之死】：詹姆·兰尼斯特在铁王座下刺杀了疯王伊里斯。",
-  "【五王之战】：维斯特洛陷入了四分五裂，铁王座、北境、铁群岛都在流血。",
-  "【守夜人誓言】：长夜将至，我从今开始守望，至死方休。",
-  "【凡人皆有一死】：Valar Morghulis，这是布拉佛斯无面者的箴言。",
-  "【兰尼斯特有债必偿】：这不仅是关于金钱，更是关于复仇。",
-  "【龙之母】：在狭海对岸，最后的真龙孵化了三颗龙蛋。"
+  "【大崩坏】：旧文明在一夜之间毁灭，原因至今不明。",
+  "【变异生物】：辐射还是病毒？动物们变得巨大且狂暴。",
+  "【幸存者】：并不是所有人类都友善，在这个世界，他人即地狱。",
+  "【遗迹】：旧时代的城市废墟，埋藏着科技和危险。",
+  "【黑石】：一种神秘的矿物，似乎能赋予人特殊的力量。"
 ];
 
-export const WORLD_LORE = "维斯特洛大陆，七国纷争，凛冬将至。";
+export const WORLD_LORE = "文明已死，唯适者生存。";
 
+// 幸存者伙伴
 export const NPC_ARCHETYPES = {
   common: [
-    { job: "酒馆老板", buff: "luck", desc: "消息灵通，但贪财。" },
-    { job: "雇佣兵", buff: "attack", desc: "只认钱，不认主。" },
-    { job: "吟游诗人", buff: "exp", desc: "会唱《卡斯特梅的雨季》。" }
+    { job: "迷失者", buff: "luck", desc: "眼神空洞，只会机械地收集树枝。" },
+    { job: "野狗", buff: "attack", desc: "它看起来很饿，但似乎愿意跟着你。" },
+    { job: "逃兵", buff: "defense", desc: "穿着破烂的迷彩服，紧紧抱着一把没子弹的枪。" }
   ],
   rare: [
-    { job: "学士", buff: "exp", desc: "精通医术和毒药。" },
-    { job: "守夜人游骑兵", buff: "defense", desc: "在长城外活下来的老兵。" }
+    { job: "医生", buff: "heal", desc: "他的急救包里只剩下一卷绷带了。" },
+    { job: "工匠", buff: "exp", desc: "他能用废铁片磨出一把好刀。" }
   ],
   epic: [
-    { job: "御林铁卫", buff: "defense", desc: "剑术超群，誓死效忠。" },
-    { job: "红袍女祭司", buff: "luck", desc: "信仰光之王，能在火中看到未来。" }
+    { job: "特种兵", buff: "attack", desc: "旧时代的杀人机器，沉默寡言。" },
+    { job: "植物学家", buff: "luck", desc: "她知道哪些蘑菇能吃，哪些能毒死一头象。" }
   ],
   legendary: [
-    { job: "无面者", buff: "attack", desc: "顶级的刺客，没有名字。" }
+    { job: "先知", buff: "luck", desc: "那个疯疯癫癫的老头，他说他见过世界毁灭的样子。" }
   ]
 };
 
-// ⚠️ 补全 SKILL_LIBRARY
 export const SKILL_LIBRARY = {
-  combat: ["水舞者剑术", "双手巨剑", "长矛方阵", "多斯拉克马术", "十字弓"],
-  intrigue: ["谎言", "毒药", "情报网", "政治联姻"],
-  survival: ["生火", "狩猎", "抗寒", "草药学"],
-  knowledge: ["瓦雷利亚语", "历史", "战术", "渡鸦"],
-  command: ["鼓舞", "后勤", "攻城", "海战"]
+  combat: ["矛术", "弓箭", "投石", "陷阱", "近身格斗"],
+  intrigue: ["伪装", "潜行", "恐吓", "谈判"],
+  survival: ["生火", "净水", "急救", "辨识植物", "剥皮"],
+  knowledge: ["旧时代知识", "地理", "机械维修", "生物学"],
+  command: ["营地管理", "驯兽", "战术指挥"]
 };
 
-export const PERSONALITIES = ["荣誉", "狡诈", "残忍", "忠诚", "贪婪", "虔诚", "疯癫"];
-export const NPC_NAMES_MALE = ["琼恩", "詹姆", "提利昂", "艾德", "罗柏", "泰温", "培提尔", "瓦里斯", "山姆", "布兰"];
-export const NPC_NAMES_FEMALE = ["丹妮莉丝", "瑟曦", "珊莎", "艾莉亚", "凯特琳", "玛格丽", "布蕾妮", "耶哥蕊特"];
-export const NPC_NAMES_LAST = ["史塔克", "兰尼斯特", "拜拉席恩", "坦格利安", "徒利", "提利尔", "雪诺", "佛雷", "波顿"];
-export const NPC_TRAITS = ["私生子", "侏儒", "弑亲者", "骑士", "野人", "学士"];
+export const PERSONALITIES = ["坚韧", "偏执", "冷静", "疯狂", "乐观", "冷血", "谨慎"];
+export const NPC_NAMES_MALE = ["杰克", "罗伊", "汤姆", "黑石", "老骨头", "刀疤", "阿强", "独眼"];
+export const NPC_NAMES_FEMALE = ["安娜", "劳拉", "小红", "野花", "萨拉", "毒藤", "麻雀"];
+export const NPC_NAMES_LAST = ["无名氏", "幸存者", "流浪者", "野人", "博士", "猎手"];
+export const NPC_TRAITS = ["受伤的", "饥饿的", "强壮的", "聪明的", "疯狂的"];
 
+// 生存物资 Loot
 export const LOOT_TABLE: Partial<Item>[] = [
-  { name: "青亭岛红酒", type: 'consumable', desc: "贵族享用的美酒。", price: 100, minLevel: 1, quality: 'common', effect: 50 },
-  { name: "罂粟花奶", type: 'consumable', desc: "强效止痛药。", price: 50, minLevel: 10, quality: 'rare', effect: 100 },
-  { name: "瓦雷利亚钢匕首", type: 'weapon', desc: "龙骨柄，锋利无比。", price: 5000, minLevel: 50, quality: 'legendary', power: 150 },
-  { name: "劳勃的战锤", type: 'weapon', desc: "曾经击碎雷加胸甲的武器。", price: 4000, minLevel: 40, quality: 'epic', power: 120 },
-  { name: "守夜人黑衣", type: 'body', desc: "不仅保暖，也是誓言的象征。", price: 50, minLevel: 5, quality: 'common', power: 20 },
-  { name: "兰尼斯特金甲", type: 'body', desc: "华丽且防御力极高。", price: 3000, minLevel: 30, quality: 'legendary', power: 100 }
+  { name: "椰子", type: 'consumable', desc: "甘甜的椰汁，救命的物资。", price: 5, minLevel: 1, quality: 'common', effect: 20 },
+  { name: "绷带", type: 'consumable', desc: "破布条消毒后制成。", price: 10, minLevel: 1, quality: 'common', effect: 50 },
+  { name: "抗生素", type: 'consumable', desc: "旧世界的遗物，比黄金还珍贵。", price: 500, minLevel: 10, quality: 'epic', effect: 100 },
+  { name: "压缩饼干", type: 'consumable', desc: "硬得像砖头，但能提供大量热量。", price: 50, minLevel: 5, quality: 'rare', effect: 80 },
+  { name: "《野外生存指南》", type: 'book', desc: "虽然缺了几页，但依然很有用。", price: 100, minLevel: 1, quality: 'rare', effect: "生存知识" },
+  { name: "黑曜石匕首", type: 'weapon', desc: "极其锋利，甚至能切开岩石。", price: 200, minLevel: 5, quality: 'rare', power: 30 },
+  { name: "消防斧", type: 'weapon', desc: "红色的油漆已经剥落，刃口依然寒光闪闪。", price: 500, minLevel: 10, quality: 'epic', power: 60 },
+  { name: "骨矛", type: 'weapon', desc: "野兽的大腿骨磨制而成。", price: 20, minLevel: 1, quality: 'common', power: 15 },
+  { name: "兽皮衣", type: 'body', desc: "散发着腥味，但很暖和。", price: 50, minLevel: 5, quality: 'common', power: 10 },
+  { name: "战术背心", type: 'body', desc: "不知道从哪个尸体上扒下来的。", price: 1000, minLevel: 20, quality: 'legendary', power: 50 }
 ];
 
 export const MAP_LOCATIONS = {
-  common: ["跳蚤窝", "十字路口客栈", "鼹鼠村"],
-  search: ["龙石岛", "旧镇学城", "赫伦堡"],
-  hunt: ["御林", "鬼影森林", "颈泽"],
-  challenge: ["比武审判场", "绝境长城", "弥林竞技场"],
-  train: ["红堡教头场", "黑城堡演武场"],
-  life: ["高庭花园", "临冬城大厅", "君临集市"]
+  common: ["沙滩", "浅海", "椰林"],
+  search: ["坠机点", "废弃营地", "神秘山洞"],
+  hunt: ["野猪林", "沼泽", "深海"],
+  challenge: ["火山", "食人族祭坛", "地下设施"],
+  train: ["安全屋", "瀑布下"],
+  life: ["临时营地", "篝火旁"]
 };
 
 export const WORLD_MAP = [
-  { name: "临冬城", type: "life", minLv: 1 }, 
-  { name: "国王大道", type: "common", minLv: 5 },
-  { name: "君临城", type: "life", minLv: 10 },
-  { name: "绝境长城", type: "train", minLv: 20 },
-  { name: "铁王座", type: "challenge", minLv: 50 }
+  { name: "荒芜海滩", type: "life", minLv: 1 }, 
+  { name: "椰林边缘", type: "common", minLv: 1 },
+  { name: "深邃丛林", type: "hunt", minLv: 5 },
+  { name: "坠机山顶", type: "search", minLv: 10 },
+  { name: "食人族营地", type: "challenge", minLv: 20 },
+  { name: "地下遗迹", type: "dungeon", minLv: 40 }
 ];
 
 export const STORY_STAGES = [
-  { level: 1, name: "无名之辈" },
-  { level: 20, name: "风云人物" },
-  { level: 50, name: "一方诸侯" },
-  { level: 80, name: "维斯特洛传说" }
+  { level: 1, name: "幸存者" },
+  { level: 10, name: "狩猎者" },
+  { level: 30, name: "开拓者" },
+  { level: 60, name: "征服者" },
+  { level: 90, name: "世界之王" }
 ];
 
 export const STATIC_LOGS = {
   idle: [
-    "你擦拭着剑上的锈迹，在这乱世，这是你唯一的朋友。",
-    "远处传来乌鸦的叫声，仿佛在预示着什么。",
-    "寒风凛冽，你裹紧了破旧的斗篷。"
+    "肚子咕咕叫了，得找点吃的。",
+    "伤口有点痒，希望没有感染。",
+    "望着无尽的大海，心里一阵绝望。",
+    "篝火快灭了，得加点柴。",
+    "整理了一下背包里的物资，每一件都至关重要。"
   ]
 };
