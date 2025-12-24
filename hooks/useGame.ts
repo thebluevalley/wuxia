@@ -210,16 +210,10 @@ export function useGame() {
 
     if (isBusy) {
         if (hero.queuedQuest) { addMessage('system', '繁忙', `队列已满`); return; }
-        
-        setHero(prev => prev ? { 
-            ...prev, 
-            queuedQuest: quest, 
-            questBoard: newBoard 
-        } : null);
+        setHero(prev => prev ? { ...prev, queuedQuest: quest, questBoard: newBoard } : null);
         addMessage('system', '计划', `已列入计划：${quest.name}`);
         triggerAI('quest_start', '', 'accept', { ...hero, queuedQuest: quest }); 
     } else {
-        // ⚠️ 修复：显式声明类型，避免 TS 报错
         const newHeroState: HeroState = { 
             ...hero, 
             stamina: hero.stamina - quest.staminaCost, 
@@ -232,6 +226,7 @@ export function useGame() {
         
         setHero(newHeroState);
         addMessage('system', '执行', `立即开始：${quest.name}`);
+        // ⚠️ 关键：直接触发过程描写，无需等待
         triggerAI('quest_journey', '', 'start', newHeroState); 
     }
   };
@@ -252,7 +247,7 @@ export function useGame() {
           stamina: hero.stamina - 30,
           location: exp.location,
           expeditionBoard: hero.expeditionBoard.filter(e => e.id !== expeditionId),
-          currentQuest: null, // 暂停自动任务
+          currentQuest: null, 
           queuedQuest: null
       };
 
@@ -286,7 +281,9 @@ export function useGame() {
         taskObjective = `在${currentHero.activeExpedition.name}探索未知`;
     } else if (currentHero.currentQuest) {
         questTitle = currentHero.currentQuest.name;
-        taskObjective = currentHero.currentQuest.script.objective; 
+        // ⚠️ 核心：直接使用任务名作为目标，让 AI 知道具体要做什么
+        // 之前只传了 objective (如“采集”)，现在传 "收集漂流木"
+        taskObjective = currentHero.currentQuest.name; 
     }
 
     const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';

@@ -13,14 +13,14 @@ export async function POST(req: Request) {
     const envFlavor = FLAVOR_TEXTS.environment[Math.floor(Math.random() * FLAVOR_TEXTS.environment.length)];
     const isDanger = context.isDanger;
     
-    // 明确的任务上下文
+    // ⚠️ 获取具体的任务名 (例如 "收集漂流木")
     const currentAction = context.taskObjective || "生存"; 
 
     let styleInstruction = "";
     if (isDanger) {
         styleInstruction = "【危急状态】：极短句。动词为主。强调紧迫感。";
     } else {
-        styleInstruction = "【第一人称动作】：专注于描写'我'正在做的具体动作。不要写心理活动，写手上的活。";
+        styleInstruction = "【第一人称动作】：专注于描写'我'正在做的具体动作细节。拒绝心理活动。";
     }
 
     const baseInstruction = `
@@ -45,17 +45,17 @@ export async function POST(req: Request) {
       case 'quest_start':
         prompt = `${baseInstruction} 
         事件：决定开始任务【${context.questTitle}】。
-        指令：写一句准备工作的描述。例如检查工具、深呼吸、或是观察目标。`;
+        指令：写一句准备动作。检查工具，观察目标。`;
         break;
 
       case 'quest_journey':
-        // ⚠️ 核心修改：强制绑定任务内容，产生即时反馈感
+        // ⚠️ 核心修改：强制绑定任务内容
         prompt = `${baseInstruction} 
         当前正在进行：【${currentAction}】。
         指令：写一个**正在执行该动作**的具体细节。
-        示例：如果任务是找水，写"扒开阔叶植物寻找露水"。
-        示例：如果任务是伐木，写"石斧砍在树干上震得虎口发麻"。
-        禁止：不要写"我正在路上"或"我准备开始"。直接写动作。`;
+        示例：如果任务是"收集漂流木"，写"弯腰捡起一根湿漉漉的木头，沉甸甸的"。
+        示例：如果任务是"找水"，写"扒开阔叶植物，寻找叶片上的露珠"。
+        禁止：不要写"我正在做任务"或"我准备开始"。直接写动作！`;
         break;
 
       case 'quest_climax':
