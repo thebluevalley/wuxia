@@ -8,8 +8,7 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL
 
 const REFRESH_INTERVAL = 1 * 60 * 60 * 1000; 
 
-// ... (省略辅助函数 getStoryStage, calculateTags, pickEventSeed, generateQuestBoard, generateExpeditions, getLocationByQuest, getInitialSkills, getInitialLifeSkills, generateVisitors, rollLoot 以节省篇幅，请保持原样) ...
-// ⚠️ 务必保留上述辅助函数的完整定义，此处仅为省略展示
+// --- 辅助函数定义 ---
 const getStoryStage = (level: number) => { const stage = [...STORY_STAGES].reverse().find(s => level >= s.level); return stage ? stage.name : "幸存者"; };
 const calculateTags = (hero: HeroState): string[] => { const tags: Set<string> = new Set(); const { hp, maxHp, stamina, gold, equipment } = hero; if (hp < maxHp * 0.3) tags.add("重伤"); if (stamina < 30) tags.add("饥饿"); if (equipment.weapon) tags.add("武装"); else tags.add("空手"); if (hero.state === 'expedition') tags.add("探险中"); return Array.from(tags).slice(0, 5); };
 const pickEventSeed = (location: string, objective: string): string => { const actionKey = objective.substring(0, 2); const actionSeeds = EVENT_SEEDS[actionKey] || []; const locationSeeds = EVENT_SEEDS[location] || []; const pool = [...actionSeeds, ...locationSeeds]; if (pool.length === 0) return "观察周围的环境"; return pool[Math.floor(Math.random() * pool.length)]; };
@@ -63,7 +62,7 @@ export function useGame() {
       activeExpedition: null, expeditionBoard: [], lastExpeditionRefresh: 0,
       strategy: { longTermGoal: "生存", currentFocus: "活着", urgency: 'high', narrativePhase: 'survival' },
       idleUntil: 0,
-      storyBuffer: [] // 初始化缓冲池
+      storyBuffer: [] 
     };
     
     newHero.questBoard = generateQuestBoard(newHero);
@@ -77,9 +76,8 @@ export function useGame() {
         if (user.password !== password) { setError("验证失败"); setLoading(false); return; }
         const mergedData = { ...newHero, ...user.data };
         if (mergedData.mainStoryIndex === undefined) mergedData.mainStoryIndex = 0;
-        if (!mergedData.storyBuffer) mergedData.storyBuffer = []; // 兼容旧数据
+        if (!mergedData.storyBuffer) mergedData.storyBuffer = []; 
         setHero(mergedData);
-        // 如果上线时缓冲池空了，立刻触发一次生成
         if (mergedData.storyBuffer.length === 0) {
              setTimeout(() => triggerAI('generate_script_batch', undefined, undefined, mergedData), 500);
         }
@@ -99,15 +97,16 @@ export function useGame() {
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
   }, [hero]);
 
+  // ⚠️ 接收 'story' 类型并传递给 addLog
   const addLog = (text: string, type: LogEntry['type'] = 'highlight') => {
-    const finalType: LogEntry['type'] = 'highlight'; 
     setHero(prev => {
       if (!prev) return null;
       const recentTexts = prev.logs.slice(0, 5).map(l => l.text);
       if (recentTexts.includes(text)) { return prev; }
       const timeStr = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
       const newHistory = (prev.narrativeHistory + " " + text).slice(-800); 
-      const newLog: LogEntry = { id: Date.now().toString(), text, type: finalType, time: timeStr };
+      // 直接使用传入的 type，不再强制覆盖为 finalType
+      const newLog: LogEntry = { id: Date.now().toString(), text, type, time: timeStr };
       const newLogs = [newLog, ...prev.logs].slice(0, 50);
       recentLogsRef.current = newLogs.slice(0, 5).map(l => l.text);
       return { ...prev, logs: newLogs, narrativeHistory: newHistory };
@@ -115,7 +114,7 @@ export function useGame() {
   };
 
   const addMessage = (type: 'rumor' | 'system', title: string, content: string) => { setHero(prev => { if (!prev) return null; return { ...prev, messages: [{ id: Date.now().toString(), type, title, content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'}), isRead: false }, ...prev.messages].slice(0, 50) }; }); };
-  const acceptQuest = (questId: string) => { if(!heroRef.current) return; const hero=heroRef.current; if(hero.activeExpedition) { addMessage('system', '无法行动', '正在探险中！'); return; } const quest=hero.questBoard.find(q=>q.id===questId); if(!quest) return; const newBoard=hero.questBoard.filter(q=>q.id!==questId); const isBusy = !!hero.currentQuest; if(isBusy){ if(hero.queuedQuest) { addMessage('system', '繁忙', `队列已满`); return; } setHero(prev => prev ? { ...prev, queuedQuest: quest, questBoard: newBoard } : null); addMessage('system', '计划', `已列入计划：${quest.name}`); } else { const ns:HeroState={ ...hero, stamina:hero.stamina-quest.staminaCost, currentQuest:quest, queuedQuest:null, questBoard:newBoard, location:hero.location, state:'fight', idleUntil: 0 }; setHero(ns); /* 手动任务触发单次生成 */ triggerAI('quest_journey','','start',ns); } };
+  const acceptQuest = (questId: string) => { if(!heroRef.current) return; const hero=heroRef.current; if(hero.activeExpedition) { addMessage('system', '无法行动', '正在探险中！'); return; } const quest=hero.questBoard.find(q=>q.id===questId); if(!quest) return; const newBoard=hero.questBoard.filter(q=>q.id!==questId); const isBusy = !!hero.currentQuest; if(isBusy){ if(hero.queuedQuest) { addMessage('system', '繁忙', `队列已满`); return; } setHero(prev => prev ? { ...prev, queuedQuest: quest, questBoard: newBoard } : null); addMessage('system', '计划', `已列入计划：${quest.name}`); } else { const ns:HeroState={ ...hero, stamina:hero.stamina-quest.staminaCost, currentQuest:quest, queuedQuest:null, questBoard:newBoard, location:hero.location, state:'fight', idleUntil: 0 }; setHero(ns); triggerAI('quest_journey','','start',ns); } };
   const startExpedition = (expeditionId: string) => { if(!heroRef.current) return; const hero=heroRef.current; const exp=hero.expeditionBoard.find(e=>e.id===expeditionId); if(!exp) return; const ns:HeroState={...hero,activeExpedition:{...exp,startTime:Date.now(),endTime:Date.now()+exp.duration},state:'expedition',stamina:hero.stamina-30,location:exp.location,expeditionBoard:hero.expeditionBoard.filter(e=>e.id!==expeditionId),currentQuest:null,queuedQuest:null}; setHero(ns); triggerAI('expedition_start','','start',ns); };
   const hireCompanion = (visitorId: string) => { if(!hero) return; const v=hero.tavern.visitors.find(v=>v.id===visitorId); if(!v) return; setHero(p=>p?{...p,gold:p.gold-v.price,companion:v,companionExpiry:Date.now()+86400000,tavern:{...p.tavern,visitors:p.tavern.visitors.filter(x=>x.id!==visitorId)}}:null); triggerAI("recruit_companion","", "recruit",{...hero,companion:v}); };
   const autoManageInventory = (currentHero: HeroState): { hero: HeroState, logs: string[], tagsChanged: boolean } => { let hero = { ...currentHero }; const logs: string[] = []; let updated = false; let equipChanged = false; const newTags = calculateTags(hero); const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(hero.tags); if (tagsChanged) { hero.tags = newTags; updated = true; } hero.inventory.forEach(item => { if (item.type === 'weapon' && (!hero.equipment.weapon || (item.power||0) > (hero.equipment.weapon.power||0))) { hero.equipment.weapon = item; updated = true; equipChanged = true; } }); if (hero.hp < hero.maxHp * 0.5) { const potion = hero.inventory.find(i => i.type === 'consumable' && !i.desc.includes("热量")); if (potion) { const heal = Number(potion.effect) || 0; hero.hp = Math.min(hero.maxHp, hero.hp + heal); logs.push(`使用: ${potion.name}`); const idx = hero.inventory.findIndex(i => i.id === potion.id); if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); } updated = true; } } if (hero.stamina < hero.maxStamina * 0.2) { const food = hero.inventory.find(i => i.type === 'consumable' && (i.desc.includes("热量") || i.name.includes("椰子") || i.name.includes("饼干"))); if (food) { const regen = Number(food.effect) || 0; hero.stamina = Math.min(hero.maxStamina, hero.stamina + regen); logs.push(`食用: ${food.name}`); const idx = hero.inventory.findIndex(i => i.id === food.id); if (idx > -1) { if (hero.inventory[idx].count > 1) hero.inventory[idx].count--; else hero.inventory.splice(idx, 1); } updated = true; } } if (equipChanged) { setTimeout(() => triggerAI('generate_equip_desc', '', undefined, hero), 100); } return { hero: updated ? hero : currentHero, logs, tagsChanged }; };
@@ -134,9 +133,7 @@ export function useGame() {
     let questCategory = "none";
     let questDesc = "";
 
-    // 假设 mainStoryIndex 是当前正在进行的任务
     const currentNode = NOVEL_SCRIPT[currentHero.mainStoryIndex] || NOVEL_SCRIPT[0];
-    // 用于 AI 生成时的剧情依据
     questDesc = currentNode.summary;
 
     if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
@@ -147,7 +144,7 @@ export function useGame() {
         questTitle = currentHero.currentQuest.name;
         taskObjective = currentHero.currentQuest.script.objective || currentHero.currentQuest.name; 
         if (currentHero.currentQuest.category !== 'main') {
-             questDesc = currentHero.currentQuest.script.description || ""; // 支线覆盖主线描述
+             questDesc = currentHero.currentQuest.script.description || ""; 
         }
         questCategory = currentHero.currentQuest.category;
     }
@@ -175,12 +172,14 @@ export function useGame() {
       const data = await res.json();
       
       if (data.storyBatch) {
-          // ⚠️ 批量生成模式：将生成的一组段落存入 buffer
+          // ⚠️ 批量生成的都是 'story' 类型
           setHero(prev => prev ? { ...prev, storyBuffer: [...prev.storyBuffer, ...data.storyBatch] } : null);
           addLog("(思维涌动：新的记忆碎片已浮现...)", "system");
       } else if (data.text) {
-          // 普通单条模式
-          const fullText = suffix ? `${data.text} ${suffix}` : data.text; addLog(fullText, 'highlight');
+          const fullText = suffix ? `${data.text} ${suffix}` : data.text;
+          // ⚠️ 修正：单条任务日志也归为 'story' 类型（如果不是系统提示）
+          // 这样只要是 AI 写的，颜色都一致
+          addLog(fullText, 'story'); 
       }
     } catch (e: any) { console.error("AI Gen Failed:", e); if (e.message.includes('429')) aiCooldownRef.current = Date.now() + 30000; } finally { isRequestingRef.current = false; }
     return true;
@@ -191,7 +190,6 @@ export function useGame() {
   const autoDirector = (currentHero: HeroState) => {
       let newStrategy = { ...currentHero.strategy };
       let newScriptNode = NOVEL_SCRIPT[currentHero.mainStoryIndex];
-      // 循环逻辑：如果跑完了，就停在最后一个，或者循环随机
       if (!newScriptNode) newScriptNode = NOVEL_SCRIPT[NOVEL_SCRIPT.length - 1];
 
       let chosenTaskTitle = `【主线】${newScriptNode.objective}`;
@@ -243,35 +241,25 @@ export function useGame() {
           let queued = managedHero.queuedQuest;
           let seedEvent = "";
 
-          // ⚠️ 核心消费逻辑 (Consumer)
-          // 1. 如果缓冲池里有剧情，优先播放剧情 (每 12-18秒一条，模拟阅读速度)
+          // ⚠️ 消费缓冲池逻辑：显示时使用 'story' 类型
           if (managedHero.storyBuffer && managedHero.storyBuffer.length > 0) {
               const nextLog = managedHero.storyBuffer[0];
               const remainingBuffer = managedHero.storyBuffer.slice(1);
-              
-              // 更新状态：移除第一条
               setHero(h => h ? { ...h, storyBuffer: remainingBuffer } : null);
-              addLog(nextLog, 'highlight');
               
-              // 这里 return，跳过本次循环的其他逻辑，让玩家专心看剧情
-              // 设置下次 tick 时间稍短一点，保持阅读连贯性
+              // ⚠️ 关键：这里指定类型为 'story'
+              addLog(nextLog, 'story');
+              
               timerRef.current = setTimeout(gameLoop, 12000 + Math.random() * 5000);
               return;
           }
 
-          // 2. 如果缓冲池空了，且当前没有任务，或者有主线任务正在进行中 -> 触发批量生成
-          // 我们希望只要有主线任务，且 buffer 空了，就去进货
-          // 为了防止死循环，加一个冷却检查
           if (managedHero.storyBuffer.length === 0 && !isRequestingRef.current && Date.now() > aiCooldownRef.current) {
-               // 如果当前有主线任务，说明剧情还在继续，去生成这一章的详情
                if (newQuest && newQuest.category === 'main') {
-                   // 触发生成
                    await triggerAI('generate_script_batch');
-                   // 生成期间，暂时不打扰，等待下一次 tick
                    timerRef.current = setTimeout(gameLoop, 5000); 
                    return;
                }
-               // 如果没有任务，进入原来的 Director 逻辑 (分配新任务)
           }
 
           if (!newQuest) {
@@ -287,8 +275,6 @@ export function useGame() {
                       managedHero.currentSeed = seed; 
                       managedHero.location = NOVEL_SCRIPT[Math.min(managedHero.mainStoryIndex, NOVEL_SCRIPT.length-1)].location; 
                       seedEvent = seed;
-                      
-                      // 接了新任务立刻生成剧情
                       aiEvent = 'generate_script_batch'; 
                   }
               }
@@ -296,17 +282,14 @@ export function useGame() {
 
           if (newQuest) {
             let progressInc = 5 + Math.floor(Math.random() * 5); 
-            // 只有当 buffer 空了，才推进任务进度？或者并行？
-            // 为了游戏性，我们让进度和剧情并行，但剧情播放时进度可以慢一点
             newQuest.progress += progressInc;
-            
             if (newQuest.progress >= newQuest.total) {
-               aiEvent = 'quest_end'; // 任务结束时也可以触发一段总结剧情
+               aiEvent = 'quest_end'; 
                managedHero.gold += newQuest.rewards.gold;
                managedHero.exp += newQuest.rewards.exp;
                
                if (newQuest.category === 'main' && newQuest.id === `story_${managedHero.mainStoryIndex}`) {
-                   managedHero.mainStoryIndex += 1; // 推进到下一章
+                   managedHero.mainStoryIndex += 1; 
                    addMessage('system', '剧情', `章节完成！进度保存。`);
                }
                
@@ -320,7 +303,6 @@ export function useGame() {
           
           if (aiEvent) { 
               setHero({...managedHero}); 
-              // 如果是生成 batch，就不需要 seed
               await triggerAI(aiEvent, "", undefined, undefined, seedEvent); 
           } 
           
