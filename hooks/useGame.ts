@@ -25,13 +25,6 @@ const calculateTags = (hero: HeroState): string[] => {
   return Array.from(tags).slice(0, 5);
 };
 
-// ⚠️ 智能种子选择器
-const pickEventSeed = (location: string, objective: string): string => {
-    // 简单模拟，不再依赖庞大的 EVENT_SEEDS 字典，直接返回基础描述，把压力给 AI
-    // 如果需要之前的 EVENT_SEEDS 逻辑可以保留，但为了精简这里暂时简化
-    return `${objective}的时候发生了意外`; 
-};
-
 const generateQuestBoard = (hero: HeroState): Quest[] => {
   const quests: Quest[] = [];
   const { location } = hero;
@@ -116,6 +109,9 @@ export function useGame() {
   const [error, setError] = useState<string | null>(null);
   const heroRef = useRef<HeroState | null>(null);
   const recentLogsRef = useRef<string[]>([]);
+  // ⚠️ 核心修复：请求锁。防止 AI 还在思考时，下一个请求又发出去，导致堆积和掉线。
+  const isRequestingRef = useRef(false);
+  
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -183,7 +179,6 @@ export function useGame() {
     const finalType: LogEntry['type'] = 'highlight'; 
     setHero(prev => {
       if (!prev) return null;
-      // 这里的防重逻辑仍然保留，防止 AI 自己输出重复内容
       const recentTexts = prev.logs.slice(0, 5).map(l => l.text);
       if (recentTexts.includes(text)) {
           return prev;
@@ -280,14 +275,20 @@ export function useGame() {
   };
 
   const triggerAI = async (eventType: string, suffix: string = "", action?: string, explicitHero?: HeroState) => {
+    // ⚠️ 核心修复：如果上一个请求还在进行，直接放弃本次触发，防止堆积
+    if (isRequestingRef.current) return false;
+
     const currentHero = explicitHero || hero;
     if (!currentHero) return false;
     
+    // ⚠️ 加锁
+    isRequestingRef.current = true;
+
     const companionInfo = currentHero.companion ? `伙伴:${currentHero.companion.title}` : "独自";
     const mainSagaInfo = currentHero.mainStoryIndex < MAIN_SAGA.length ? MAIN_SAGA[currentHero.mainStoryIndex].title : "完结";
     
     let questTitle = "无";
-    let taskObjective = "休息/放松"; 
+    let taskObjective = "生存"; 
     let questCategory = "none";
 
     if (currentHero.state === 'expedition' && currentHero.activeExpedition) {
@@ -300,7 +301,6 @@ export function useGame() {
         questCategory = currentHero.currentQuest.category;
     }
 
-    // 简化种子逻辑，交给后端生成
     let seedEvent = ""; 
 
     const isDanger = currentHero.state === 'fight' || currentHero.hp < currentHero.maxHp * 0.3 || currentHero.state === 'expedition';
@@ -326,7 +326,11 @@ export function useGame() {
       };
       
       const res = await fetch('/api/ai', { method: 'POST', body: JSON.stringify({ context, eventType, userAction: action }) });
-      if (!res.ok) throw new Error("AI API Failed");
+      
+      if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`API Error: ${res.status} ${res.statusText} - ${errorText.substring(0, 50)}`);
+      }
       
       const data = await res.json();
       if (data.text) {
@@ -338,14 +342,16 @@ export function useGame() {
            const fullText = suffix ? `${data.text} ${suffix}` : data.text;
            addLog(fullText, 'highlight');
         }
-        return true;
       }
-    } catch (e) { 
-        console.error(e); 
-        // ⚠️ 调试模式：禁用兜底，直接显示失败信息
-        addLog(`(AI掉线) 这句话AI还没想好...`, "bad");
+    } catch (e: any) { 
+        console.error("AI Generation Failed:", e); 
+        // ⚠️ 诊断信息：直接显示错误原因，而不是兜底文本
+        addLog(`(信号中断: ${e.message || "未知错误"})`, "bad");
+    } finally {
+        // ⚠️ 解锁
+        isRequestingRef.current = false;
     }
-    return false;
+    return true;
   };
 
   const godAction = async (type: 'bless' | 'punish') => {
@@ -466,7 +472,7 @@ export function useGame() {
               managedHero.state = 'sleep';
               aiEvent = 'idle_event'; 
           } else if (!newQuest && !queued) {
-              if (Math.random() < 0.05) { // 5% 概率发呆
+              if (Math.random() < 0.05) { 
                   managedHero.state = 'idle';
                   aiEvent = 'idle_event'; 
               } else {
